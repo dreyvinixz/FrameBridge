@@ -75,10 +75,16 @@ jobs:
         Set-Content -Path $issPath -Value $content -Encoding UTF8
 
     - name: Compile Inno Setup Installer
-      uses: minyus/inno-setup-action@v1.2.2
-      with:
-        path: installer\setup.iss
-        options: /O+
+      shell: powershell
+      run: |
+        choco install innosetup -y
+        # The default install path for Inno Setup 6 via chocolatey
+        $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+        if (-not (Test-Path $iscc)) {
+          $iscc = "C:\Program Files\Inno Setup 6\ISCC.exe"
+        }
+        & $iscc "installer\setup.iss" /O+
+
 
     - name: Get Commit Messages for Release Notes
       id: release_notes
