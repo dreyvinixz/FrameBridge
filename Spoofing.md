@@ -4,18 +4,12 @@ To bypass these checks modders have developed some tools.
 
 ## Windows
 ### Nvapi
-For spoofing Nvapi calls FakeNvapi can be used. This is needed for enabling DLSS support for some games (like Shadow of the Tomb Raider etc.) 
+For spoofing Nvapi calls, **Fakenvapi** is used. This is needed for enabling DLSS support for some games (like Shadow of the Tomb Raider etc.). 
 
-Also as a **big bonus** with latest releases FakeNvapi added support for AMD's AntiLag 2 & LatencyFlex to reduce input latency on games that supports Nvidia's Reflex.
-##### Usage 
-Just put `nvapi64.dll` next to OptiScaler and set `OverrideNvapiDll=true` from `OptiScaler.ini`. This only works when OptiScaler is working as non-nvngx (not as `nvngx.dll`).
+Also as a **big bonus**, FakeNvapi adds support for AMD's AntiLag 2 & LatencyFlex to reduce input latency in games that support Nvidia's Reflex.
 
-For using without OptiScaler:  
-You need to put `nvapi64.dll` file to your `%WINDIR%\System32` but **be careful!**
-* If you are an Nvidia user **backup your original file** and restore after mod usage is over.
-* Do not use this mod with online games, it might cause anti cheat issues or banning.
-##### Link
-[FakeNvapi](https://github.com/FakeMichau/fakenvapi/releases)   
+> [!TIP]
+> **FrameBridge bundles Fakenvapi natively.** You do not need to download or install it separately. The installer automatically places `fakenvapi.dll` in your game directory and FrameBridge loads it out of the box when required.
 
 ### DXGI
 OptiScaler have built-in DXGI spoofing option which is enabled by default when working as non-nvngx (not as `nvngx.dll`).  

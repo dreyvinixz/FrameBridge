@@ -1,5 +1,8 @@
 # Known Issues
 
+> [!TIP]
+> **FrameBridge Installer Automation**
+> FrameBridge uses a unified installer to prevent common issues such as missing registry keys, misplaced DLLs, and incorrect signature overrides. If you encounter crashes, first try **reinstalling through the FrameBridge Setup** to ensure all dependencies (like Fakenvapi) are placed correctly.
 ## In-game Menu
 
 If you can't open in-game menu:

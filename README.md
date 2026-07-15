@@ -4,7 +4,11 @@
 
 **FrameBridge** bridges upscaling and frame generation technologies across all GPUs. Built from source — compiled, packaged, and released automatically.
 
-Based on [OptiScaler](https://github.com/optiscaler/OptiScaler) and inspired by [DLSS-Enabler](https://github.com/artur-graniszewski/DLSS-Enabler).
+## ❤️ Acknowledgments and OptiScaler Heritage
+
+This project is deeply indebted to [OptiScaler](https://github.com/optiscaler/OptiScaler), the incredible open-source project that serves as our core engine. OptiScaler's developers have done monumental work in bringing cross-vendor upscaling and frame generation to the community. 
+
+**FrameBridge is a community-driven fork of OptiScaler.** We have no intention of selling anything or taking credit for their core engine. Our goal is simply to build upon their amazing foundation, integrating the "all-in-one installer" philosophy inspired by [DLSS-Enabler](https://github.com/artur-graniszewski/DLSS-Enabler) directly with the source code. We hope that FrameBridge contributes back to the community by making these technologies more accessible and easier to deploy.
 
 ![FrameBridge Banner](https://github.com/user-attachments/assets/placeholder)
 

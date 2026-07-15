@@ -1,5 +1,9 @@
 # Configuration
-This document will try to explain the `OptiScaler.ini` and in-game menu (shortcut key for opening menu is **INSERT**) settings as much as possible. 
+
+> [!NOTE]
+> **FrameBridge Advantage:** The FrameBridge installer automatically configures the optimal backend and spoofing settings for your GPU during installation. For most users, **no manual configuration is required**. 
+
+However, advanced users can still fine-tune their experience. This document explains the `OptiScaler.ini` settings and the in-game menu (shortcut key: **INSERT**).
 
 ![in-game menu](images/menu043.png)
 
