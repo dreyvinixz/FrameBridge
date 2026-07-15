@@ -1,0 +1,273 @@
+name: Build FrameBridge
+
+on:
+  # Manual trigger
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build type'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+          - release
+          - debug
+      force_build:
+        description: 'Force build even if no changes'
+        type: boolean
+        required: false
+        default: false
+
+  # Build on push to main
+  push:
+    branches: [ main, master ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
+
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Setup 7-Zip
+      uses: milliewalky/setup-7-zip@v2
+
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: nuget-${{ hashFiles('**/*.vcxproj') }}
+        restore-keys: nuget-
+
+    # ============================================================
+    # Step 1: Compile OptiScaler from source
+    # ============================================================
+    - name: Build OptiScaler (Release x64)
+      run: |
+        msbuild OptiScaler.sln /p:Configuration=Release /p:Platform=x64 /m /v:minimal
+        
+        if (!(Test-Path "x64\Release\OptiScaler.dll")) {
+          Write-Error "Build failed: OptiScaler.dll not found"
+          exit 1
+        }
+        
+        $dllInfo = Get-Item "x64\Release\OptiScaler.dll"
+        Write-Host "OptiScaler.dll built successfully: $($dllInfo.Length) bytes"
+      shell: powershell
+
+    # ============================================================
+    # Step 2: Prepare build directory with all components
+    # ============================================================
+    - name: Prepare build directory
+      shell: powershell
+      run: |
+        # Create build output directories
+        New-Item -ItemType Directory -Path "installer\build" -Force
+        New-Item -ItemType Directory -Path "installer\build\licenses" -Force
+        New-Item -ItemType Directory -Path "installer\assets\configs" -Force
+        New-Item -ItemType Directory -Path "installer\assets\dlssg" -Force
+        New-Item -ItemType Directory -Path "installer\assets\nvidia-env" -Force
+        
+        # Copy compiled OptiScaler DLL
+        Copy-Item "x64\Release\OptiScaler.dll" "installer\build\OptiScaler.dll" -Force
+        Write-Host "[OK] Copied OptiScaler.dll (compiled from source)"
+        
+        # Copy OptiScaler.ini from repo
+        if (Test-Path "OptiScaler.ini") {
+          Copy-Item "OptiScaler.ini" "installer\assets\configs\OptiScaler.ini" -Force
+          Write-Host "[OK] Copied OptiScaler.ini"
+        }
+
+    # ============================================================
+    # Step 3: Download external dependencies
+    # ============================================================
+    - name: Download external dependencies
+      shell: powershell
+      run: |
+        # Download latest OptiScaler release to get bundled DLLs (XeSS, FidelityFX, Fakenvapi, etc.)
+        $headers = @{
+          'Accept' = 'application/vnd.github.v3+json'
+          'User-Agent' = 'FrameBridge-Bot'
+        }
+        if ($env:GITHUB_TOKEN) { $headers['Authorization'] = "token $env:GITHUB_TOKEN" }
+        
+        $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/optiscaler/OptiScaler/releases" -Headers $headers
+        $latestStable = $releases | Where-Object { $_.prerelease -eq $false } | Select-Object -First 1
+        
+        if (-not $latestStable) {
+          Write-Warning "Could not find latest stable OptiScaler release"
+          exit 0
+        }
+        
+        Write-Host "Latest OptiScaler release: $($latestStable.tag_name)"
+        
+        $asset = $latestStable.assets | Where-Object { 
+          $_.name -match "Optiscaler.*\.(7z|zip)$" 
+        } | Select-Object -First 1
+        
+        if (-not $asset) {
+          Write-Warning "Could not find OptiScaler archive asset"
+          exit 0
+        }
+        
+        # Download
+        $tempDir = "$env:TEMP\optiscaler-deps"
+        New-Item -ItemType Directory -Path $tempDir -Force
+        $filePath = Join-Path $tempDir $asset.name
+        
+        Write-Host "Downloading: $($asset.name) ($([math]::Round($asset.size / 1MB, 1)) MB)..."
+        Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $filePath -UseBasicParsing -TimeoutSec 300
+        
+        # Extract
+        $extractDir = Join-Path $tempDir "extracted"
+        New-Item -ItemType Directory -Path $extractDir -Force
+        & 7z x "$filePath" "-o$extractDir" -y | Out-Null
+        
+        # Copy bundled DLLs that we don't compile ourselves
+        $dllMappings = @{
+          "libxess.dll" = "installer\build\libxess.dll"
+          "libxess_dx11.dll" = "installer\build\libxess_dx11.dll"
+          "amd_fidelityfx_dx12.dll" = "installer\build\amd_fidelityfx_dx12.dll"
+          "amd_fidelityfx_vk.dll" = "installer\build\amd_fidelityfx_vk.dll"
+          "D3D12Core.dll" = "installer\build\D3D12Core.dll"
+          "fakenvapi.dll" = "installer\build\fakenvapi.dll"
+          "dlssg_to_fsr3_amd_is_better.dll" = "installer\assets\dlssg\dlssg_to_fsr3_amd_is_better.dll"
+          "nvngx.dll" = "installer\assets\dlssg\nvngx.dll"
+        }
+        
+        foreach ($mapping in $dllMappings.GetEnumerator()) {
+          $sourceFile = Get-ChildItem -Path $extractDir -Filter $mapping.Key -Recurse | Select-Object -First 1
+          if ($sourceFile) {
+            Copy-Item $sourceFile.FullName $mapping.Value -Force
+            Write-Host "[OK] $($mapping.Key) -> $($mapping.Value)"
+          } else {
+            Write-Warning "[SKIP] $($mapping.Key) not found in archive"
+          }
+        }
+        
+        # Copy license files
+        $licenseMappings = @{
+          "XeSS_LICENSE.txt" = "installer\build\licenses\XeSS_LICENSE.txt"
+          "FidelityFX_LICENSE.md" = "installer\build\licenses\FidelityFX_LICENSE.md"
+          "DirectX_LICENSE.txt" = "installer\build\licenses\DirectX_LICENSE.txt"
+        }
+        
+        foreach ($mapping in $licenseMappings.GetEnumerator()) {
+          $sourceFile = Get-ChildItem -Path $extractDir -Filter $mapping.Key -Recurse | Select-Object -First 1
+          if ($sourceFile) {
+            Copy-Item $sourceFile.FullName $mapping.Value -Force
+            Write-Host "[OK] $($mapping.Key)"
+          }
+        }
+        
+        # Copy registry override files
+        $regMappings = @{
+          "DisableSignatureOverride.reg" = "installer\assets\dlssg\DisableNvidiaSignatureChecks.reg"
+          "EnableSignatureOverride.reg" = "installer\assets\dlssg\RestoreNvidiaSignatureChecks.reg"
+        }
+        
+        foreach ($mapping in $regMappings.GetEnumerator()) {
+          $sourceFile = Get-ChildItem -Path $extractDir -Filter $mapping.Key -Recurse | Select-Object -First 1
+          if ($sourceFile) {
+            Copy-Item $sourceFile.FullName $mapping.Value -Force
+            Write-Host "[OK] $($mapping.Key)"
+          }
+        }
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    # ============================================================
+    # Step 4: Build installer with Inno Setup
+    # ============================================================
+    - name: Update installer version
+      shell: powershell
+      run: |
+        $issFile = "installer\setup.iss"
+        $content = Get-Content $issFile -Raw
+        
+        $timestamp = Get-Date -Format "yyyyMMdd.HHmmss"
+        $version = "1.00.$timestamp"
+        $content = $content -replace '#define MyAppVersion ".*"', "#define MyAppVersion `"$version`""
+        
+        $commitHash = git rev-parse --short HEAD
+        $outputName = "framebridge-setup-$commitHash"
+        $content = $content -replace 'OutputBaseFilename=.*', "OutputBaseFilename=$outputName"
+        
+        Set-Content -Path $issFile -Value $content -Encoding UTF8
+        Write-Host "Installer version: $version"
+        Write-Host "Output: $outputName.exe"
+
+    - name: Build Installer
+      uses: Minionguyjpro/Inno-Setup-Action@v1.2.7
+      with:
+        path: "installer/setup.iss"
+
+    # ============================================================
+    # Step 5: Upload artifacts and create release
+    # ============================================================
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: framebridge-installer-${{ github.sha }}
+        path: installer/Output/*.exe
+        retention-days: 30
+
+    - name: Get build info
+      id: info
+      shell: powershell
+      run: |
+        $date = Get-Date -Format "yyyy-MM-dd HH:mm:ss UTC"
+        $commitHash = git rev-parse --short HEAD
+        $dllSize = (Get-Item "x64\Release\OptiScaler.dll").Length
+        echo "date=$date" >> $env:GITHUB_OUTPUT
+        echo "commit=$commitHash" >> $env:GITHUB_OUTPUT
+        echo "dll_size=$([math]::Round($dllSize / 1MB, 2)) MB" >> $env:GITHUB_OUTPUT
+
+    - name: Create Release
+      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: build-${{ steps.info.outputs.commit }}
+        name: "FrameBridge Build ${{ steps.info.outputs.commit }}"
+        body: |
+          🚀 **FrameBridge** — Built from source
+          
+          ## 📦 Build Information
+          - **Commit**: `${{ steps.info.outputs.commit }}`
+          - **Build Date**: ${{ steps.info.outputs.date }}
+          - **OptiScaler DLL Size**: ${{ steps.info.outputs.dll_size }}
+          - **Compiled**: From C++ source via MSBuild
+          
+          ## 🔧 Installation
+          1. Download the installer below
+          2. Run and select your game directory
+          3. Choose your preferred installation type
+          
+          ## ⚠️ Notes
+          - NVIDIA GPU users: Use standard installation
+          - AMD/Intel GPU users: Select "Experimental support"
+          - Some antivirus may flag as false positive due to DLL injection
+          
+          ---
+          Built from source with ❤️ by FrameBridge CI/CD
+        files: installer/Output/*.exe
+        draft: false
+        prerelease: true
+        generate_release_notes: true
+        fail_on_unmatched_files: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
