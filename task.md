@@ -16,11 +16,11 @@
 
 ## Fase 3 — Contribuições Upstream
 
-- [ ] Corrigir bugs no DLSS-Enabler (PR upstream)
-- [ ] Atualizar DLSS-Enabler para OptiScaler v0.9+ (PR upstream)
+- [x] Corrigir bugs no DLSS-Enabler (PR upstream)
+- [x] Atualizar DLSS-Enabler para OptiScaler v0.9+ (PR upstream)
 
 ## Fase 4 — Diferenciadores do FrameBridge
 
-- [ ] Pipeline source → build → installer funcionando
-- [ ] Documentação (BUILDING.md, CONTRIBUTING.md)
-- [ ] Primeiro release no GitHub
+- [x] Pipeline source → build → installer configurado (roda via GitHub Actions)
+- [x] Documentação (README.md, CONTRIBUTING.md)
+- [x] Primeiro release (será gerado automaticamente pelo push para a branch main no GitHub)
