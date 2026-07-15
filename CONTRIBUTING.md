@@ -1,4 +1,4 @@
-﻿# Contributing to FrameBridge
+# Contributing to FrameBridge
 
 Thank you for your interest in contributing to FrameBridge! This document provides guidelines for contributing code, reporting issues, and submitting pull requests.
 
@@ -56,7 +56,7 @@ refactor: simplify upscaler input detection logic
 
 1. **Create a branch** from `master` for your changes
 2. **Make your changes** following the code guidelines above
-3. **Test locally** ΓÇö build and verify the DLL works with at least one game
+3. **Test locally** — build and verify the DLL works with at least one game
 4. **Submit the PR** with a clear description of what changed and why
 5. **Respond to feedback** from maintainers
 

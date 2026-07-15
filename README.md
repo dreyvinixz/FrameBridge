@@ -1,25 +1,25 @@
-﻿# FrameBridge
+# FrameBridge
 
 [![Build & Release](https://github.com/dreyvinixz/FrameBridge/actions/workflows/build.yml/badge.svg)](https://github.com/dreyvinixz/FrameBridge/actions/workflows/build.yml)
 
-**FrameBridge** bridges upscaling and frame generation technologies across all GPUs. Built from source ΓÇö compiled, packaged, and released automatically.
+**FrameBridge** bridges upscaling and frame generation technologies across all GPUs. Built from source — compiled, packaged, and released automatically.
 
 Based on [OptiScaler](https://github.com/optiscaler/OptiScaler) and inspired by [DLSS-Enabler](https://github.com/artur-graniszewski/DLSS-Enabler).
 
 ![FrameBridge Banner](https://github.com/user-attachments/assets/placeholder)
 
-## ≡ƒÜÇ What is FrameBridge?
+## 🚀 What is FrameBridge?
 
-FrameBridge is a fork of OptiScaler that takes the "all-in-one installer" philosophy from DLSS-Enabler and combines it with the full source code of OptiScaler. The result: a project you can **build from source**, **customize**, and **contribute to** ΓÇö with automated CI/CD that compiles the C++ code and generates a ready-to-use installer.
+FrameBridge is a fork of OptiScaler that takes the "all-in-one installer" philosophy from DLSS-Enabler and combines it with the full source code of OptiScaler. The result: a project you can **build from source**, **customize**, and **contribute to** — with automated CI/CD that compiles the C++ code and generates a ready-to-use installer.
 
 ### Key Features
 
-- Γ£à **Built from source** ΓÇö Full C++ source code, compiled via CI/CD
-- Γ£à **All-in-one installer** ΓÇö Inno Setup installer with all components pre-configured
-- Γ£à **Automated releases** ΓÇö GitHub Actions pipeline: source ΓåÆ compile ΓåÆ package ΓåÆ release
-- Γ£à **Multi-GPU support** ΓÇö NVIDIA, AMD, and Intel GPUs supported
-- Γ£à **Frame Generation** ΓÇö FSR-FG, XeFG, DLSSG-to-FSR3 (via Nukem9's mod)
-- Γ£à **Upscaling** ΓÇö XeSS, FSR 2.x/3.x/4.x, DLSS replacement
+- ✅ **Built from source** — Full C++ source code, compiled via CI/CD
+- ✅ **All-in-one installer** — Inno Setup installer with all components pre-configured
+- ✅ **Automated releases** — GitHub Actions pipeline: source → compile → package → release
+- ✅ **Multi-GPU support** — NVIDIA, AMD, and Intel GPUs supported
+- ✅ **Frame Generation** — FSR-FG, XeFG, DLSSG-to-FSR3 (via Nukem9's mod)
+- ✅ **Upscaling** — XeSS, FSR 2.x/3.x/4.x, DLSS replacement
 
 ### Bundled Components
 
@@ -31,11 +31,11 @@ FrameBridge is a fork of OptiScaler that takes the "all-in-one installer" philos
 | FFX SDK | 2.2 | FSR 4.1 + FSR-FG 4.0.0 |
 | XeSS SDK | 3.0.1 | Intel |
 
-## ≡ƒôª Download
+## 📦 Download
 
 Download the latest installer from the [Releases](../../releases) page.
 
-## ≡ƒ¢á∩╕Å Building from Source
+## 🛠️ Building from Source
 
 ### Prerequisites
 
@@ -68,15 +68,15 @@ The automated pipeline handles everything:
 3. **Package** all components with Inno Setup
 4. **Release** as a GitHub release with installer
 
-## ≡ƒÄ« Installation
+## 🎮 Installation
 
 1. Download the installer from [Releases](../../releases)
 2. Run the setup and select your game directory
 3. Choose installation type:
-   - **Preferred (DLL package)** ΓÇö Recommended for most users
-   - **Experimental support** ΓÇö For AMD and Intel GPUs
+   - **Preferred (DLL package)** — Recommended for most users
+   - **Experimental support** — For AMD and Intel GPUs
 
-## ≡ƒñ¥ Contributing
+## 🤝 Contributing
 
 Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting PRs.
 
@@ -86,14 +86,14 @@ Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before
 - Never include `"pch.h"` inside header files
 - Follow the `.clang-format` style
 
-## ≡ƒô£ License
+## 📜 License
 
-This project is licensed under the **GNU General Public License v3.0** ΓÇö see [LICENSE](LICENSE) for details.
+This project is licensed under the **GNU General Public License v3.0** — see [LICENSE](LICENSE) for details.
 
 ### Acknowledgments
 
-- [OptiScaler](https://github.com/optiscaler/OptiScaler) ΓÇö Core upscaling/frame generation engine (GPLv3)
-- [DLSS-Enabler](https://github.com/artur-graniszewski/DLSS-Enabler) ΓÇö Installer concept and packaging (MIT)
-- [Nukem9's DLSSG-to-FSR3](https://github.com/Nukem9/dlssg-to-fsr3) ΓÇö Frame generation module
-- [Intel XeSS](https://github.com/intel/xess) ΓÇö XeSS SDK
-- [AMD FidelityFX](https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK) ΓÇö FSR SDK
+- [OptiScaler](https://github.com/optiscaler/OptiScaler) — Core upscaling/frame generation engine (GPLv3)
+- [DLSS-Enabler](https://github.com/artur-graniszewski/DLSS-Enabler) — Installer concept and packaging (MIT)
+- [Nukem9's DLSSG-to-FSR3](https://github.com/Nukem9/dlssg-to-fsr3) — Frame generation module
+- [Intel XeSS](https://github.com/intel/xess) — XeSS SDK
+- [AMD FidelityFX](https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK) — FSR SDK
