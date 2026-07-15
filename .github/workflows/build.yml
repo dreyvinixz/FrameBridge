@@ -1,227 +1,105 @@
-# This workflow uses actions that are not certified by GitHub.
-# They are provided by a third-party and are governed by
-# separate terms of service, privacy policy, and support
-# documentation.
-
-name: Scheduled Build
+name: FrameBridge Release Pipeline
 
 on:
-  schedule:
-    - cron: '0 4 * * *' 
-
+  push:
+    branches: [ "main" ]
   workflow_dispatch:
-#  push:
-#    branches: [ "master" ]
-#  pull_request:
-#    branches: [ "master" ]
-    
-env:
-  # Path to the solution file relative to the root of the project.
-  SOLUTION_FILE_PATH: .
-
-  # Configuration type to build.
-  # You can convert this to a build matrix if you need coverage of multiple configuration types.
-  # https://docs.github.com/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
-  BUILD_CONFIGURATION: Release
 
 permissions:
   contents: write
 
 jobs:
-  build:
+  build-and-release:
     runs-on: windows-latest
 
     steps:
-    - uses: actions/checkout@v6
+    - name: Checkout Repository
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0            
-        submodules: 'true'
-        
-    - name: Check Existing Release
-      id: check_release
-      uses: actions/github-script@v8
-      with:
-        script: |
-          const releaseTag = "nightly";
-          try {
-            const release = await github.rest.repos.getReleaseByTag({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              tag: releaseTag,
-            });
-            core.setOutput("release_exists", true);
-            core.setOutput("release_id", release.data.id);
-            core.setOutput("upload_url", release.data.upload_url);
-          } catch (error) {
-            if (error.status === 404) {
-              core.setOutput("release_exists", false);
-            } else {
-              throw error;
-            }
-          }
+        submodules: 'recursive'
 
-    - name: Create Nightly Release (if not exists)
-      id: create_release
-      if: steps.check_release.outputs.release_exists == 'false'
-      uses: actions/github-script@v8
-      with:
-        script: |
-          const release = await github.rest.repos.createRelease({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            tag_name: "nightly",
-            name: "Nightly Builds",
-            body: "This is an automated nightly build release.",
-            draft: false,
-            prerelease: true,
-          });
-          core.setOutput("release_id", release.data.id);
-          core.setOutput("upload_url", release.data.upload_url);
-       
-    - name: Extract OptiScaler Version
-      id: get_version
-      working-directory: ${{ github.workspace }}
+    - name: Generate Version Number
+      id: version
       shell: powershell
       run: |
-        # Ensure the file exists before proceeding
-        $resourceFile = ".\OptiScaler\resource.h"
-        if (-Not (Test-Path $resourceFile)) {
-            Write-Error "File not found: $resourceFile"
-            exit 1
-        }
-        
-        # Helper function to extract the first matching line for a version component
-        function Get-Version-Component {
-            param (
-                [string]$pattern,
-                [string]$replacement
-            )
-            # Use Select-String and take only the first match
-            $line = Get-Content $resourceFile | Select-String -Pattern $pattern | Select-Object -First 1
-            if ($line) {
-                return ($line.Line -replace $replacement).Trim()
-            } else {
-                Write-Error "Pattern not found: $pattern"
-                exit 1
-            }
-        }
-        
-        # Extract version components (only the first match for each pattern)
-        $majorVersion = Get-Version-Component 'VER_MAJOR_VERSION' '#define VER_MAJOR_VERSION\s+'
-        $minorVersion = Get-Version-Component 'VER_MINOR_VERSION' '#define VER_MINOR_VERSION\s+'
-        $hotfixVersion = Get-Version-Component 'VER_HOTFIX_VERSION' '#define VER_HOTFIX_VERSION\s+'
-        $buildVersion = Get-Version-Component 'VER_BUILD_NUMBER' '#define VER_BUILD_NUMBER\s+'
-        
-        # Merge into a single version string
-        $version = "v$majorVersion.$minorVersion.$hotfixVersion-pre$buildVersion"
-        
-        # Get the current date in a specific format (e.g., YYYYMMDD)
-        $date = Get-Date -Format "yyyyMMdd"
-        
-        # Construct the output filename with version and date
-        $outputFileName = "OptiScaler_${version}_${date}"
-        
-        # Output the generated filename
-        Write-Output "Generated Filename: $outputFileName"
-        
-        # Write outputs to GITHUB_OUTPUT
-        "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-        "filename=$outputFileName" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-        
-      continue-on-error: false
-      
-    - name: Debug Outputs
-      run: |
-        echo "Version: ${{ steps.get_version.outputs.version }}"
-        echo "Filename: ${{ steps.get_version.outputs.filename }}"
-        
+        $version = "1.0.${{ github.run_number }}"
+        echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+        echo "Generated version: $version"
+
     - name: Add MSBuild to PATH
       uses: microsoft/setup-msbuild@v2
 
-    - name: Build
-      working-directory: ${{env.GITHUB_WORKSPACE}}
-      # Add additional options to the MSBuild command line here (like platform or verbosity level).
-      # See https://docs.microsoft.com/visualstudio/msbuild/msbuild-command-line-reference
-      run: msbuild /m /p:Configuration=${{env.BUILD_CONFIGURATION}} ${{env.SOLUTION_FILE_PATH}} /verbosity:minimal
-      
-    - name: Compress the artifact 
-      run: |
-        $zipName = "${{ steps.get_version.outputs.filename }}.7z"
-        7z a -r ${{ github.workspace }}\$zipName ${{ github.workspace }}\x64\Release\a\*.*
-
-      continue-on-error: false
-        
-    - uses: actions/upload-artifact@v7.0.0
-      with:
-        name: ${{ steps.get_version.outputs.filename }}
-        path: ${{ github.workspace }}\${{ steps.get_version.outputs.filename }}.7z
-        compression-level: 0
-        archive: false
-        if-no-files-found: error
-       
-    - name: Remove Previous Artifacts
-      if: steps.check_release.outputs.release_exists == 'true'
-      uses: actions/github-script@v8
-      with:
-        script: |
-          const releaseId = ${{ steps.check_release.outputs.release_id }};
-          const assets = await github.rest.repos.listReleaseAssets({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            release_id: releaseId,
-          });
-
-          for (const asset of assets.data) {
-            await github.rest.repos.deleteReleaseAsset({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              asset_id: asset.id,
-            });
-            console.log(`Deleted asset: ${asset.name}`);
-          }
-
-    - name: Upload Artifact to Release
-      uses: softprops/action-gh-release@v2
-      with:
-        tag_name: nightly
-        files: ${{ github.workspace }}/${{ steps.get_version.outputs.filename }}.7z
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-            
-    - name: Get Commit Messages From Last Day and Update the Release
-      id: commit_messages
+    - name: Build OptiScaler Core
       working-directory: ${{ github.workspace }}
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: msbuild /m /p:Configuration=Release /p:Platform=x64 OptiScaler.sln /verbosity:minimal
+
+    - name: Prepare Installer Directories
       shell: powershell
       run: |
-        Write-Output "Fetching commits from the last 24 hours..."
-
-        # Get commit messages excluding .yml file commits
-        $commits = git log --since="1 day ago" --pretty=format:"%h %s (%an)" --abbrev-commit --no-merges --first-parent
+        New-Item -ItemType Directory -Force -Path "installer\build"
+        New-Item -ItemType Directory -Force -Path "installer\assets\configs"
+        New-Item -ItemType Directory -Force -Path "installer\assets\nvidia-env"
+        New-Item -ItemType Directory -Force -Path "installer\assets\dlssg"
         
-        $commits = $commits -split "`n"
-
-        # If no commits are found, cancel the workflow
-        if (-not $commits) {          
-          Write-Output "No relevant commits in the last 24 hours. Cancelling workflow."
-
-          $ReleaseTag = "nightly"
-          Write-Output "Updating existing release: $ReleaseTag"
-          gh release edit $ReleaseTag --notes "### Changes in the Last 24 Hours`n`nNo changes..."   
-        }
-        else {
-          # Join commits into a newline-separated string
-          $formattedCommits = $commits -join "`n"        
-          Write-Output "Commits: $formattedCommits`n"
-  
-          # Generate release notes
-          $releaseNotes = "### Changes in the Last 24 Hours`n`n$formattedCommits"
-          
-          $ReleaseTag = "nightly"
-          Write-Output "Updating existing release: $ReleaseTag"
-          gh release edit $ReleaseTag --notes "$ReleaseNotes"   
-        }
+        # Move MSBuild outputs
+        Copy-Item -Path "x64\Release\a\OptiScaler.dll" -Destination "installer\build\" -Force
+        Copy-Item -Path "x64\Release\a\libxess.dll" -Destination "installer\build\" -Force
+        Copy-Item -Path "x64\Release\a\amd_fidelityfx_*.dll" -Destination "installer\build\" -Force
+        Copy-Item -Path "x64\Release\a\fakenvapi.dll" -Destination "installer\build\" -Force
         
-      continue-on-error: false
+        # Copy INI configuration
+        Copy-Item -Path "nvngx.ini" -Destination "installer\assets\configs\OptiScaler.ini" -Force
+        Copy-Item -Path "LICENSE" -Destination "installer\assets\LICENSE.rtf" -Force
+        Set-Content -Path "installer\assets\Intro.rtf" -Value "Welcome to FrameBridge."
+
+    - name: Download External Assets (Nukem9 & NVAPI Proxy)
+      shell: powershell
+      run: |
+        # Download Nukem9 DLSSG-to-FSR3
+        Invoke-WebRequest -Uri "https://github.com/Nukem9/dlssg-to-fsr3/releases/download/0.100/dlssg-to-fsr3-0.100.zip" -OutFile "dlssg.zip"
+        Expand-Archive -Path "dlssg.zip" -DestinationPath "temp_dlssg" -Force
+        Copy-Item -Path "temp_dlssg\*" -Destination "installer\assets\dlssg\" -Recurse -Force
         
+        # Create mock nvidia-env for installer compatibility
+        New-Item -ItemType File -Path "installer\assets\nvidia-env\dxgi.dll" -Force
+        New-Item -ItemType File -Path "installer\assets\nvidia-env\dlss-finder.bin" -Force
+        New-Item -ItemType File -Path "installer\assets\nvidia-env\nvapi64-proxy.dll" -Force
+
+    - name: Update Inno Setup Version
+      shell: powershell
+      run: |
+        $issPath = "installer\setup.iss"
+        $content = Get-Content $issPath
+        $content = $content -replace '#define MyAppVersion ".*"', '#define MyAppVersion "${{ steps.version.outputs.VERSION }}"'
+        Set-Content -Path $issPath -Value $content -Encoding UTF8
+
+    - name: Compile Inno Setup Installer
+      uses: minyus/inno-setup-action@v1.2.2
+      with:
+        path: installer\setup.iss
+        options: /O+
+
+    - name: Get Commit Messages for Release Notes
+      id: release_notes
+      shell: powershell
+      run: |
+        $commits = git log -1 --pretty=format:"%s%n%n%b"
+        $notes = "### What's New in v${{ steps.version.outputs.VERSION }}`n`n$commits`n`nAutomated release by FrameBridge CI/CD."
+        # Write multi-line string to GITHUB_OUTPUT correctly
+        $EOF = [guid]::NewGuid().ToString()
+        "NOTES<<$EOF" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+        $notes | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+        "$EOF" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: v${{ steps.version.outputs.VERSION }}
+        name: FrameBridge v${{ steps.version.outputs.VERSION }}
+        body: ${{ steps.release_notes.outputs.NOTES }}
+        files: installer\Output\framebridge-setup-*.exe
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
