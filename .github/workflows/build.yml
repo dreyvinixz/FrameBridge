@@ -18,6 +18,9 @@ jobs:
       with:
         fetch-depth: 0            
         submodules: 'recursive'
+        
+    - name: Initialize Submodules
+      run: git submodule update --init --recursive
 
     - name: Generate Version Number
       id: version
