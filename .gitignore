@@ -430,6 +430,10 @@ FodyWeavers.xsd
 *.a
 *.lib
 
+# Force-include prebuilt libraries required for building
+!/OptiScaler/library/**/*.lib
+!/external/freetype/*.lib
+
 # Executables
 *.exe
 *.out
