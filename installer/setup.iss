@@ -13,6 +13,8 @@ DirExistsWarning=no
 LicenseFile=assets\LICENSE.rtf
 PrivilegesRequired=lowest
 OutputBaseFilename=framebridge-setup-{#MyAppVersion}
+SetupIconFile=assets\framebridge.ico
+UninstallDisplayIcon={app}\framebridge.ico
 AppendDefaultDirName=no
 ; bzip/9 is safest for AV false positives, lzma2 reduces size by ~50%
 Compression=lzma2
@@ -125,6 +127,7 @@ Source: "build\OptiScaler.dll"; DestDir: "{app}"; DestName: "d3d12.dll"; Flags: 
 ; ============================================================
 Source: "assets\README.md"; DestDir: "{app}/docs"; Flags: ignoreversion skipifsourcedoesntexist; Components: mainfiles
 Source: "assets\configs\Config.md"; DestDir: "{app}/docs"; DestName: "OptiScaler_Config.md"; Flags: ignoreversion skipifsourcedoesntexist; Components: mainfiles
+Source: "assets\framebridge.ico"; DestDir: "{app}"; Flags: ignoreversion; Components: mainfiles
 
 [Icons]
 
