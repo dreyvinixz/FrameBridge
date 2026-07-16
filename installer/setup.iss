@@ -64,7 +64,7 @@ Name: optional/fgdebug; Description: (optional) Debug configuration for DLSSG-to
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
-
+Name: "gtx_compat"; Description: "Apply GTX/Kepler Compatibility Patch (Forces D3D12 Feature Level 11.0)"; Flags: unchecked
 [Files]
 
 
@@ -133,6 +133,9 @@ Filename: "{app}\framebridge_manifest.ini"; Section: "Installation"; Key: "Proxy
 Filename: "{app}\framebridge_manifest.ini"; Section: "Installation"; Key: "ProxyFile"; String: "d3d12.dll"; Components: mainfiles/dlld3d12
 Filename: "{app}\framebridge_manifest.ini"; Section: "Installation"; Key: "ProxyFile"; String: "dxgi.dll"; Components: mainfiles/dlldxgi
 Filename: "{app}\framebridge_manifest.ini"; Section: "Installation"; Key: "ProxyFile"; String: "OptiScaler.asi"; Components: mainfiles/asiversion
+
+; Optional compatibility patches
+Filename: "{app}\OptiScaler.ini"; Section: "Spoofing"; Key: "D3DFeatureLevel"; String: "true"; Tasks: gtx_compat
 
 [Code]
 procedure CurStepChanged(CurStep: TSetupStep);
