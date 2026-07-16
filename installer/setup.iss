@@ -64,6 +64,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "gtx_compat"; Description: "Apply GTX/Kepler Compatibility Patch (Forces D3D12 Feature Level 11.0)"; Flags: unchecked
+Name: "fsr4_rdna"; Description: "Install experimental FSR 4.0.2 for AMD RDNA 2 and 3 GPUs"; Flags: unchecked
 [Files]
 
 
@@ -83,6 +84,7 @@ Source: "assets\configs\OptiScaler.ini"; DestDir: "{app}"; Flags: ignoreversion 
 Source: "build\libxess.dll"; DestDir: "{app}"; Flags: uninsneveruninstall skipifsourcedoesntexist; Components: upscalers
 Source: "build\libxess_dx11.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist; Components: upscalers
 Source: "build\amd_fidelityfx_*.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist; Components: upscalers
+Source: "assets\fsr4\amd_fidelityfx_upscaler_dx12.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist; Tasks: fsr4_rdna
 Source: "build\D3D12_OptiScaler\*"; DestDir: "{app}\D3D12_OptiScaler"; Flags: ignoreversion skipifsourcedoesntexist; Components: upscalers
 
 
