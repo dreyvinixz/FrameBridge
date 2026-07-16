@@ -30,23 +30,27 @@ It builds directly on top of the amazing **[OptiScaler](https://github.com/optis
 
 ---
 
-## ❤️ Powered by OptiScaler
+## 🏛️ Architecture & OptiScaler
 
-FrameBridge wouldn't exist without **OptiScaler**.
+FrameBridge follows a simple design philosophy: **One Runtime. One Responsibility.**
 
-OptiScaler is the graphics runtime responsible for:
+It is built entirely around **[OptiScaler](https://github.com/optiscaler/OptiScaler)**, which handles all graphics rendering, API hooking, Frame Generation integration, and the in-game overlay. FrameBridge focuses purely on the ecosystem around it: installation, automation, packaging, and future tools.
 
-- API hooking
-- DLSS / FSR / XeSS translation
-- Frame Generation integration
-- NVAPI emulation
-- In-game overlay
-
-If you're interested in how the graphics runtime works internally, please visit the official repository:
-
-➡️ **https://github.com/optiscaler/OptiScaler**
-
-FrameBridge focuses on everything around that runtime: installation, automation, packaging and making it easier for everyone to use.
+```text
+               FrameBridge
+──────────────────────────────────────
+ Installer
+ Release Pipeline
+ Profiles
+ Launcher (future)
+ Telemetry (future)
+──────────────────────────────────────
+          OptiScaler Runtime
+──────────────────────────────────────
+ DXGI / D3D12 / NVAPI
+──────────────────────────────────────
+   DLSS • FSR • XeSS • Frame Gen
+```
 
 ---
 
@@ -54,16 +58,16 @@ FrameBridge focuses on everything around that runtime: installation, automation,
 
 | Component | Source |
 |-----------|--------|
-| OptiScaler | https://github.com/optiscaler/OptiScaler |
-| DLSSG-to-FSR3 | Nukem9 |
-| Intel XeSS SDK | Intel |
-| AMD FidelityFX SDK | AMD |
+| OptiScaler | [Official Repository](https://github.com/optiscaler/OptiScaler) |
+| DLSSG-to-FSR3 | [Nukem9](https://github.com/Nukem9/dlssg-to-fsr3) |
+| Intel XeSS SDK | [Intel](https://github.com/intel/xess) |
+| AMD FidelityFX SDK | [AMD](https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK) |
 
 ---
 
 ## 🚀 Installation
 
-1. Download the latest release.
+1. Download the latest automated installer from our [Releases](https://github.com/dreyvinixz/FrameBridge/releases) page.
 2. Run the installer.
 3. Select your game's folder.
 4. Keep **DXGI (Recommended)** selected.
@@ -99,10 +103,10 @@ This project stands on the shoulders of some incredible open-source work.
 
 Special thanks to:
 
-- **OptiScaler** — The graphics runtime that powers FrameBridge.
-- **Nukem9** — DLSSG-to-FSR3 Frame Generation.
-- **Intel** — XeSS SDK.
-- **AMD GPUOpen** — FidelityFX SDK.
+- **[OptiScaler](https://github.com/optiscaler/OptiScaler)** — The graphics runtime that powers FrameBridge.
+- **[Nukem9](https://github.com/Nukem9/dlssg-to-fsr3)** — DLSSG-to-FSR3 Frame Generation.
+- **[Intel](https://github.com/intel/xess)** — XeSS SDK.
+- **[AMD GPUOpen](https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK)** — FidelityFX SDK.
 
 Please consider starring the **OptiScaler** repository as well if you enjoy using FrameBridge ❤️
 
@@ -110,4 +114,4 @@ Please consider starring the **OptiScaler** repository as well if you enjoy usin
 
 ## 📄 License
 
-FrameBridge is licensed under the **GPL-3.0 License**.
+FrameBridge is licensed under the **[GPL-3.0 License](LICENSE)**.
