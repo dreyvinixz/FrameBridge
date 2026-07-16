@@ -602,7 +602,10 @@ static void CheckWorkingMode()
             break;
         }
 
-        // optiscaler.dll or dlss-enabler-upscaler.dll
+        // -----------------------------------------------------------------
+        // FrameBridge compatibility layer
+        // Keep synchronized with docs/PATCHES.md
+        // -----------------------------------------------------------------
         if (lCaseFilename == "optiscaler.dll" || lCaseFilename == "dlss-enabler-upscaler.dll" || lCaseFilename == "nvngx-upscaler.dll")
         {
             if (!_passThruMode)

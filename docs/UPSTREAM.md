@@ -3,6 +3,13 @@
 O **FrameBridge** utiliza o OptiScaler oficial como seu motor de Runtime principal. 
 Nossa filosofia é manter o componente `OptiScaler/` o mais fiel possível ao repositório upstream oficial, permitindo auditorias transparentes e atualizações fáceis.
 
+## FrameBridge Upstream Policy
+- Never modify upstream code unless required.
+- Keep all local patches documented in `docs/PATCHES.md`.
+- Prefer configuration over source changes.
+- Sync with OptiScaler regularly.
+- Every release should be traceable to an upstream commit.
+
 ## Versão Atual Integrada
 - **OptiScaler Version:** v0.10.0-pre1 (Nightly/Dev branch)
 - **Upstream Repository:** [https://github.com/optiscaler/OptiScaler](https://github.com/optiscaler/OptiScaler)
