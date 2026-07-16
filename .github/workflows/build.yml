@@ -108,7 +108,7 @@ jobs:
       run: |
         [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
         $OutputEncoding = [System.Text.Encoding]::UTF8
-        $commits = git log -5 --pretty=format:"* %h - %s"
+        $commits = @(git log -5 --pretty=format:"* %h - %s")
         $date = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss UTC")
         $v = "${{ steps.version.outputs.VERSION }}"
         $lines = @(
@@ -123,8 +123,10 @@ jobs:
           "* **DLSSG-to-FSR3 Module:** Nukem9's mod (v0.130 OptiScaler branch)",
           "* **Installer:** Custom Inno Setup wrapper for easy deployment",
           "",
-          "### Changelog (Latest 5 Commits)",
-          $commits,
+          "### Changelog (Latest 5 Commits)"
+        )
+        $lines += $commits
+        $lines += @(
           "",
           "### Installation",
           "1. Download **``framebridge-setup-$v.exe``** from the Assets section below.",
