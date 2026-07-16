@@ -123,7 +123,6 @@ Type: files; Name: "{app}\nvngx-wrapper.dll"
 Type: files; Name: "{app}\_nvngx.dll"
 Type: files; Name: "{app}\nvapi64-proxy.dll"
 Type: files; Name: "{app}\dlss-finder.exe"
-Type: files; Name: "{app}\dlssg_to_fsr3.ini"
 
 [INI]
 ; Create a manifest to track which proxy was installed, so the next update can safely remove it without touching user files
@@ -132,6 +131,9 @@ Filename: "{app}\framebridge_manifest.ini"; Section: "Installation"; Key: "Proxy
 Filename: "{app}\framebridge_manifest.ini"; Section: "Installation"; Key: "ProxyFile"; String: "d3d12.dll"; Components: mainfiles/dlld3d12
 Filename: "{app}\framebridge_manifest.ini"; Section: "Installation"; Key: "ProxyFile"; String: "dxgi.dll"; Components: mainfiles/dlldxgi
 Filename: "{app}\framebridge_manifest.ini"; Section: "Installation"; Key: "ProxyFile"; String: "OptiScaler.asi"; Components: mainfiles/asiversion
+
+; Fix FSR3-FG debug artifacts by forcing the debug overlay off
+Filename: "{app}\dlssg_to_fsr3.ini"; Section: "Debug"; Key: "EnableDebugOverlay"; String: "0"
 
 ; Optional compatibility patches
 Filename: "{app}\OptiScaler.ini"; Section: "Spoofing"; Key: "D3DFeatureLevel"; String: "true"; Tasks: gtx_compat
