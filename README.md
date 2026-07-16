@@ -12,7 +12,7 @@
 
 **FrameBridge** is an open-source graphics compatibility platform built around the **OptiScaler Runtime**.
 
-It provides a clean and unified way to install modern upscaling and Frame Generation technologies without manually copying DLLs, renaming files, or editing configuration files.
+It provides a clean, unified, and hassle-free way to install modern upscaling and Frame Generation technologies. Say goodbye to manually copying DLLs, renaming files, or fighting with configuration files!
 
 FrameBridge does **not** replace OptiScaler—it builds upon it by providing automation, packaging, configuration, and a consistent installation experience.
 
@@ -91,7 +91,7 @@ OptiScaler performs NVAPI emulation natively. No external FakeNvapi layer is req
 
 # Installation
 
-1. Download the latest installer from the Releases page.
+1. Download the latest automated installer from our [Releases](https://github.com/dreyvinixz/FrameBridge/releases) page.
 2. Select your game's executable folder.
 3. Keep **DXGI** as the default injection method unless your game requires another proxy.
 4. Launch the game.
@@ -166,10 +166,10 @@ Code style:
 
 FrameBridge would not exist without these amazing projects.
 
-- OptiScaler
-- Nukem9 DLSSG-to-FSR3
-- Intel XeSS
-- AMD FidelityFX SDK
+- [OptiScaler](https://github.com/optiscaler/OptiScaler) — The incredible core graphics runtime engine
+- [Nukem9 DLSSG-to-FSR3](https://github.com/Nukem9/dlssg-to-fsr3) — Frame generation module
+- [Intel XeSS](https://github.com/intel/xess) — XeSS SDK
+- [AMD FidelityFX SDK](https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK) — FSR SDK
 
 ---
 
