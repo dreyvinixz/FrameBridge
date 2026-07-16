@@ -120,10 +120,37 @@ Type: files; Name: "{app}\dlss-enabler-xess.dll"
 Type: files; Name: "{app}\dlss-enabler-fsr.dll"
 Type: files; Name: "{app}\dlss-enabler.ini"
 Type: files; Name: "{app}\dlss-enabler-upscaler.dll"
-Type: files; Name: "{app}\version.dll"
-Type: files; Name: "{app}\winmm.dll"
 Type: files; Name: "{app}\FSR2FSR3.asi"
 Type: files; Name: "{app}\nvngx-wrapper.dll"
 Type: files; Name: "{app}\_nvngx.dll"
 Type: files; Name: "{app}\nvapi64-proxy.dll"
 Type: files; Name: "{app}\dlss-finder.exe"
+
+[INI]
+; Create a manifest to track which proxy was installed, so the next update can safely remove it without touching user files
+Filename: "{app}\framebridge_manifest.ini"; Section: "Installation"; Key: "ProxyFile"; String: "version.dll"; Components: mainfiles/dllversion
+Filename: "{app}\framebridge_manifest.ini"; Section: "Installation"; Key: "ProxyFile"; String: "winmm.dll"; Components: mainfiles/dllwinmm
+Filename: "{app}\framebridge_manifest.ini"; Section: "Installation"; Key: "ProxyFile"; String: "d3d12.dll"; Components: mainfiles/dlld3d12
+Filename: "{app}\framebridge_manifest.ini"; Section: "Installation"; Key: "ProxyFile"; String: "dxgi.dll"; Components: mainfiles/dlldxgi
+Filename: "{app}\framebridge_manifest.ini"; Section: "Installation"; Key: "ProxyFile"; String: "OptiScaler.asi"; Components: mainfiles/asiversion
+
+[Code]
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  ManifestPath: String;
+  InstalledProxy: String;
+begin
+  if CurStep = ssInstall then
+  begin
+    ManifestPath := ExpandConstant('{app}\framebridge_manifest.ini');
+    if FileExists(ManifestPath) then
+    begin
+      InstalledProxy := GetIniString('Installation', 'ProxyFile', '', ManifestPath);
+      if InstalledProxy <> '' then
+      begin
+        Log('FrameBridge Manifest: Found previous proxy ' + InstalledProxy + '. Deleting it to prevent conflicts.');
+        DeleteFile(ExpandConstant('{app}\' + InstalledProxy));
+      end;
+    end;
+  end;
+end;
