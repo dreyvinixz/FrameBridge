@@ -10,7 +10,7 @@ This project is deeply indebted to [OptiScaler](https://github.com/optiscaler/Op
 
 **FrameBridge is a community-driven fork of OptiScaler.** We have no intention of selling anything or taking credit for their core engine. Our goal is simply to build upon their amazing foundation, integrating the "all-in-one installer" philosophy inspired by [DLSS-Enabler](https://github.com/artur-graniszewski/DLSS-Enabler) directly with the source code. We hope that FrameBridge contributes back to the community by making these technologies more accessible and easier to deploy.
 
-![FrameBridge Banner](https://github.com/user-attachments/assets/placeholder)
+![FrameBridge Banner](images/banner.png)
 
 ## 🚀 What is FrameBridge?
 
