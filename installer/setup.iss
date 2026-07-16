@@ -83,12 +83,12 @@ Source: "assets\nvidia-env\nvapi64-proxy.dll"; DestName: "nvapi64-proxy.dll"; De
 ; ============================================================
 ; DLSSG-to-FSR3 module (Nukem9)
 ; ============================================================
-Source: "assets\dlssg\dlssg_to_fsr3.ini"; DestDir: "{app}"; Flags: ignoreversion; Components: optional/fgdebug
-Source: "assets\dlssg\dlssg_to_fsr3_amd_is_better.dll"; DestDir: "{app}"; Flags: ignoreversion; Components: framegen
-Source: "assets\dlssg\nvngx.dll"; DestDir: "{app}"; DestName: "nvngx-wrapper.dll"; Flags: ignoreversion; Components: framegen
-Source: "assets\dlssg\nvngx.dll"; DestDir: "{app}"; DestName: "_nvngx.dll"; Flags: ignoreversion; Components: nonnvidia/localdir
-Source: "assets\dlssg\READ ME.txt"; DestDir: "{app}/licenses"; DestName: "READ ME (DLSSG to FSR3 mod).txt"; Flags: ignoreversion; Components: framegen
-Source: "assets\dlssg\LICENSE.txt"; DestDir: "{app}/licenses"; DestName: "LICENSE (DLSSG to FSR3 mod).txt"; Flags: ignoreversion; Components: framegen
+Source: "assets\dlssg\dlssg_to_fsr3.ini"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist; Components: optional/fgdebug
+Source: "assets\dlssg\dlssg_to_fsr3_amd_is_better.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist; Components: framegen
+Source: "assets\dlssg\nvngx.dll"; DestDir: "{app}"; DestName: "nvngx-wrapper.dll"; Flags: ignoreversion skipifsourcedoesntexist; Components: framegen
+Source: "assets\dlssg\nvngx.dll"; DestDir: "{app}"; DestName: "_nvngx.dll"; Flags: ignoreversion skipifsourcedoesntexist; Components: nonnvidia/localdir
+Source: "assets\dlssg\READ ME.txt"; DestDir: "{app}/licenses"; DestName: "READ ME (DLSSG to FSR3 mod).txt"; Flags: ignoreversion skipifsourcedoesntexist; Components: framegen
+Source: "assets\dlssg\LICENSE.txt"; DestDir: "{app}/licenses"; DestName: "LICENSE (DLSSG to FSR3 mod).txt"; Flags: ignoreversion skipifsourcedoesntexist; Components: framegen
 
 ; ============================================================
 ; OptiScaler (compiled from source or downloaded)

@@ -59,10 +59,18 @@ jobs:
     - name: Download External Assets (Nukem9 & NVAPI Proxy)
       shell: powershell
       run: |
-        # Download Nukem9 DLSSG-to-FSR3 (Using OptiScaler mirror since upstream deleted assets)
+        # Download Nukem9 DLSSG-to-FSR3 compiled DLL (OptiScaler mirror - upstream deleted release assets)
         Invoke-WebRequest -Uri "https://github.com/optiscaler/dlssg-to-fsr3/releases/download/0.130/dlssg-to-fsr3-master.zip" -OutFile "dlssg.zip"
         Expand-Archive -Path "dlssg.zip" -DestinationPath "temp_dlssg" -Force
         Copy-Item -Path "temp_dlssg\*" -Destination "installer\assets\dlssg\" -Recurse -Force
+        
+        # Fetch config/text files from Nukem9 source repo (not included in the mirror zip)
+        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/Nukem9/dlssg-to-fsr3/master/resources/dlssg_to_fsr3.ini" -OutFile "installer\assets\dlssg\dlssg_to_fsr3.ini"
+        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/Nukem9/dlssg-to-fsr3/master/resources/read_me_generic_dll.txt" -OutFile "installer\assets\dlssg\READ ME.txt"
+        
+        # Create placeholder nvngx.dll (the real one would come from a full Nukem9 build)
+        # The installer uses skipifsourcedoesntexist for this component
+        New-Item -ItemType File -Path "installer\assets\dlssg\nvngx.dll" -Force
         
         # Create mock nvidia-env for installer compatibility
         New-Item -ItemType File -Path "installer\assets\nvidia-env\dxgi.dll" -Force
