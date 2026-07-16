@@ -582,8 +582,8 @@ static void CheckWorkingMode()
             break;
         }
 
-        // optiscaler.dll
-        if (lCaseFilename == "optiscaler.dll")
+        // optiscaler.dll or dlss-enabler-upscaler.dll
+        if (lCaseFilename == "optiscaler.dll" || lCaseFilename == "dlss-enabler-upscaler.dll" || lCaseFilename == "nvngx-upscaler.dll")
         {
             if (!_passThruMode)
                 LOG_INFO("OptiScaler working as OptiScaler.dll");
