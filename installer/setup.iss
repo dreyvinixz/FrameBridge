@@ -98,6 +98,7 @@ Source: "assets\dlssg\LICENSE.txt"; DestDir: "{app}/licenses"; DestName: "LICENS
 ; ============================================================
 Source: "build\OptiScaler.dll"; DestDir: "{app}"; DestName: "dlss-enabler-upscaler.dll"; Flags: ignoreversion skipifsourcedoesntexist; Components: upscalers
 Source: "assets\configs\OptiScaler.ini"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist; Components: upscalers
+Source: "assets\configs\dlss-enabler.ini"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist; Components: upscalers
 
 ; XeSS and FidelityFX libraries
 Source: "build\libxess.dll"; DestDir: "{app}"; Flags: uninsneveruninstall skipifsourcedoesntexist; Components: upscalers
@@ -133,5 +134,6 @@ Source: "assets\framebridge.ico"; DestDir: "{app}"; Flags: ignoreversion; Compon
 
 [Run]
 Filename: "{app}\docs\README.md"; Description: "View the FrameBridge README file"; Flags: postinstall shellexec skipifsilent skipifdoesntexist
-Filename: "{app}\OptiScaler.ini"; Description: "Edit the configuration file (optional)"; Flags: postinstall shellexec skipifsilent unchecked
+Filename: "{app}\OptiScaler.ini"; Description: "Edit OptiScaler settings (optional)"; Flags: postinstall shellexec skipifsilent unchecked
+Filename: "{app}\dlss-enabler.ini"; Description: "Edit DLSS Enabler proxy settings (optional)"; Flags: postinstall shellexec skipifsilent unchecked
 Filename: "{app}\dlss-finder.exe"; Parameters: "/s"; StatusMsg: "Disabling NVIDIA signature checks for DLSS 3.7"; WorkingDir: "{app}"; Description: "DLSS 3.7 activation step"; Flags: skipifsilent skipifdoesntexist
