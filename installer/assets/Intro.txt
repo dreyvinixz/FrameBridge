@@ -2,51 +2,85 @@
                 Welcome to FrameBridge Installation
 ===================================================================
 
-FrameBridge is a community-driven installer that seamlessly 
-integrates the OptiScaler engine and the DLSSG-to-FSR3 mod.
+FrameBridge is an advanced, community-driven installer that 
+seamlessly integrates the OptiScaler engine and Nukem9's 
+DLSSG-to-FSR3 mod. It bridges the gap between hardware architectures
+and upscaling technologies, allowing NVIDIA, AMD, and Intel GPUs 
+to utilize cutting-edge Frame Generation and Super Resolution.
 
 -------------------------------------------------------------------
                      INSTALLATION INSTRUCTIONS
 -------------------------------------------------------------------
+TARGET DIRECTORY:
 In the next step, you will be asked to provide the target path 
 where the files will be installed. Please choose the exact 
 directory in which the game executable (.exe) resides. Depending 
 on the application, it may be the main directory of the game, or 
 one of its subdirectories (like "<game>\bin\x64").
 
+OVERRIDING FILES:
 During the installation, you might be asked if you want to override 
 any existing files. If you are sure you haven't installed 
 FrameBridge or other upscaler mods for that game before, DO NOT 
 override any file; instead, cancel the installation and try a 
-different injection method (e.g., dxgi.dll instead of version.dll). 
-Overriding files might break existing mods or the game itself.
+different injection method. Prompt to override the file means that 
+there might be a different mod already installed that could be in 
+conflict. Overriding the file might break that mod by accident.
 
+MANUAL INSTALLATION:
 If you want to install the files manually instead of picking the 
 game directory, select an empty folder instead. The files will be 
 copied there, and you can move them manually later.
 
+INJECTION METHOD:
+- Preferred installation (version.dll): Recommended for most users. 
+  Hooks into the game safely without replacing core graphics libraries.
+- Alternate (dxgi.dll): Use this if version.dll fails to hook, or 
+  if you are playing a specific game that explicitly requires DXGI 
+  proxying.
+- Experimental Support (AMD/Intel): Check this box if you are NOT 
+  on an NVIDIA RTX card. This installs the NVIDIA runtime bypass 
+  necessary to trick games into unlocking DLSS options.
+
+-------------------------------------------------------------------
+                         IN-GAME USAGE
+-------------------------------------------------------------------
+1. IN-GAME MENU: Once in the game, open the graphics settings.
+2. ENABLE DLSS: Select "DLSS" as your upscaler (even on AMD/Intel). 
+   FrameBridge intercepts this and translates it to FSR, XeSS, or 
+   native DLSS depending on your hardware.
+3. ENABLE FRAME GENERATION: Toggle "DLSS Frame Generation" to ON. 
+   This will activate Nukem9's FSR3 Frame Gen.
+4. OVERLAY MENU: Press the "Insert" (INS) key on your keyboard 
+   while in-game to open the OptiScaler UI overlay. From here, you 
+   can manually force specific upscalers (FSR 2.2, FSR 3.1, XeSS), 
+   tweak sharpness, control framerate limits, and adjust Reflex 
+   emulation.
+
 -------------------------------------------------------------------
                            ⚠️ WARNINGS ⚠️
 -------------------------------------------------------------------
-1. MULTIPLAYER GAMES: Do NOT use FrameBridge in online games 
-   or titles that feature anti-cheat (e.g., Easy Anti-Cheat, 
-   BattlEye). YOU WILL BE BANNED.
+- MULTIPLAYER GAMES: Do NOT use FrameBridge in online games 
+  or titles that feature anti-cheat (e.g., Easy Anti-Cheat, 
+  BattlEye, Ricochet, Vanguard). YOU WILL BE BANNED.
 
-2. ANTIVIRUS FALSE POSITIVES: Your antivirus software might flag 
-   this installer or the generated files as malicious. This is 
-   completely normal. Upscaler mods rely on DLL injection and API 
-   hooking to function, which triggers heuristic detections.
+- ANTIVIRUS FALSE POSITIVES: Your antivirus software (including 
+  Windows Defender) might flag this installer or the generated 
+  files as malicious. This is completely normal. Upscaler mods 
+  rely on DLL injection and API hooking to function, which 
+  triggers heuristic detections.
 
 -------------------------------------------------------------------
                              CHANGELOG
 -------------------------------------------------------------------
-v1.0.0 (Initial FrameBridge Release)
+v1.0.x (FrameBridge Initial Release)
 Feature: Fully automated CI/CD pipeline building OptiScaler from source.
 Feature: Seamless integration with Nukem9's DLSSG-to-FSR3 mod (v0.130).
 Feature: All-in-one Inno Setup wrapper for simplified deployment.
 Feature: Added support for both version.dll and dxgi.dll injection.
 Feature: Added Experimental Support package for AMD/Intel GPUs.
 Feature: Built-in FakeNvapi module for latency reduction (Anti-Lag 2).
+Feature: In-game UI overlay enabled by default (Press Insert key).
 Feature: Comprehensive Wiki documentation and automated release notes.
 
 ===================================================================
