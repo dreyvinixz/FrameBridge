@@ -1,9 +1,29 @@
 ===================================================================
-  Welcome to FrameBridge
+                Welcome to FrameBridge Installation
 ===================================================================
 
 FrameBridge is a community-driven installer that seamlessly 
 integrates the OptiScaler engine and the DLSSG-to-FSR3 mod.
+
+-------------------------------------------------------------------
+                     INSTALLATION INSTRUCTIONS
+-------------------------------------------------------------------
+In the next step, you will be asked to provide the target path 
+where the files will be installed. Please choose the exact 
+directory in which the game executable (.exe) resides. Depending 
+on the application, it may be the main directory of the game, or 
+one of its subdirectories (like "<game>\bin\x64").
+
+During the installation, you might be asked if you want to override 
+any existing files. If you are sure you haven't installed 
+FrameBridge or other upscaler mods for that game before, DO NOT 
+override any file; instead, cancel the installation and try a 
+different injection method (e.g., dxgi.dll instead of version.dll). 
+Overriding files might break existing mods or the game itself.
+
+If you want to install the files manually instead of picking the 
+game directory, select an empty folder instead. The files will be 
+copied there, and you can move them manually later.
 
 -------------------------------------------------------------------
                            ⚠️ WARNINGS ⚠️
@@ -18,20 +38,18 @@ integrates the OptiScaler engine and the DLSSG-to-FSR3 mod.
    hooking to function, which triggers heuristic detections.
 
 -------------------------------------------------------------------
-                     INSTALLATION INSTRUCTIONS
+                             CHANGELOG
 -------------------------------------------------------------------
-1. DIRECTORY: When prompted, select the exact folder where your 
-   game's main executable (.exe) is located.
+v1.0.0 (Initial FrameBridge Release)
+Feature: Fully automated CI/CD pipeline building OptiScaler from source.
+Feature: Seamless integration with Nukem9's DLSSG-to-FSR3 mod (v0.130).
+Feature: All-in-one Inno Setup wrapper for simplified deployment.
+Feature: Added support for both version.dll and dxgi.dll injection.
+Feature: Added Experimental Support package for AMD/Intel GPUs.
+Feature: Built-in FakeNvapi module for latency reduction (Anti-Lag 2).
+Feature: Comprehensive Wiki documentation and automated release notes.
 
-2. INJECTION METHOD: 
-   - Preferred (version.dll): Works for the vast majority of games.
-   - Alternate (dxgi.dll): Use this only if the game crashes or if 
-     the mod fails to load with version.dll.
-
-3. HARDWARE: 
-   - NVIDIA RTX Users: Use the standard installation.
-   - AMD / Intel Users: Check the "Experimental support" box 
-     to bypass native NVIDIA runtime checks.
-
+===================================================================
 For advanced configurations (OptiScaler.ini) and troubleshooting, 
 visit our Wiki: https://github.com/dreyvinixz/FrameBridge/wiki
+===================================================================
