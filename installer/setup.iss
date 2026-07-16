@@ -135,7 +135,7 @@ Filename: "{app}\framebridge_manifest.ini"; Section: "Installation"; Key: "Proxy
 Filename: "{app}\framebridge_manifest.ini"; Section: "Installation"; Key: "ProxyFile"; String: "OptiScaler.asi"; Components: mainfiles/asiversion
 
 ; Fix FSR3-FG debug artifacts by forcing the debug overlay off
-Filename: "{app}\dlssg_to_fsr3.ini"; Section: "Debug"; Key: "EnableDebugOverlay"; String: "0"
+Filename: "{app}\dlssg_to_fsr3.ini"; Section: "DLSSG_TO_FSR3"; Key: "EnableDebugOverlay"; String: "false"
 
 ; Optional compatibility patches
 Filename: "{app}\OptiScaler.ini"; Section: "Spoofing"; Key: "D3DFeatureLevel"; String: "true"; Tasks: gtx_compat
