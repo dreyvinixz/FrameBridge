@@ -75,6 +75,7 @@ jobs:
         Invoke-WebRequest -Uri "https://github.com/optiscaler/dlssg-to-fsr3/releases/download/0.130/dlssg-to-fsr3-master.zip" -OutFile "dlssg.zip"
         Expand-Archive -Path "dlssg.zip" -DestinationPath "temp_dlssg" -Force
         Copy-Item -Path "temp_dlssg\*" -Destination "installer\assets\dlssg\" -Recurse -Force
+        Copy-Item "installer\dependencies\nvngx.dll" -Destination "installer\assets\dlssg\nvngx.dll" -Force
         
         # Fetch config/text files from Nukem9 source repo (not included in the mirror zip)
         Invoke-WebRequest -Uri "https://raw.githubusercontent.com/Nukem9/dlssg-to-fsr3/master/resources/dlssg_to_fsr3.ini" -OutFile "installer\assets\dlssg\dlssg_to_fsr3.ini"
