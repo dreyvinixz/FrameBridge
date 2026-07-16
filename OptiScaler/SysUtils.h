@@ -86,27 +86,27 @@ inline HMODULE d3d12AgilityModule = nullptr;
 inline HMODULE slInterposerModule = nullptr;
 inline DWORD processId;
 
-#define LOG_TRACE(msg, ...) spdlog::trace(__FUNCTION__ " " msg, ##__VA_ARGS__)
+#define LOG_TRACE(msg, ...) do { if (spdlog::should_log(spdlog::level::trace)) spdlog::trace(__FUNCTION__ " " msg, ##__VA_ARGS__); } while(0)
 
-#define LOG_DEBUG(msg, ...) spdlog::debug(__FUNCTION__ " " msg, ##__VA_ARGS__)
+#define LOG_DEBUG(msg, ...) do { if (spdlog::should_log(spdlog::level::debug)) spdlog::debug(__FUNCTION__ " " msg, ##__VA_ARGS__); } while(0)
 
 #ifdef DETAILED_DEBUG_LOGS
-#define LOG_DEBUG_ONLY(msg, ...) spdlog::debug(__FUNCTION__ " " msg, ##__VA_ARGS__)
+#define LOG_DEBUG_ONLY(msg, ...) do { if (spdlog::should_log(spdlog::level::debug)) spdlog::debug(__FUNCTION__ " " msg, ##__VA_ARGS__); } while(0)
 #else
 #define LOG_DEBUG_ONLY(msg, ...)
 #endif
 
 #ifdef LOG_ASYNC
-#define LOG_DEBUG_ASYNC(msg, ...) spdlog::debug(__FUNCTION__ " " msg, ##__VA_ARGS__)
+#define LOG_DEBUG_ASYNC(msg, ...) do { if (spdlog::should_log(spdlog::level::debug)) spdlog::debug(__FUNCTION__ " " msg, ##__VA_ARGS__); } while(0)
 #else
 #define LOG_DEBUG_ASYNC(msg, ...)
 #endif
 
-#define LOG_INFO(msg, ...) spdlog::info(__FUNCTION__ " " msg, ##__VA_ARGS__)
+#define LOG_INFO(msg, ...) do { if (spdlog::should_log(spdlog::level::info)) spdlog::info(__FUNCTION__ " " msg, ##__VA_ARGS__); } while(0)
 
-#define LOG_WARN(msg, ...) spdlog::warn(__FUNCTION__ " " msg, ##__VA_ARGS__)
+#define LOG_WARN(msg, ...) do { if (spdlog::should_log(spdlog::level::warn)) spdlog::warn(__FUNCTION__ " " msg, ##__VA_ARGS__); } while(0)
 
-#define LOG_ERROR(msg, ...) spdlog::error(__FUNCTION__ " " msg, ##__VA_ARGS__)
+#define LOG_ERROR(msg, ...) do { if (spdlog::should_log(spdlog::level::err)) spdlog::error(__FUNCTION__ " " msg, ##__VA_ARGS__); } while(0)
 
 #define LOG_FUNC() spdlog::trace(__FUNCTION__)
 

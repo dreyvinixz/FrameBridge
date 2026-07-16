@@ -151,7 +151,9 @@ void ReportD3D12LiveObjects(ID3D12Device* device)
 static HRESULT LocalPresent(IDXGISwapChain* pSwapChain, UINT SyncInterval, UINT Flags,
                             const DXGI_PRESENT_PARAMETERS* pPresentParameters, IUnknown* pDevice, HWND hWnd, bool isUWP)
 {
-    if (State::Instance().isShuttingDown)
+    auto& state = State::Instance();
+
+    if (state.isShuttingDown)
     {
         if (pPresentParameters == nullptr)
             return pSwapChain->Present(SyncInterval, Flags);
@@ -175,65 +177,78 @@ static HRESULT LocalPresent(IDXGISwapChain* pSwapChain, UINT SyncInterval, UINT 
             ftDelta = now - _lastFrameTime;
 
         _lastFrameTime = now;
-        State::Instance().presentFrameTime = ftDelta;
+        state.presentFrameTime = ftDelta;
 
-        if (State::Instance().currentFG == nullptr)
-            State::Instance().lastFGFrameTime = ftDelta;
+        if (state.currentFG == nullptr)
+            state.lastFGFrameTime = ftDelta;
 
         LOG_DEBUG("SyncInterval: {}, Flags: {:X}, Frametime: {:0.3f} ms", SyncInterval, Flags, ftDelta);
 
-        // Update swapchain info evey frame
-        if (pSwapChain->GetDesc(&State::Instance().currentSwapchainDesc) != S_OK)
-            LOG_WARN("Can't get swapchain desc!");
+        // Cache swapchain info to avoid per-frame COM overhead
+        if (state.currentSwapchainDesc.BufferDesc.Width == 0)
+        {
+            if (pSwapChain->GetDesc(&state.currentSwapchainDesc) != S_OK)
+                LOG_WARN("Can't get swapchain desc!");
+        }
     }
 
     ID3D11Device* device = nullptr;
     ID3D12Device* device12 = nullptr;
     ID3D12CommandQueue* cq = nullptr;
 
-    bool isD3D11 = false;
+    bool isD3D11 = (state.swapchainApi == DX11);
 
-    // try to obtain directx objects and find the path
-    if (pDevice->QueryInterface(IID_PPV_ARGS(&device)) == S_OK)
+    // Only query COM interfaces if we haven't identified the API yet
+    if (state.swapchainApi == API::NotSelected)
     {
-        isD3D11 = true;
-        device->Release();
-
-        if (!_dx11Device)
-            LOG_DEBUG("D3D11Device captured");
-
-        _dx11Device = true;
-        State::Instance().swapchainApi = DX11;
-        State::Instance().currentD3D11Device = device;
-    }
-    else if (pDevice->QueryInterface(IID_PPV_ARGS(&cq)) == S_OK)
-    {
-        cq->Release();
-
-        if (!_dx12Device)
-            LOG_DEBUG("D3D12CommandQueue captured");
-
-        ID3D12CommandQueue* realQueue = nullptr;
-        if (Util::CheckForRealObject(__FUNCTION__, cq, (IUnknown**) &realQueue))
-            cq = realQueue;
-
-        State::Instance().swapchainApi = DX12;
-
-        if (State::Instance().currentCommandQueue == nullptr)
-            State::Instance().currentCommandQueue = cq;
-
-        if (cq->GetDevice(IID_PPV_ARGS(&device12)) == S_OK)
+        if (pDevice->QueryInterface(IID_PPV_ARGS(&device)) == S_OK)
         {
-            device12->Release();
+            isD3D11 = true;
+            device->Release();
+
+            if (!_dx11Device)
+                LOG_DEBUG("D3D11Device captured");
+
+            _dx11Device = true;
+            state.swapchainApi = DX11;
+            state.currentD3D11Device = device;
+        }
+        else if (pDevice->QueryInterface(IID_PPV_ARGS(&cq)) == S_OK)
+        {
+            cq->Release();
 
             if (!_dx12Device)
-                LOG_DEBUG("D3D12Device captured");
+                LOG_DEBUG("D3D12CommandQueue captured");
 
-            _dx12Device = true;
+            ID3D12CommandQueue* realQueue = nullptr;
+            if (Util::CheckForRealObject(__FUNCTION__, cq, (IUnknown**) &realQueue))
+                cq = realQueue;
 
-            State::Instance().currentD3D12Device = device12;
-            D3D12Hooks::HookDevice(device12);
+            state.swapchainApi = DX12;
+
+            if (state.currentCommandQueue == nullptr)
+                state.currentCommandQueue = cq;
+
+            if (cq->GetDevice(IID_PPV_ARGS(&device12)) == S_OK)
+            {
+                device12->Release();
+
+                if (!_dx12Device)
+                    LOG_DEBUG("D3D12Device captured");
+
+                _dx12Device = true;
+
+                state.currentD3D12Device = device12;
+                D3D12Hooks::HookDevice(device12);
+            }
         }
+    }
+    else
+    {
+        // Re-use cached pointers safely
+        device = state.currentD3D11Device;
+        cq = state.currentCommandQueue;
+        device12 = state.currentD3D12Device;
     }
 
     auto fg = State::Instance().currentFG;
@@ -708,6 +723,7 @@ HRESULT STDMETHODCALLTYPE WrappedIDXGISwapChain4::ResizeBuffers(UINT BufferCount
                                                                 DXGI_FORMAT NewFormat, UINT SwapChainFlags)
 {
     LOG_DEBUG("");
+    State::Instance().currentSwapchainDesc.BufferDesc.Width = 0;
 
 #ifdef USE_LOCAL_MUTEX
     // dlssg calls this from present it seems
@@ -1089,6 +1105,7 @@ HRESULT STDMETHODCALLTYPE WrappedIDXGISwapChain4::ResizeBuffers1(UINT BufferCoun
                                                                  IUnknown* const* ppPresentQueue)
 {
     LOG_DEBUG("");
+    State::Instance().currentSwapchainDesc.BufferDesc.Width = 0;
 
 #ifdef USE_LOCAL_MUTEX
     // dlssg calls this from present it seems
