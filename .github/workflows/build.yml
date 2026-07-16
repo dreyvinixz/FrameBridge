@@ -3,6 +3,11 @@ name: FrameBridge Release Pipeline
 on:
   push:
     branches: [ "main" ]
+    paths-ignore:
+      - 'docs/**'
+      - 'images/**'
+      - '**.md'
+      - '.gitignore'
   workflow_dispatch:
 
 permissions:
