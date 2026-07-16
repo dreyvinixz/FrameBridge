@@ -295,7 +295,7 @@ class StreamlineHooks
     static bool hk_setVoid(void* self, const char* key, void** value);
 
     // Logging
-    static char* trimStreamlineLog(const char* msg);
+    static std::string trimStreamlineLog(const char* msg);
     static void streamlineLogCallback(sl::LogType type, const char* msg);
     static void streamlineLogCallback_sl1(sl1::LogType type, const char* msg);
 

@@ -75,8 +75,7 @@ class StreamlineProxy
         else
             State::DisableChecks(owner, "sl.");
 
-        std::filesystem::path localSlPath(Config::Instance()->MainDllPath.value());
-        localSlPath = localSlPath / L"streamline"; // Hardcoded streamline folder
+        const std::filesystem::path localSlPath = Util::GetStreamlineDirectory(Config::Instance()->MainDllPath.value());
 
         std::filesystem::path slInterposerPath = localSlPath / L"sl.interposer.dll";
         LOG_INFO(L"Trying to load sl.interposer.dll from dll path: {}", slInterposerPath.wstring());
@@ -164,8 +163,8 @@ class StreamlineProxy
     {
         spdlog::info("");
 
-        std::filesystem::path localSlPath(Config::Instance()->MainDllPath.value());
-        localSlPath = localSlPath / L"streamline" / L"sl.dlss_g.dll";
+        std::filesystem::path localSlPath = Util::GetStreamlineDirectory(Config::Instance()->MainDllPath.value());
+        localSlPath /= L"sl.dlss_g.dll";
         auto dlssg = NtdllProxy::LoadLibraryExW_Ldr(localSlPath.c_str(), NULL, NULL);
 
         // if already hooked
@@ -198,8 +197,8 @@ class StreamlineProxy
     {
         spdlog::info("");
 
-        std::filesystem::path localSlPath(Config::Instance()->MainDllPath.value());
-        localSlPath = localSlPath / L"streamline" / L"sl.reflex.dll";
+        std::filesystem::path localSlPath = Util::GetStreamlineDirectory(Config::Instance()->MainDllPath.value());
+        localSlPath /= L"sl.reflex.dll";
         auto reflex = NtdllProxy::LoadLibraryExW_Ldr(localSlPath.c_str(), NULL, NULL);
 
         // if already hooked
@@ -237,8 +236,8 @@ class StreamlineProxy
     {
         spdlog::info("");
 
-        std::filesystem::path localSlPath(Config::Instance()->MainDllPath.value());
-        localSlPath = localSlPath / L"streamline" / L"sl.pcl.dll";
+        std::filesystem::path localSlPath = Util::GetStreamlineDirectory(Config::Instance()->MainDllPath.value());
+        localSlPath /= L"sl.pcl.dll";
         auto pcl = NtdllProxy::LoadLibraryExW_Ldr(localSlPath.c_str(), NULL, NULL);
 
         // if already hooked
@@ -316,8 +315,7 @@ class StreamlineProxy
 
         std::vector<std::wstring> pathStorage;
 
-        std::filesystem::path mainDllPath(Config::Instance()->MainDllPath.value());
-        mainDllPath = mainDllPath / L"streamline";
+        std::filesystem::path mainDllPath = Util::GetStreamlineDirectory(Config::Instance()->MainDllPath.value());
         pathStorage.push_back(mainDllPath.wstring());
 
         if (nvngxDlssGPath.has_value())

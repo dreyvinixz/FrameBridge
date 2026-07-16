@@ -117,18 +117,16 @@ static void PatchSL1PluginJson(nlohmann::json& configJson)
         configJson["external"]["hws"]["required"] = false;
 }
 
-char* StreamlineHooks::trimStreamlineLog(const char* msg)
+std::string StreamlineHooks::trimStreamlineLog(const char* msg)
 {
-    char* result = (char*) malloc(strlen(msg) + 1);
-    if (!result)
-        return nullptr;
+    if (msg == nullptr)
+        return {};
 
-    strcpy(result, msg);
+    std::string result(msg);
 
-    size_t length = strlen(result);
-    if (length > 0 && result[length - 1] == '\n')
+    if (!result.empty() && result.back() == '\n')
     {
-        result[length - 1] = '\0';
+        result.pop_back();
     }
 
     return result;
@@ -139,8 +137,8 @@ void StreamlineHooks::streamlineLogCallback(sl::LogType type, const char* msg)
     if (msg == nullptr)
         return;
 
-    char* trimmed_msg = trimStreamlineLog(msg);
-    if (trimmed_msg != nullptr)
+    const auto trimmed_msg = trimStreamlineLog(msg);
+    if (!trimmed_msg.empty())
     {
         switch (type)
         {
@@ -157,8 +155,6 @@ void StreamlineHooks::streamlineLogCallback(sl::LogType type, const char* msg)
             LOG_ERROR("{}", trimmed_msg);
             break;
         }
-
-        free(trimmed_msg);
     }
 
     if (o_logCallback != nullptr)
@@ -185,8 +181,7 @@ sl::Result StreamlineHooks::hkslInit(const sl::Preferences& pref, uint64_t sdkVe
     if (localPref.engine == sl::EngineType::eUnreal)
         State::Instance().gameQuirks |= GameQuirk::ForceUnrealEngine;
 
-    std::filesystem::path localSlPath(Config::Instance()->MainDllPath.value());
-    localSlPath = localSlPath / L"streamline"; // Hardcoded streamline folder
+    const std::filesystem::path localSlPath = Util::GetStreamlineDirectory(Config::Instance()->MainDllPath.value());
 
     auto localSlPathStr = localSlPath.wstring();
 
