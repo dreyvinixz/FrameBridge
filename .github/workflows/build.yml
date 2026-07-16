@@ -47,12 +47,12 @@ jobs:
         
         # Move MSBuild outputs
         Copy-Item -Path "x64\Release\a\OptiScaler.dll" -Destination "installer\build\" -Force
-        Copy-Item -Path "x64\Release\a\libxess.dll" -Destination "installer\build\" -Force
-        Copy-Item -Path "x64\Release\a\amd_fidelityfx_*.dll" -Destination "installer\build\" -Force
-        Copy-Item -Path "x64\Release\a\fakenvapi.dll" -Destination "installer\build\" -Force
+        Copy-Item -Path "x64\Release\a\OptiScaler\libxess*.dll" -Destination "installer\build\" -Force
+        Copy-Item -Path "x64\Release\a\OptiScaler\amd_fidelityfx_*.dll" -Destination "installer\build\" -Force
+        if (Test-Path "x64\Release\a\fakenvapi.dll") { Copy-Item -Path "x64\Release\a\fakenvapi.dll" -Destination "installer\build\" -Force }
         
         # Copy INI configuration
-        Copy-Item -Path "nvngx.ini" -Destination "installer\assets\configs\OptiScaler.ini" -Force
+        Copy-Item -Path "OptiScaler.ini" -Destination "installer\assets\configs\OptiScaler.ini" -Force
         Copy-Item -Path "LICENSE" -Destination "installer\assets\LICENSE.rtf" -Force
         Set-Content -Path "installer\assets\Intro.rtf" -Value "Welcome to FrameBridge."
 
