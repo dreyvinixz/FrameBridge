@@ -59,7 +59,7 @@ jobs:
         # Copy INI configuration
         Copy-Item -Path "OptiScaler.ini" -Destination "installer\assets\configs\OptiScaler.ini" -Force
         Copy-Item -Path "LICENSE" -Destination "installer\assets\LICENSE.rtf" -Force
-        Set-Content -Path "installer\assets\Intro.rtf" -Value "Welcome to FrameBridge."
+
 
     - name: Download External Assets (Nukem9 & NVAPI Proxy)
       shell: powershell
