@@ -57,6 +57,9 @@ jobs:
         if (Test-Path "x64\Release\a\OptiScaler\D3D12_OptiScaler") { Copy-Item -Path "x64\Release\a\OptiScaler\D3D12_OptiScaler" -Destination "installer\build\D3D12_OptiScaler" -Recurse -Force }
         if (Test-Path "x64\Release\a\fakenvapi.dll") { Copy-Item -Path "x64\Release\a\fakenvapi.dll" -Destination "installer\build\" -Force }
         
+        # Include DLSS Enabler lightweight proxy DLL
+        Copy-Item -Path "installer\dependencies\dlss-enabler.dll" -Destination "installer\build\" -Force
+        
         # Copy INI configuration
         Copy-Item -Path "OptiScaler.ini" -Destination "installer\assets\configs\OptiScaler.ini" -Force
         Copy-Item -Path "Config.md" -Destination "installer\assets\configs\Config.md" -Force

@@ -114,13 +114,13 @@ Source: "build\licenses\FidelityFX_LICENSE.md"; DestDir: "{app}/licenses"; Flags
 Source: "build\licenses\DirectX_LICENSE.txt"; DestDir: "{app}/licenses"; Flags: ignoreversion skipifsourcedoesntexist; Components: upscalers
 
 ; ============================================================
-; Main module (the DLL loader/hook)
+; Injection Options (Lightweight DLSS Enabler Proxy)
 ; ============================================================
-Source: "build\OptiScaler.dll"; DestDir: "{app}/plugins"; DestName: "framebridge.asi"; Flags: confirmoverwrite skipifsourcedoesntexist; Components: mainfiles/asiversion
-Source: "build\OptiScaler.dll"; DestDir: "{app}"; DestName: "framebridge.dll"; Flags: confirmoverwrite skipifsourcedoesntexist; Components: mainfiles/dlldxgi
-Source: "build\OptiScaler.dll"; DestDir: "{app}"; DestName: "version.dll"; Flags: confirmoverwrite skipifsourcedoesntexist; Components: mainfiles/dllversion
-Source: "build\OptiScaler.dll"; DestDir: "{app}"; DestName: "winmm.dll"; Flags: confirmoverwrite skipifsourcedoesntexist; Components: mainfiles/dllwinmm
-Source: "build\OptiScaler.dll"; DestDir: "{app}"; DestName: "d3d12.dll"; Flags: confirmoverwrite skipifsourcedoesntexist; Components: mainfiles/dlld3d12
+Source: "build\dlss-enabler.dll"; DestDir: "{app}"; DestName: "version.dll"; Flags: confirmoverwrite skipifsourcedoesntexist; Components: mainfiles/dllversion
+Source: "build\dlss-enabler.dll"; DestDir: "{app}"; DestName: "winmm.dll"; Flags: confirmoverwrite skipifsourcedoesntexist; Components: mainfiles/dllwinmm
+Source: "build\dlss-enabler.dll"; DestDir: "{app}"; DestName: "d3d12.dll"; Flags: confirmoverwrite skipifsourcedoesntexist; Components: mainfiles/dlld3d12
+Source: "build\dlss-enabler.dll"; DestDir: "{app}"; DestName: "dxgi.dll"; Flags: confirmoverwrite skipifsourcedoesntexist; Components: mainfiles/dlldxgi
+Source: "build\dlss-enabler.dll"; DestDir: "{app}"; DestName: "OptiScaler.asi"; Flags: confirmoverwrite skipifsourcedoesntexist; Components: mainfiles/asiversion
 
 ; ============================================================
 ; Documentation
