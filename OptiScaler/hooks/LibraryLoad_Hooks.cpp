@@ -55,7 +55,8 @@ HMODULE LibraryLoadHooks::LoadLibraryCheckW(std::wstring libName, LPCWSTR lpLibF
     auto normalizedPath = path.wstring();
     to_lower_in_place(normalizedPath);
 
-    const auto localSlPath = Util::GetStreamlineDirectory(Config::Instance()->MainDllPath.value());
+    std::filesystem::path localSlPath(Config::Instance()->MainDllPath.value());
+    localSlPath = localSlPath / L"streamline"; // Hardcoded streamline folder
     auto normalizedLocalSlPath = localSlPath.lexically_normal();
 
     const bool pathInsideLocalSlPath = Util::IsSubpath(path, normalizedLocalSlPath);
@@ -981,7 +982,7 @@ void LibraryLoadHooks::CheckModulesInMemory()
 
             auto path = std::filesystem::path(callerPath).lexically_normal();
             std::filesystem::path localSlPath(Config::Instance()->MainDllPath.value());
-            localSlPath = Util::GetStreamlineDirectory(Config::Instance()->MainDllPath.value());
+            localSlPath = localSlPath / L"streamline";
             auto normalizedLocalSlPath = localSlPath.lexically_normal();
 
             const bool pathInsideLocalSlPath = Util::IsSubpath(path, normalizedLocalSlPath);

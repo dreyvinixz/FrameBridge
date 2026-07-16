@@ -117,16 +117,18 @@ static void PatchSL1PluginJson(nlohmann::json& configJson)
         configJson["external"]["hws"]["required"] = false;
 }
 
-std::string StreamlineHooks::trimStreamlineLog(const char* msg)
+char* StreamlineHooks::trimStreamlineLog(const char* msg)
 {
-    if (msg == nullptr)
-        return {};
+    char* result = (char*) malloc(strlen(msg) + 1);
+    if (!result)
+        return nullptr;
 
-    std::string result(msg);
+    strcpy(result, msg);
 
-    if (!result.empty() && result.back() == '\n')
+    size_t length = strlen(result);
+    if (length > 0 && result[length - 1] == '\n')
     {
-        result.pop_back();
+        result[length - 1] = '\0';
     }
 
     return result;
@@ -137,8 +139,8 @@ void StreamlineHooks::streamlineLogCallback(sl::LogType type, const char* msg)
     if (msg == nullptr)
         return;
 
-    const auto trimmed_msg = trimStreamlineLog(msg);
-    if (!trimmed_msg.empty())
+    char* trimmed_msg = trimStreamlineLog(msg);
+    if (trimmed_msg != nullptr)
     {
         switch (type)
         {
@@ -155,6 +157,8 @@ void StreamlineHooks::streamlineLogCallback(sl::LogType type, const char* msg)
             LOG_ERROR("{}", trimmed_msg);
             break;
         }
+
+        free(trimmed_msg);
     }
 
     if (o_logCallback != nullptr)
@@ -181,7 +185,8 @@ sl::Result StreamlineHooks::hkslInit(const sl::Preferences& pref, uint64_t sdkVe
     if (localPref.engine == sl::EngineType::eUnreal)
         State::Instance().gameQuirks |= GameQuirk::ForceUnrealEngine;
 
-    const std::filesystem::path localSlPath = Util::GetStreamlineDirectory(Config::Instance()->MainDllPath.value());
+    std::filesystem::path localSlPath(Config::Instance()->MainDllPath.value());
+    localSlPath = localSlPath / L"streamline"; // Hardcoded streamline folder
 
     auto localSlPathStr = localSlPath.wstring();
 
@@ -394,9 +399,9 @@ void StreamlineHooks::streamlineLogCallback_sl1(sl1::LogType type, const char* m
     if (msg == nullptr)
         return;
 
-    const auto trimmed_msg = trimStreamlineLog(msg);
+    char* trimmed_msg = trimStreamlineLog(msg);
 
-    if (!trimmed_msg.empty())
+    if (trimmed_msg != nullptr)
     {
         switch (type)
         {
@@ -413,6 +418,8 @@ void StreamlineHooks::streamlineLogCallback_sl1(sl1::LogType type, const char* m
             LOG_ERROR("{}", trimmed_msg);
             break;
         }
+
+        free(trimmed_msg);
     }
 
     if (o_logCallback_sl1)

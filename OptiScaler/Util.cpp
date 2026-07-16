@@ -483,13 +483,6 @@ bool Util::GetFileVersion(std::wstring dllPath, version_t* fileVersionOut, versi
     return true;
 }
 
-std::filesystem::path Util::GetStreamlineDirectory(const std::filesystem::path& basePath)
-{
-    std::filesystem::path path =
-        basePath.empty() ? std::filesystem::path(Config::Instance()->MainDllPath.value()) : basePath;
-    return path / L"streamline";
-}
-
 bool Util::IsSubpath(const std::filesystem::path& path, const std::filesystem::path& base)
 {
     auto rel = std::filesystem::relative(path, base);
@@ -500,7 +493,8 @@ bool Util::IsSubpath(const std::filesystem::path& path, const std::filesystem::p
 std::optional<std::filesystem::path> Util::FindFilePath(const std::filesystem::path& startDir,
                                                         const std::filesystem::path& fileName)
 {
-    std::filesystem::path optiPath = GetStreamlineDirectory(Config::Instance()->MainDllPath.value());
+    std::filesystem::path optiPath(Config::Instance()->MainDllPath.value());
+    optiPath /= L"streamline";
     auto normalizedStreamlinePath = optiPath.lexically_normal();
 
     const bool isDlssgOutput = State::Instance().activeFgOutput == FGOutput::DLSSG ||
