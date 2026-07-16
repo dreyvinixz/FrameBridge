@@ -95,7 +95,7 @@ Source: "assets\dlssg\LICENSE.txt"; DestDir: "{app}/licenses"; DestName: "LICENS
 ; OptiScaler (compiled from source or downloaded)
 ; ============================================================
 Source: "build\OptiScaler.dll"; DestDir: "{app}"; DestName: "dlss-enabler-upscaler.dll"; Flags: ignoreversion skipifsourcedoesntexist; Components: upscalers
-Source: "assets\configs\OptiScaler.ini"; DestDir: "{app}"; DestName: "nvngx.ini"; Flags: ignoreversion skipifsourcedoesntexist; Components: upscalers
+Source: "assets\configs\OptiScaler.ini"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist; Components: upscalers
 
 ; XeSS and FidelityFX libraries
 Source: "build\libxess.dll"; DestDir: "{app}"; Flags: uninsneveruninstall skipifsourcedoesntexist; Components: upscalers
@@ -123,12 +123,12 @@ Source: "build\OptiScaler.dll"; DestDir: "{app}"; DestName: "d3d12.dll"; Flags: 
 ; ============================================================
 ; Documentation
 ; ============================================================
-Source: "docs\README.txt"; DestDir: "{app}/licenses"; Flags: ignoreversion skipifsourcedoesntexist; Components: mainfiles
+Source: "assets\README.md"; DestDir: "{app}/docs"; Flags: ignoreversion skipifsourcedoesntexist; Components: mainfiles
 Source: "assets\configs\Config.md"; DestDir: "{app}/docs"; DestName: "OptiScaler_Config.md"; Flags: ignoreversion skipifsourcedoesntexist; Components: mainfiles
 
 [Icons]
 
 [Run]
-Filename: "{app}\licenses\README.txt"; Description: "View the FrameBridge README file"; Flags: postinstall shellexec skipifsilent skipifdoesntexist
-Filename: "{app}\nvngx.ini"; Description: "Edit the configuration file (optional)"; Flags: postinstall shellexec skipifsilent unchecked
+Filename: "{app}\docs\README.md"; Description: "View the FrameBridge README file"; Flags: postinstall shellexec skipifsilent skipifdoesntexist
+Filename: "{app}\OptiScaler.ini"; Description: "Edit the configuration file (optional)"; Flags: postinstall shellexec skipifsilent unchecked
 Filename: "{app}\dlss-finder.exe"; Parameters: "/s"; StatusMsg: "Disabling NVIDIA signature checks for DLSS 3.7"; WorkingDir: "{app}"; Description: "DLSS 3.7 activation step"; Flags: skipifsilent skipifdoesntexist

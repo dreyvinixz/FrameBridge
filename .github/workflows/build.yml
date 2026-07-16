@@ -61,6 +61,7 @@ jobs:
         Copy-Item -Path "OptiScaler.ini" -Destination "installer\assets\configs\OptiScaler.ini" -Force
         Copy-Item -Path "Config.md" -Destination "installer\assets\configs\Config.md" -Force
         Copy-Item -Path "LICENSE" -Destination "installer\assets\LICENSE.rtf" -Force
+        Copy-Item -Path "README.md" -Destination "installer\assets\README.md" -Force
 
 
     - name: Download External Assets (Nukem9 & NVAPI Proxy)
