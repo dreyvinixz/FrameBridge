@@ -40,7 +40,21 @@ jobs:
 
     - name: Build OptiScaler Core
       working-directory: ${{ github.workspace }}
-      run: msbuild /m /p:Configuration=Release /p:Platform=x64 OptiScaler.sln /verbosity:minimal
+      run: msbuild /m /p:Configuration=Release /p:Platform=x64 /p:OutDir=x64\Release\ OptiScaler.sln /verbosity:minimal
+
+    - name: Locate build outputs
+      shell: pwsh
+      run: |
+        Write-Host "=== DLLs ==="
+        Get-ChildItem -Recurse -Filter *.dll | Select FullName
+        
+        Write-Host ""
+        Write-Host "=== EXEs ==="
+        Get-ChildItem -Recurse -Filter *.exe | Select FullName
+        
+        Write-Host ""
+        Write-Host "=== Release folders ==="
+        Get-ChildItem -Recurse -Directory | Where-Object {$_.Name -eq "Release"} | Select FullName
 
     - name: Prepare Installer Directories
       shell: powershell
@@ -51,10 +65,10 @@ jobs:
         New-Item -ItemType Directory -Force -Path "installer\assets\dlssg"
         
         # Move MSBuild outputs
-        Copy-Item -Path "x64\Release\a\OptiScaler.dll" -Destination "installer\build\" -Force
-        Copy-Item -Path "x64\Release\a\OptiScaler\libxess*.dll" -Destination "installer\build\" -Force
-        Copy-Item -Path "x64\Release\a\OptiScaler\amd_fidelityfx_*.dll" -Destination "installer\build\" -Force
-        if (Test-Path "x64\Release\a\OptiScaler\D3D12_OptiScaler") { Copy-Item -Path "x64\Release\a\OptiScaler\D3D12_OptiScaler" -Destination "installer\build\D3D12_OptiScaler" -Recurse -Force }
+        Copy-Item -Path "x64\Release\OptiScaler.dll" -Destination "installer\build\" -Force
+        Copy-Item -Path "x64\Release\libxess*.dll" -Destination "installer\build\" -Force
+        Copy-Item -Path "x64\Release\amd_fidelityfx_*.dll" -Destination "installer\build\" -Force
+        if (Test-Path "x64\Release\D3D12_OptiScaler") { Copy-Item -Path "x64\Release\D3D12_OptiScaler" -Destination "installer\build\D3D12_OptiScaler" -Recurse -Force }
         
         # Copy INI configuration
         Copy-Item -Path "OptiScaler.ini" -Destination "installer\assets\configs\OptiScaler.ini" -Force
