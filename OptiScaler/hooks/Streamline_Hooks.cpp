@@ -394,9 +394,9 @@ void StreamlineHooks::streamlineLogCallback_sl1(sl1::LogType type, const char* m
     if (msg == nullptr)
         return;
 
-    char* trimmed_msg = trimStreamlineLog(msg);
+    const auto trimmed_msg = trimStreamlineLog(msg);
 
-    if (trimmed_msg != nullptr)
+    if (!trimmed_msg.empty())
     {
         switch (type)
         {
@@ -414,7 +414,7 @@ void StreamlineHooks::streamlineLogCallback_sl1(sl1::LogType type, const char* m
             break;
         }
 
-        free(trimmed_msg);
+        
     }
 
     if (o_logCallback_sl1)
