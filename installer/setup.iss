@@ -124,6 +124,7 @@ Source: "build\OptiScaler.dll"; DestDir: "{app}"; DestName: "d3d12.dll"; Flags: 
 ; Documentation
 ; ============================================================
 Source: "docs\README.txt"; DestDir: "{app}/licenses"; Flags: ignoreversion skipifsourcedoesntexist; Components: mainfiles
+Source: "assets\configs\Config.md"; DestDir: "{app}/docs"; DestName: "OptiScaler_Config.md"; Flags: ignoreversion skipifsourcedoesntexist; Components: mainfiles
 
 [Icons]
 

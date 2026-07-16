@@ -59,6 +59,7 @@ jobs:
         
         # Copy INI configuration
         Copy-Item -Path "OptiScaler.ini" -Destination "installer\assets\configs\OptiScaler.ini" -Force
+        Copy-Item -Path "Config.md" -Destination "installer\assets\configs\Config.md" -Force
         Copy-Item -Path "LICENSE" -Destination "installer\assets\LICENSE.rtf" -Force
 
 
