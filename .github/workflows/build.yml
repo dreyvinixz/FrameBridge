@@ -59,8 +59,8 @@ jobs:
     - name: Download External Assets (Nukem9 & NVAPI Proxy)
       shell: powershell
       run: |
-        # Download Nukem9 DLSSG-to-FSR3
-        Invoke-WebRequest -Uri "https://github.com/Nukem9/dlssg-to-fsr3/releases/download/0.100/dlssg-to-fsr3-0.100.zip" -OutFile "dlssg.zip"
+        # Download Nukem9 DLSSG-to-FSR3 (Using OptiScaler mirror since upstream deleted assets)
+        Invoke-WebRequest -Uri "https://github.com/optiscaler/dlssg-to-fsr3/releases/download/0.130/dlssg-to-fsr3-master.zip" -OutFile "dlssg.zip"
         Expand-Archive -Path "dlssg.zip" -DestinationPath "temp_dlssg" -Force
         Copy-Item -Path "temp_dlssg\*" -Destination "installer\assets\dlssg\" -Recurse -Force
         
