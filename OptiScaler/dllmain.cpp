@@ -606,10 +606,9 @@ static void CheckWorkingMode()
         // FrameBridge compatibility layer
         // Keep synchronized with docs/PATCHES.md
         // -----------------------------------------------------------------
-        const bool isOptiScalerModule = 
-            lCaseFilename == "optiscaler.dll" || 
-            lCaseFilename == "dlss-enabler-upscaler.dll" || 
-            lCaseFilename == "nvngx-upscaler.dll";
+        const bool isOptiScalerModule = lCaseFilename == "optiscaler.dll" ||
+                                        lCaseFilename == "dlss-enabler-upscaler.dll" ||
+                                        lCaseFilename == "nvngx-upscaler.dll";
 
         if (isOptiScalerModule)
         {
