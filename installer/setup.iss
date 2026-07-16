@@ -44,10 +44,10 @@ Name: "experimental"; Description: "Experimental support for AMD and Intel GPUs"
 [Components]
 ; Main module - choose one DLL injection method
 Name: mainfiles; Description: Install main FrameBridge files (game dependant); Types: full
-Name: mainfiles/dllversion; Description: Install as a version.dll file (optimal compatibility); Types: full; Flags: exclusive
+Name: mainfiles/dllversion; Description: Install as a version.dll file (if dxgi.dll didn't work); Types: custom; Flags: exclusive
 Name: mainfiles/dllwinmm; Description: Install as a winmm.dll file (if version.dll didn't work); Types: custom; Flags: exclusive
 Name: mainfiles/asiversion; Description: Install as an ASI plugin (if the game is heavily modded); Types: custom debug; Flags: exclusive
-Name: mainfiles/dlldxgi; Description: Install as a dxgi.dll file (if nothing above works); Types: custom; Flags: exclusive
+Name: mainfiles/dlldxgi; Description: Install as a dxgi.dll file (optimal compatibility); Types: full; Flags: exclusive
 Name: mainfiles/dlld3d12; Description: Install as a d3d12.dll file (for specific DirectX 12 games); Types: custom; Flags: exclusive
 
 ; OptiScaler upscaler (compiled from source)
