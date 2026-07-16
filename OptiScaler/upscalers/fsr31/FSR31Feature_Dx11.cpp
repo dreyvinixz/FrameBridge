@@ -1,16 +1,24 @@
 #include <pch.h>
 #include <Config.h>
 #include <Util.h>
-#include "FSR31Feature_Dx11.h"
-#include "MathUtils.h"
 
-using namespace OptiMath;
+#include "FSR31Feature_Dx11.h"
 
 #define ASSIGN_DESC(dest, src)                                                                                         \
     dest.Width = src.Width;                                                                                            \
     dest.Height = src.Height;                                                                                          \
     dest.Format = src.Format;                                                                                          \
     dest.BindFlags = src.BindFlags;
+
+#define SAFE_RELEASE(p)                                                                                                \
+    do                                                                                                                 \
+    {                                                                                                                  \
+        if (p && p != nullptr)                                                                                         \
+        {                                                                                                              \
+            (p)->Release();                                                                                            \
+            (p) = nullptr;                                                                                             \
+        }                                                                                                              \
+    } while ((void) 0, 0);
 
 FSR31FeatureDx11::FSR31FeatureDx11(unsigned int InHandleId, NVSDK_NGX_Parameter* InParameters)
     : FSR31Feature(InHandleId, InParameters), IFeature_Dx11(InHandleId, InParameters),
@@ -134,15 +142,14 @@ bool FSR31FeatureDx11::Evaluate(ID3D11DeviceContext* DeviceContext, NVSDK_NGX_Pa
     if (!IsInited())
         return false;
 
-    auto& state = State::Instance();
-    auto& cfg = *Config::Instance();
-    const auto& ngxParams = *InParameters;
-
     if (!RCAS->IsInit())
         Config::Instance()->RcasEnabled.set_volatile_value(false);
 
     if (!OutputScaler->IsInit())
         Config::Instance()->OutputScalingEnabled.set_volatile_value(false);
+
+    if (Config::Instance()->DADepthIsLinear.value_for_config_ignore_default() == std::nullopt)
+        Config::Instance()->DADepthIsLinear.set_volatile_value(false);
 
     ID3D11ShaderResourceView* restoreSRVs[D3D11_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT] = {};
     ID3D11SamplerState* restoreSamplerStates[D3D11_COMMONSHADER_SAMPLER_SLOT_COUNT] = {};
@@ -346,7 +353,7 @@ bool FSR31FeatureDx11::Evaluate(ID3D11DeviceContext* DeviceContext, NVSDK_NGX_Pa
         else
         {
             LOG_DEBUG("AutoExposure disabled but ExposureTexture is not exist, it may cause problems!!");
-            State::Instance().autoExposure = true;
+            State::Instance().AutoExposure = true;
             State::Instance().changeBackend[Handle()->Id] = true;
             return true;
         }
@@ -409,28 +416,26 @@ bool FSR31FeatureDx11::Evaluate(ID3D11DeviceContext* DeviceContext, NVSDK_NGX_Pa
 
     if (DepthInverted())
     {
-        params.cameraFar = cfg.FsrCameraNear.value_or_default();
-        params.cameraNear = cfg.FsrCameraFar.value_or_default();
+        params.cameraFar = Config::Instance()->FsrCameraNear.value_or_default();
+        params.cameraNear = Config::Instance()->FsrCameraFar.value_or_default();
     }
     else
     {
-        params.cameraFar = cfg.FsrCameraFar.value_or_default();
-        params.cameraNear = cfg.FsrCameraNear.value_or_default();
+        params.cameraFar = Config::Instance()->FsrCameraFar.value_or_default();
+        params.cameraNear = Config::Instance()->FsrCameraNear.value_or_default();
     }
 
-    state.lastFsrCameraFar = params.cameraFar;
-    state.lastFsrCameraNear = params.cameraNear;
+    State::Instance().lastFsrCameraFar = params.cameraFar;
+    State::Instance().lastFsrCameraNear = params.cameraNear;
 
-    if (cfg.FsrVerticalFov.has_value())
-        params.cameraFovAngleVertical = GetRadiansFromDeg(cfg.FsrVerticalFov.value());
-    else if (cfg.FsrHorizontalFov.value_or_default() > 0.0f)
-    {
-        const float hFovRad = GetRadiansFromDeg(cfg.FsrHorizontalFov.value());
+    if (Config::Instance()->FsrVerticalFov.has_value())
+        params.cameraFovAngleVertical = Config::Instance()->FsrVerticalFov.value() * 0.0174532925199433f;
+    else if (Config::Instance()->FsrHorizontalFov.value_or_default() > 0.0f)
         params.cameraFovAngleVertical =
-            GetVerticalFovFromHorizontal(hFovRad, (float) TargetWidth(), (float) TargetHeight());
-    }
+            2.0f * atan((tan(Config::Instance()->FsrHorizontalFov.value() * 0.0174532925199433f) * 0.5f) /
+                        (float) DisplayHeight() * (float) DisplayWidth());
     else
-        params.cameraFovAngleVertical = GetRadiansFromDeg(60);
+        params.cameraFovAngleVertical = 1.0471975511966f;
 
     LOG_DEBUG("FsrVerticalFov: {0}", params.cameraFovAngleVertical);
 
@@ -495,9 +500,7 @@ bool FSR31FeatureDx11::Evaluate(ID3D11DeviceContext* DeviceContext, NVSDK_NGX_Pa
         RCAS != nullptr && RCAS.get() != nullptr && RCAS->CanRender())
     {
         RcasConstants rcasConstants {};
-        rcasConstants.DepthIsLinear = DepthLinear();
-        rcasConstants.DepthIsReversed = DepthInverted();
-        rcasConstants.IsHdr = IsHdr();
+
         rcasConstants.Sharpness = _sharpness;
         InParameters->Get(NVSDK_NGX_Parameter_MV_Scale_X, &rcasConstants.MvScaleX);
         InParameters->Get(NVSDK_NGX_Parameter_MV_Scale_Y, &rcasConstants.MvScaleY);

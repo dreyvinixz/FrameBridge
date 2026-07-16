@@ -12,13 +12,11 @@
 #include <proxies/XeFG_Proxy.h>
 #include <proxies/XeSS_Proxy.h>
 #include <proxies/IGDExt_Proxy.h>
-#include <proxies/Streamline_Proxy.h>
 #include <proxies/KernelBase_Proxy.h>
 
 #include <detours/detours.h>
 
 #include <dxgi1_6.h>
-#include <misc/IdentifyGpu.h>
 
 #include "Hook_Utils.h"
 
@@ -1348,11 +1346,9 @@ static HRESULT hkD3D12CreateDevice(IUnknown* pAdapter, D3D_FEATURE_LEVEL Minimum
         debugController->Release();
     }
 #endif
-    IdentifyGpu::updateD3d12Capabilities(o_D3D12CreateDevice);
 
     DXGI_ADAPTER_DESC desc {};
     std::wstring szName;
-    bool nonPrimaryGpu = false;
     if (pAdapter != nullptr && MinimumFeatureLevel != D3D_FEATURE_LEVEL_1_0_CORE)
     {
         ScopedSkipSpoofing skipSpoofing {};
@@ -1361,13 +1357,6 @@ static HRESULT hkD3D12CreateDevice(IUnknown* pAdapter, D3D_FEATURE_LEVEL Minimum
         {
             szName = desc.Description;
             LOG_INFO("Adapter Desc: {}", wstring_to_string(szName));
-
-            auto primaryGpu = IdentifyGpu::getPrimaryGpu();
-            if (!IsEqualLUID(desc.AdapterLuid, primaryGpu.luid))
-            {
-                LOG_WARN("D3D12Device created with non-primary GPU");
-                nonPrimaryGpu = true;
-            }
         }
     }
 
@@ -1380,13 +1369,11 @@ static HRESULT hkD3D12CreateDevice(IUnknown* pAdapter, D3D_FEATURE_LEVEL Minimum
 
     if (ppDevice == nullptr)
     {
-        LOG_TRACE("ppDevice is nullptr");
-
+        LOG_ERROR("ppDevice is nullptr");
         _creatingD3D12Device = true;
         ScopedCreatingD3DDevice skipCreatingD3DDevice {};
         auto result = o_D3D12CreateDevice(pAdapter, minLevel, riid, ppDevice);
         _creatingD3D12Device = false;
-
         return result;
     }
 
@@ -1406,10 +1393,13 @@ static HRESULT hkD3D12CreateDevice(IUnknown* pAdapter, D3D_FEATURE_LEVEL Minimum
 
     LOG_DEBUG("o_D3D12CreateDevice result: {:X}", (UINT) result);
 
-    if (result == S_OK && ppDevice != nullptr && MinimumFeatureLevel != D3D_FEATURE_LEVEL_1_0_CORE && !nonPrimaryGpu)
+    if (result == S_OK && ppDevice != nullptr && MinimumFeatureLevel != D3D_FEATURE_LEVEL_1_0_CORE)
     {
         LOG_DEBUG("Device captured: {0:X}", (size_t) *ppDevice);
         State::Instance().currentD3D12Device = (ID3D12Device*) *ppDevice;
+
+        if (szName.size() > 0)
+            State::Instance().DeviceAdapterNames[*ppDevice] = wstring_to_string(szName);
 
         if (desc.VendorId == VendorId::Intel && Config::Instance()->UESpoofIntelAtomics64.value_or_default())
         {
@@ -1425,24 +1415,6 @@ static HRESULT hkD3D12CreateDevice(IUnknown* pAdapter, D3D_FEATURE_LEVEL Minimum
 
         // if (Config::Instance()->UESpoofIntelAtomics64.value_or_default())
         //     UnhookDevice();
-
-        if (State::Instance().gameQuirks & GameQuirk::CreateSLOnThe2ndDevice)
-        {
-            static void* lastDevice = nullptr;
-
-            if (lastDevice && lastDevice != *ppDevice && StreamlineProxy::IsD3D12Inited() &&
-                StreamlineProxy::SetD3DDevice()(*ppDevice) == sl::Result::eOk)
-            {
-                auto reflexConst = sl::ReflexOptions {};
-                reflexConst.mode = sl::ReflexMode::eLowLatency;
-                reflexConst.useMarkersToOptimize = false;
-
-                auto result = StreamlineProxy::ReflexSetOptions()(reflexConst);
-                LOG_TRACE("ReflexSetOptions");
-            }
-
-            lastDevice = *ppDevice;
-        }
 
         HookToDevice(State::Instance().currentD3D12Device);
         _d3d12Captured = true;
@@ -1520,10 +1492,6 @@ static HRESULT hkCreateDevice(ID3D12DeviceFactory* pFactory, IUnknown* pAdapter,
         {
             szName = desc.Description;
             LOG_INFO("Adapter Desc: {}", wstring_to_string(szName));
-
-            auto primaryGpu = IdentifyGpu::getPrimaryGpu();
-            if (!IsEqualLUID(desc.AdapterLuid, primaryGpu.luid))
-                LOG_WARN("D3D12Device created with non-primary GPU");
         }
     }
 
@@ -1560,6 +1528,9 @@ static HRESULT hkCreateDevice(ID3D12DeviceFactory* pFactory, IUnknown* pAdapter,
     {
         LOG_DEBUG("Device captured: {0:X}", (size_t) *ppDevice);
         State::Instance().currentD3D12Device = (ID3D12Device*) *ppDevice;
+
+        if (szName.size() > 0)
+            State::Instance().DeviceAdapterNames[*ppDevice] = wstring_to_string(szName);
 
         if (desc.VendorId == VendorId::Intel && Config::Instance()->UESpoofIntelAtomics64.value_or_default())
         {
@@ -2210,19 +2181,8 @@ static void HookToDevice(ID3D12Device* InDevice)
 
     HookToCommandList(InDevice);
 
-    if (State::Instance().activeFgInput == FGInput::Upscaler &&
-        !Config::Instance()->FGDisableHUDFix.value_or_default() &&
-        State::Instance().swapchainInteropApi == SwapchainInteropApi::None)
-    {
+    if (State::Instance().activeFgInput == FGInput::Upscaler && !Config::Instance()->FGDisableHUDFix.value_or_default())
         ResTrack_Dx12::HookDevice(InDevice);
-    }
-
-    if ((State::Instance().activeFgOutput == FGOutput::DLSSG ||
-         State::Instance().activeFgOutput == FGOutput::DLSSGWithNvngx) &&
-        StreamlineProxy::LoadStreamline())
-    {
-        StreamlineProxy::InitWithD3D12(InDevice);
-    }
 }
 
 static void UnhookDevice()

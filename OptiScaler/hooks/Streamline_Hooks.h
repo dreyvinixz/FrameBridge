@@ -8,6 +8,7 @@
 #include <sl_pcl.h>
 #include <sl_reflex.h>
 
+#include <d3d12.h>
 #include "include/sl.param/parameters.h"
 
 #include "Hook_Utils.h"
@@ -55,78 +56,6 @@ struct SystemCapsSl15
     bool hwSchedulingEnabled {};
 };
 
-enum class BufferType : uint64_t
-{
-    Depth = 0,
-    MotionVectors = 1,
-    HUDLessColor = 2,
-    ScalingInputColor = 3,
-    ScalingOutputColor = 4,
-    Normals = 5,
-    Roughness = 6,
-    Albedo = 7,
-    SpecularAlbedo = 8,
-    IndirectAlbedo = 9,
-    SpecularMotionVectors = 10,
-    DisocclusionMask = 11,
-    Emissive = 12,
-    Exposure = 13,
-    NormalRoughness = 14,
-    DiffuseHitNoisy = 15,
-    DiffuseHitDenoised = 16,
-    SpecularHitNoisy = 17,
-    SpecularHitDenoised = 18,
-    ShadowNoisy = 19,
-    ShadowDenoised = 20,
-    AmbientOcclusionNoisy = 21,
-    AmbientOcclusionDenoised = 22,
-    UIColorAndAlpha = 23,
-    ShadowHint = 24,
-    ReflectionHint = 25,
-    ParticleHint = 26,
-    TransparencyHint = 27,
-    AnimatedTextureHint = 28,
-    BiasCurrentColorHint = 29,
-    RaytracingDistance = 30,
-    ReflectionMotionVectors = 31,
-    Position = 32,
-    InvalidDepthMotionHint = 33,
-    Alpha = 34,
-    OpaqueColor = 35,
-    ReactiveMaskHint = 36,
-    TransparencyAndCompositionMaskHint = 37,
-    ReflectedAlbedo = 38,
-    ColorBeforeParticles = 39,
-    ColorBeforeTransparency = 40,
-    ColorBeforeFog = 41,
-    SpecularHitDistance = 42,
-    SpecularRayDirectionHitDistance = 43,
-    SpecularRayDirection = 44,
-    DiffuseHitDistance = 45,
-    DiffuseRayDirectionHitDistance = 46,
-    DiffuseRayDirection = 47,
-    HiResDepth = 48,
-    LinearDepth = 49,
-    BidirectionalDistortionField = 50,
-    TransparencyLayer = 51,
-    TransparencyLayerOpacity = 52,
-    Backbuffer = 53,
-    NoWarpMask = 54,
-    ColorAfterParticles = 55,
-    ColorAfterTransparency = 56,
-    ColorAfterFog = 57,
-    ScreenSpaceSubsurfaceScatteringGuide = 58,
-    ColorBeforeScreenSpaceSubsurfaceScattering = 59,
-    ColorAfterScreenSpaceSubsurfaceScattering = 60,
-    ScreenSpaceRefractionGuide = 61,
-    ColorBeforeScreenSpaceRefraction = 62,
-    ColorAfterScreenSpaceRefraction = 63,
-    DepthOfFieldGuide = 64,
-    ColorBeforeDepthOfField = 65,
-    ColorAfterDepthOfField = 66,
-    ScalingOutputAlpha = 67
-};
-
 class StreamlineHooks
 {
   public:
@@ -138,7 +67,6 @@ class StreamlineHooks
     typedef bool (*PFN_setVoid)(void* self, const char* key, void** value);
 
     static void updateForceReflex();
-    static void updateDlssgOptions();
 
     static void unhookInterposer();
     static void hookInterposer(HMODULE slInterposer);
@@ -148,9 +76,6 @@ class StreamlineHooks
 
     static void unhookDlssg();
     static void hookDlssg(HMODULE slDlssg);
-
-    static void unhookLocalDlssg();
-    static void hookLocalDlssg(HMODULE slDlssg);
 
     static void unhookReflex();
     static void hookReflex(HMODULE slReflex);
@@ -164,7 +89,6 @@ class StreamlineHooks
     static bool isInterposerHooked();
     static bool isDlssHooked();
     static bool isDlssgHooked();
-    static bool isLocalDlssgHooked();
     static bool isCommonHooked();
     static bool isPclHooked();
     static bool isReflexHooked();
@@ -177,9 +101,9 @@ class StreamlineHooks
     static SystemCaps* systemCaps;
     static SystemCapsSl15* systemCapsSl15;
     static void hookSystemCaps(sl::param::IParameters* params);
-    static uint32_t getSystemCapsArch(SystemCaps* altSystemCaps = nullptr);
-    static void setArch(uint32_t arch, SystemCaps* altSystemCaps = nullptr);
-    static void spoofArch(uint32_t currentArch, sl::Feature feature, SystemCaps* altSystemCaps = nullptr);
+    static uint32_t getSystemCapsArch();
+    static void setArch(uint32_t arch);
+    static void spoofArch(uint32_t currentArch, sl::Feature feature);
 
     // Interposer
     static decltype(&slInit) o_slInit;
@@ -193,20 +117,12 @@ class StreamlineHooks
     static decltype(&slGetNewFrameToken) o_slGetNewFrameToken;
 
     static decltype(&sl1::slInit) o_slInit_sl1;
-    static decltype(&sl1::slSetTag) o_slSetTag_sl1;
-    static decltype(&sl1::slSetConstants) o_slSetConstants_interposer_sl1;
-    static decltype(&sl1::slEvaluateFeature) o_slEvaluateFeature_sl1;
 
     static sl::PFun_LogMessageCallback* o_logCallback;
     static sl1::pfunLogMessageCallback* o_logCallback_sl1;
 
     static sl::Result hkslInit(const sl::Preferences& pref, uint64_t sdkVersion);
     static bool hkslInit_sl1(const sl1::Preferences& pref, int applicationId);
-    static bool hkslSetTag_sl1(const sl1::Resource* resource, sl1::BufferType tag, uint32_t id,
-                               const sl1::Extent* extent);
-    static bool hkslSetConstants_sl1(const sl1::Constants& values, uint32_t frameIndex, uint32_t id);
-    static bool hkslEvaluateFeature_sl1(sl1::CommandBuffer* cmdBuffer, sl1::Feature feature, uint32_t frameIndex,
-                                        uint32_t id);
     static sl::Result hkslSetTag(const sl::ViewportHandle& viewport, const sl::ResourceTag* tags, uint32_t numTags,
                                  sl::CommandBuffer* cmdBuffer);
 
@@ -239,8 +155,6 @@ class StreamlineHooks
     static PFN_slOnPluginLoad o_dlssg_slOnPluginLoad;
     static decltype(&slDLSSGSetOptions) o_slDLSSGSetOptions;
     static decltype(&slDLSSGGetState) o_slDLSSGGetState;
-    static inline sl::ViewportHandle lastDlssgViewport {}; // For updating options when we change them
-    static inline sl::DLSSGOptions lastDlssgOptions {};
 
     static bool hkdlssg_slOnPluginLoad(sl::param::IParameters* params, const char* loaderJSON, const char** pluginJSON);
     static sl::Result hkslSetConstants(const sl::Constants& values, const sl::FrameToken& frame,
@@ -250,26 +164,16 @@ class StreamlineHooks
                                         const sl::DLSSGOptions* options);
     static void* hkdlssg_slGetPluginFunction(const char* functionName);
 
-    // Local DLSSG
-    static PFN_slGetPluginFunction o_local_dlssg_slGetPluginFunction;
-    static PFN_slOnPluginLoad o_local_dlssg_slOnPluginLoad;
-
-    static bool hklocal_dlssg_slOnPluginLoad(sl::param::IParameters* params, const char* loaderJSON,
-                                             const char** pluginJSON);
-    static void* hklocal_dlssg_slGetPluginFunction(const char* functionName);
-
     // Reflex
     static sl::ReflexMode reflexGamesLastMode;
     static PFN_slGetPluginFunction o_reflex_slGetPluginFunction;
     static PFN_slSetConstants_sl1 o_reflex_slSetConstants_sl1;
     static PFN_slOnPluginLoad o_reflex_slOnPluginLoad;
     static decltype(&slReflexSetOptions) o_slReflexSetOptions;
-    static decltype(&slReflexSleep) o_slReflexSleep;
 
     static bool hkreflex_slOnPluginLoad(sl::param::IParameters* params, const char* loaderJSON,
                                         const char** pluginJSON);
     static sl::Result hkslReflexSetOptions(const sl::ReflexOptions& options);
-    static sl::Result hkslReflexSleep(const sl::FrameToken& frame);
     static bool hkreflex_slSetConstants_sl1(const void* data, uint32_t frameIndex, uint32_t id);
     static void* hkreflex_slGetPluginFunction(const char* functionName);
 
@@ -302,9 +206,6 @@ class StreamlineHooks
     // Function signature checking
     VALIDATE_MEMBER_HOOK(hkslInit, decltype(&slInit))
     VALIDATE_MEMBER_HOOK(hkslInit_sl1, decltype(&sl1::slInit))
-    VALIDATE_MEMBER_HOOK(hkslSetTag_sl1, decltype(&sl1::slSetTag))
-    VALIDATE_MEMBER_HOOK(hkslSetConstants_sl1, decltype(&sl1::slSetConstants))
-    VALIDATE_MEMBER_HOOK(hkslEvaluateFeature_sl1, decltype(&sl1::slEvaluateFeature))
     VALIDATE_MEMBER_HOOK(hkslSetTag, decltype(&slSetTag))
     VALIDATE_MEMBER_HOOK(hkslSetTagForFrame, decltype(&slSetTagForFrame))
     VALIDATE_MEMBER_HOOK(hkslEvaluateFeature, decltype(&slEvaluateFeature))

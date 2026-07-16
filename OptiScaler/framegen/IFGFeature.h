@@ -20,6 +20,8 @@ struct FG_Constants
     flag_set<FG_Flags> flags;
     uint32_t displayWidth;
     uint32_t displayHeight;
+    // uint32_t maxRenderWidth;
+    // uint32_t maxRenderHeight;
 };
 
 enum FG_ResourceType : uint32_t

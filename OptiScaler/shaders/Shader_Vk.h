@@ -5,17 +5,6 @@
 #include <string>
 #include <vector>
 
-// Matches NVSDK_NGX_ImageViewInfo_VK
-struct VkImageInfo
-{
-    VkImageView ImageView;
-    VkImage Image;
-    VkImageSubresourceRange SubresourceRange;
-    VkFormat Format;
-    unsigned int Width;
-    unsigned int Height;
-};
-
 class Shader_Vk
 {
   protected:

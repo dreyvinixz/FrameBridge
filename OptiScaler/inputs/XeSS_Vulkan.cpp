@@ -129,7 +129,7 @@ xess_result_t hk_xessVKCreateContext(VkInstance instance, VkPhysicalDevice physi
     _physicalDevice = physicalDevice;
     _device = device;
 
-    if (!State::Instance().nvngxVkInited)
+    if (!State::Instance().NvngxVkInited)
     {
         NVSDK_NGX_FeatureCommonInfo fcInfo {};
         auto exePath = Util::ExePath().remove_filename();
@@ -327,7 +327,7 @@ xess_result_t hk_xessVKExecute(xess_context_handle_t hContext, VkCommandBuffer c
     params->Set(NVSDK_NGX_Parameter_DLSS_Input_Bias_Current_Color_SubrectBase_Y,
                 pExecParams->inputResponsiveMaskBase.y);
 
-    State::Instance().setInputApiName = ApiUpscalerInput::XeSS_VK;
+    State::Instance().setInputApiName = "XeSS";
 
     if (NVSDK_NGX_VULKAN_EvaluateFeature(commandBuffer, handle, params, nullptr) == NVSDK_NGX_Result_Success)
         return XESS_RESULT_SUCCESS;

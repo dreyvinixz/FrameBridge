@@ -24,7 +24,7 @@ class XeSSFeature_Vk : public virtual IFeature_Vk
     {
         return feature_version { XeSSProxy::Version().major, XeSSProxy::Version().minor, XeSSProxy::Version().patch };
     }
-    Upscaler GetUpscalerType() const final { return Upscaler::XeSS; }
+    std::string Name() const { return "XeSS"; }
 
     bool Init(VkInstance InInstance, VkPhysicalDevice InPD, VkDevice InDevice, VkCommandBuffer InCmdList,
               PFN_vkGetInstanceProcAddr InGIPA, PFN_vkGetDeviceProcAddr InGDPA,

@@ -18,6 +18,8 @@
 #include <ffx_framegeneration.h>
 #include <ffx_upscale.h>
 
+#include <scanner/scanner.h>
+
 #include <magic_enum.hpp>
 
 // A mess to be able to import both
@@ -33,7 +35,6 @@
 #define FFX_API_CONFIGURE_FG_SWAPCHAIN_KEY_FRAMEPACINGTUNING FFX_API_CONFIGURE_FG_SWAPCHAIN_KEY_FRAMEPACINGTUNING_VK
 
 #include <vk/ffx_api_vk.h>
-#include <imgui/ImGuiNotify.hpp>
 
 #undef FFX_API_CONFIGURE_FG_SWAPCHAIN_KEY_WAITCALLBACK
 #undef FFX_API_CONFIGURE_FG_SWAPCHAIN_KEY_FRAMEPACINGTUNING
@@ -71,6 +72,8 @@ struct FfxModule
     PfnFfxDispatch Dispatch = nullptr;
 };
 
+using AmdInt8Check = uint8_t(__fastcall*)(void* a1, ID3D12Device* device);
+
 class FfxApiProxy
 {
   private:
@@ -91,6 +94,31 @@ class FfxApiProxy
     inline static ankerl::unordered_dense::map<ffxContext, FFXStructType> contextToType;
 
     inline static bool _skipDestroyCalls = false;
+
+    inline static AmdInt8Check o_amdInt8Check = nullptr;
+    inline static uint8_t hkAmdInt8Check(void* a1, ID3D12Device* device)
+    {
+        LOG_DEBUG("Called with a1: {:X}, device: {:X}", (uintptr_t) a1, (uintptr_t) device);
+        return 1;
+    }
+
+    static inline void parse_version(const char* version_str, feature_version* _version)
+    {
+        const char* p = version_str;
+
+        // Skip non-digits at front
+        while (*p)
+        {
+            if (isdigit((unsigned char) p[0]))
+            {
+                if (sscanf(p, "%u.%u.%u", &_version->major, &_version->minor, &_version->patch) == 3)
+                    return;
+            }
+            ++p;
+        }
+
+        LOG_WARN("can't parse {0}", version_str);
+    }
 
     static bool IsLoader(const std::wstring& filePath)
     {
@@ -113,49 +141,10 @@ class FfxApiProxy
     static std::wstring Dx12Module_Denoiser_Path() { return denoiser_dx12.filePath; }
     static std::wstring Dx12Module_Radiance_Path() { return radiance_dx12.filePath; }
 
-    static bool IsFGReady()
-    {
-        bool result = (main_dx12.dll && !main_dx12.isLoader) || fg_dx12.dll != nullptr;
-
-        if (!result)
-            ImGui::InsertNotification({ ImGuiToastType::Error, 10000,
-                                        "Can't load amd_fidelityfx_dx12\nDid you forget to extract that dll?" });
-
-        return result;
-    }
-
-    static bool IsSRReady()
-    {
-        bool result = (main_dx12.dll && !main_dx12.isLoader) || upscaling_dx12.dll != nullptr;
-
-        if (!result)
-            ImGui::InsertNotification({ ImGuiToastType::Error, 10000,
-                                        "Can't load amd_fidelityfx_dx12\nDid you forget to extract that dll?" });
-
-        return result;
-    }
-
-    static bool IsDenoiserReady()
-    {
-        bool result = (main_dx12.dll && !main_dx12.isLoader) || denoiser_dx12.dll != nullptr;
-
-        if (!result)
-            ImGui::InsertNotification({ ImGuiToastType::Error, 10000,
-                                        "Can't load amd_fidelityfx_dx12\nDid you forget to extract that dll?" });
-
-        return result;
-    }
-
-    static bool IsRadianceReady()
-    {
-        bool result = (main_dx12.dll && !main_dx12.isLoader) || radiance_dx12.dll != nullptr;
-
-        if (!result)
-            ImGui::InsertNotification({ ImGuiToastType::Error, 10000,
-                                        "Can't load amd_fidelityfx_dx12\nDid you forget to extract that dll?" });
-
-        return result;
-    }
+    static bool IsFGReady() { return (main_dx12.dll && !main_dx12.isLoader) || fg_dx12.dll != nullptr; }
+    static bool IsSRReady() { return (main_dx12.dll && !main_dx12.isLoader) || upscaling_dx12.dll != nullptr; }
+    static bool IsDenoiserReady() { return (main_dx12.dll && !main_dx12.isLoader) || denoiser_dx12.dll != nullptr; }
+    static bool IsRadianceReady() { return (main_dx12.dll && !main_dx12.isLoader) || radiance_dx12.dll != nullptr; }
 
     static FFXStructType GetType(ffxStructType_t type)
     {
@@ -499,6 +488,33 @@ class FfxApiProxy
 
         if (!loadResult)
             upscaling_dx12.dll = nullptr;
+
+        if (Config::Instance()->Fsr4ForceEnableInt8.value_or_default())
+        {
+            const char* pattern =
+                "48 83 EC 48 48 8B C2 48 85 D2 74 54 48 8D 54 24 20 48 8B C8 E8 ? ? ? ? 81 7C 24 34 91 00 00 00 44 0F "
+                "B6 C0 75 23 8B 54 24 30 8D 4A FF 83 F9 0E 76 13 8D 4A E0 81 F9 DE 00 00 00 76 08 8D 4A F0 83 F9 0F";
+
+            auto o_amdInt8Check = (AmdInt8Check) scanner::GetAddress(upscaling_dx12.dll, pattern);
+
+            if (o_amdInt8Check != nullptr)
+            {
+                LOG_INFO("Found AmdInt8Check at {:X}", (size_t) o_amdInt8Check);
+
+                DetourTransactionBegin();
+                DetourUpdateThread(GetCurrentThread());
+
+                if (o_amdInt8Check != nullptr)
+                    DetourAttach(&(PVOID&) o_amdInt8Check, hkAmdInt8Check);
+
+                auto detourResult = DetourTransactionCommit();
+                if (detourResult != NO_ERROR)
+                {
+                    LOG_ERROR("DetourTransactionCommit result: {:X}", detourResult);
+                    o_amdInt8Check = nullptr;
+                }
+            }
+        }
 
         return loadResult;
     }
@@ -953,7 +969,7 @@ class FfxApiProxy
 
                 if (queryResult == FFX_API_RETURN_OK)
                 {
-                    main_dx12.version.parse_version(versionNames[0]);
+                    parse_version(versionNames[0], &main_dx12.version);
                     LOG_INFO("FfxApi Dx12 version: {}.{}.{}", main_dx12.version.major, main_dx12.version.minor,
                              main_dx12.version.patch);
                 }
@@ -1014,7 +1030,7 @@ class FfxApiProxy
 
                 if (queryResult == FFX_API_RETURN_OK)
                 {
-                    upscaling_dx12.version.parse_version(versionNames[0]);
+                    parse_version(versionNames[0], &upscaling_dx12.version);
                     LOG_INFO("FfxApi Dx12 SR version: {}.{}.{}", upscaling_dx12.version.major,
                              upscaling_dx12.version.minor, upscaling_dx12.version.patch);
                 }
@@ -1063,7 +1079,7 @@ class FfxApiProxy
 
                 if (queryResult == FFX_API_RETURN_OK)
                 {
-                    fg_dx12.version.parse_version(versionNames[0]);
+                    parse_version(versionNames[0], &fg_dx12.version);
                     LOG_INFO("FfxApi Dx12 FG version: {}.{}.{}", fg_dx12.version.major, fg_dx12.version.minor,
                              fg_dx12.version.patch);
                 }
@@ -1112,7 +1128,7 @@ class FfxApiProxy
 
                 if (queryResult == FFX_API_RETURN_OK)
                 {
-                    denoiser_dx12.version.parse_version(versionNames[0]);
+                    parse_version(versionNames[0], &denoiser_dx12.version);
                     LOG_INFO("FfxApi Dx12 SR version: {}.{}.{}", denoiser_dx12.version.major,
                              denoiser_dx12.version.minor, denoiser_dx12.version.patch);
                 }
@@ -1161,7 +1177,7 @@ class FfxApiProxy
 
                 if (queryResult == FFX_API_RETURN_OK)
                 {
-                    radiance_dx12.version.parse_version(versionNames[0]);
+                    parse_version(versionNames[0], &radiance_dx12.version);
                     LOG_INFO("FfxApi Dx12 SR version: {}.{}.{}", radiance_dx12.version.major,
                              radiance_dx12.version.minor, radiance_dx12.version.patch);
                 }
@@ -1600,7 +1616,7 @@ class FfxApiProxy
 
                 if (queryResult == FFX_API_RETURN_OK)
                 {
-                    main_vk.version.parse_version(versionNames[0]);
+                    parse_version(versionNames[0], &main_vk.version);
                     LOG_INFO("FfxApi Vulkan version: {}.{}.{}", main_vk.version.major, main_vk.version.minor,
                              main_vk.version.patch);
                 }

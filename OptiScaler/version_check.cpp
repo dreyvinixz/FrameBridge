@@ -18,13 +18,76 @@
 
 namespace
 {
+struct SemanticVersion
+{
+    int major = 0;
+    int minor = 0;
+    int patch = 0;
+};
+
 struct LatestReleaseInfo
 {
     std::string tag;
     std::string url;
 };
 
-feature_version CurrentVersion() { return { VER_MAJOR_VERSION, VER_MINOR_VERSION, VER_HOTFIX_VERSION }; }
+SemanticVersion CurrentVersion() { return { VER_MAJOR_VERSION, VER_MINOR_VERSION, VER_HOTFIX_VERSION }; }
+
+std::optional<SemanticVersion> ParseVersionString(std::string_view version)
+{
+    if (version.empty())
+        return std::nullopt;
+
+    if (version.front() == 'v' || version.front() == 'V')
+        version.remove_prefix(1);
+
+    const auto suffixPos = version.find_first_of("-+ ");
+    if (suffixPos != std::string_view::npos)
+        version = version.substr(0, suffixPos);
+
+    SemanticVersion parsed {};
+    int components[3] = { 0, 0, 0 };
+    size_t componentIndex = 0;
+    size_t begin = 0;
+
+    while (begin <= version.size() && componentIndex < 3)
+    {
+        const size_t end = version.find('.', begin);
+        const auto part = version.substr(begin, (end == std::string_view::npos ? version.size() : end) - begin);
+
+        if (part.empty())
+            return std::nullopt;
+
+        int value = 0;
+        const auto result = std::from_chars(part.data(), part.data() + part.size(), value);
+        if (result.ec != std::errc())
+            return std::nullopt;
+
+        components[componentIndex++] = value;
+
+        if (end == std::string_view::npos)
+            break;
+
+        begin = end + 1;
+    }
+
+    parsed.major = components[0];
+    parsed.minor = components[1];
+    parsed.patch = components[2];
+
+    return parsed;
+}
+
+int CompareVersions(const SemanticVersion& lhs, const SemanticVersion& rhs)
+{
+    if (lhs.major != rhs.major)
+        return lhs.major < rhs.major ? -1 : 1;
+    if (lhs.minor != rhs.minor)
+        return lhs.minor < rhs.minor ? -1 : 1;
+    if (lhs.patch != rhs.patch)
+        return lhs.patch < rhs.patch ? -1 : 1;
+    return 0;
+}
 
 std::optional<LatestReleaseInfo> FetchLatestRelease()
 {
@@ -50,9 +113,6 @@ std::optional<LatestReleaseInfo> FetchLatestRelease()
             session = nullptr;
         }
     };
-
-    // Wine is being stoopid and fetch deadlocks somewhere otherwise
-    Sleep(1000);
 
     session = WinHttpOpen(L"OptiScaler Version Check/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME,
                           WINHTTP_NO_PROXY_BYPASS, 0);
@@ -187,7 +247,7 @@ void RunVersionCheck()
         return;
     }
 
-    const feature_version remoteVersion(release->tag.c_str());
+    const auto remoteVersion = ParseVersionString(release->tag);
 
     auto& state = State::Instance();
     {
@@ -196,7 +256,7 @@ void RunVersionCheck()
         state.latestVersionUrl = release->url;
     }
 
-    if (remoteVersion == feature_version { 0, 0, 0 })
+    if (!remoteVersion.has_value())
     {
         LOG_WARN("Version check received unrecognized tag format: {}", release->tag);
         std::scoped_lock lock(state.versionCheckMutex);
@@ -206,7 +266,7 @@ void RunVersionCheck()
     }
 
     const auto localVersion = CurrentVersion();
-    const bool updateAvailable = remoteVersion > localVersion;
+    const bool updateAvailable = CompareVersions(remoteVersion.value(), localVersion) > 0;
 
     {
         std::scoped_lock lock(state.versionCheckMutex);

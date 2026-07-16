@@ -7,8 +7,27 @@ IFeature_Dx11::~IFeature_Dx11()
     if (State::Instance().isShuttingDown)
         return;
 
-    Imgui.reset();
-    OutputScaler.reset();
-    RCAS.reset();
-    Bias.reset();
+    if (Imgui != nullptr && Imgui.get() != nullptr)
+    {
+        Imgui.reset();
+        Imgui = nullptr;
+    }
+
+    if (OutputScaler != nullptr && OutputScaler.get() != nullptr)
+    {
+        OutputScaler.reset();
+        OutputScaler = nullptr;
+    }
+
+    if (RCAS != nullptr && RCAS.get() != nullptr)
+    {
+        RCAS.reset();
+        RCAS = nullptr;
+    }
+
+    if (Bias != nullptr && Bias.get() != nullptr)
+    {
+        Bias.reset();
+        Bias = nullptr;
+    }
 }

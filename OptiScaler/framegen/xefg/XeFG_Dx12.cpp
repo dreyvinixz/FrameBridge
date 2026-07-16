@@ -55,7 +55,7 @@ bool XeFG_Dx12::CreateSwapchainContext(ID3D12Device* device)
         if (result != XEFG_SWAPCHAIN_RESULT_SUCCESS)
         {
             LOG_ERROR("D3D12CreateContext error: {} ({})", magic_enum::enum_name(result), (UINT) result);
-            return false;
+            return result;
         }
 
         LOG_INFO("XeFG context created");
@@ -67,50 +67,34 @@ bool XeFG_Dx12::CreateSwapchainContext(ID3D12Device* device)
             LOG_ERROR("SetLoggingCallback error: {} ({})", magic_enum::enum_name(result), (UINT) result);
         }
 
-#ifndef LOW_LATENCY_INPUTS
-        // Force fakenvapi to create XeLL for us
-        if (fakenvapi::forceMode(device, LowLatencyMode::XeLL))
-        {
-            result = XeFGProxy::SetLatencyReduction()(_swapChainContext, fakenvapi::getCurrentContext());
+        // if (XeLLProxy::Context() == nullptr)
+        XeLLProxy::CreateContext(device);
 
-            if (result != XEFG_SWAPCHAIN_RESULT_SUCCESS)
-            {
-                LOG_ERROR("SetLatencyReduction error: {} ({})", magic_enum::enum_name(result), (UINT) result);
-                return false;
-            }
-        }
-#else
-        InputXeLL::xell_input_handle_t localXellContext;
-        if (InputXeLL::D3D12CreateContext(device, &localXellContext) == XELL_RESULT_SUCCESS)
+        if (XeLLProxy::Context() != nullptr)
         {
-            localXellContext->inputContext.localContext = true; // We created this context
-
             xell_sleep_params_t sleepParams = {};
             sleepParams.bLowLatencyMode = true;
             sleepParams.bLowLatencyBoost = false;
             sleepParams.minimumIntervalUs = 0;
 
-            auto xellResult = InputXeLL::SetSleepMode(localXellContext, &sleepParams);
+            auto xellResult = XeLLProxy::SetSleepMode()(XeLLProxy::Context(), &sleepParams);
             if (xellResult != XELL_RESULT_SUCCESS)
             {
                 LOG_ERROR("SetSleepMode error: {} ({})", magic_enum::enum_name(xellResult), (UINT) xellResult);
-                return false;
+                return result;
             }
 
-            result = XeFGProxy::SetLatencyReduction()(_swapChainContext, (xell_context_handle_t) localXellContext);
+            auto fnaResult = fakenvapi::setModeAndContext(XeLLProxy::Context(), Mode::XeLL);
+            LOG_DEBUG("fakenvapi::setModeAndContext: {}", fnaResult);
+
+            result = XeFGProxy::SetLatencyReduction()(_swapChainContext, XeLLProxy::Context());
 
             if (result != XEFG_SWAPCHAIN_RESULT_SUCCESS)
             {
                 LOG_ERROR("SetLatencyReduction error: {} ({})", magic_enum::enum_name(result), (UINT) result);
-                return false;
+                return result;
             }
-        }
-#endif
-        else
-        {
-            LOG_ERROR("Couldn't create XeLL");
-            return false;
-        }
+        };
 
         createResult = true;
 
@@ -169,7 +153,11 @@ bool XeFG_Dx12::DestroySwapchainContext()
         }
         else
         {
-            State::Instance().currentFGSwapchain = nullptr;
+            if (XeLLProxy::Context() != nullptr)
+                XeLLProxy::DestroyXeLLContext();
+
+            if (!Config::Instance()->FGPreserveSwapChain.value_or_default())
+                State::Instance().currentFGSwapchain = nullptr;
         }
     }
 
@@ -241,6 +229,7 @@ bool XeFG_Dx12::CreateSwapchain(IDXGIFactory* factory, ID3D12CommandQueue* cmdQu
                               desc->BufferDesc.Format, desc->Flags) == S_OK;
 
             *swapChain = State::Instance().currentFGSwapchain;
+
             return result;
         }
         // Game is creating new swapchain without releasing old one,
@@ -367,9 +356,6 @@ bool XeFG_Dx12::CreateSwapchain(IDXGIFactory* factory, ID3D12CommandQueue* cmdQu
     if (_framesToInterpolate > intTarget)
         Config::Instance()->FGXeFGInterpolationCount.set_volatile_value(intTarget);
 
-    if (Config::Instance()->ForceXeLL.value_or_default())
-        params.maxInterpolatedFrames = 1;
-
     params.maxInterpolatedFrames = intTarget;
 
     params.initFlags = XEFG_SWAPCHAIN_INIT_FLAG_NONE;
@@ -419,12 +405,6 @@ bool XeFG_Dx12::CreateSwapchain(IDXGIFactory* factory, ID3D12CommandQueue* cmdQu
     {
         LOG_ERROR("D3D12GetSwapChainPtr error: {} ({})", magic_enum::enum_name(result), (UINT) result);
         return false;
-    }
-
-    // When forcing XeLL, always tell XeFG that FG is active, even tho we don't send anything
-    if (State::Instance().activeFgInput == FGInput::ForceXeLL)
-    {
-        XeFGProxy::SetEnabled()(_swapChainContext, true);
     }
 
     _gameCommandQueue = realQueue;
@@ -535,9 +515,6 @@ bool XeFG_Dx12::CreateSwapchain1(IDXGIFactory* factory, ID3D12CommandQueue* cmdQ
     if (_framesToInterpolate > intTarget)
         Config::Instance()->FGXeFGInterpolationCount.set_volatile_value(intTarget);
 
-    if (Config::Instance()->ForceXeLL.value_or_default())
-        params.maxInterpolatedFrames = 1;
-
     params.maxInterpolatedFrames = intTarget;
 
     params.initFlags = XEFG_SWAPCHAIN_INIT_FLAG_NONE;
@@ -567,15 +544,17 @@ bool XeFG_Dx12::CreateSwapchain1(IDXGIFactory* factory, ID3D12CommandQueue* cmdQ
     if (Config::Instance()->FGXeFGHighResMV.value_or_default())
         _constants.flags |= FG_Flags::DisplayResolutionMVs;
 
-    xefg_swapchain_result_t result;
+    State::Instance().skipSpoofing = true;
 
-    {
 #ifndef DONT_USE_XMX
-        ScopedSkipSpoofing skipSpoofing {};
+    ScopedSkipSpoofing skipSpoofing {};
 #endif // !DONT_USE_XMX
-        result = XeFGProxy::D3D12InitFromSwapChainDesc()(_swapChainContext, hwnd, desc, pFullscreenDesc, realQueue,
-                                                         factory12, &params);
-    }
+
+    xefg_swapchain_result_t result;
+    result = XeFGProxy::D3D12InitFromSwapChainDesc()(_swapChainContext, hwnd, desc, pFullscreenDesc, realQueue,
+                                                     factory12, &params);
+
+    State::Instance().skipSpoofing = false;
 
     if (result != XEFG_SWAPCHAIN_RESULT_SUCCESS)
     {
@@ -589,12 +568,6 @@ bool XeFG_Dx12::CreateSwapchain1(IDXGIFactory* factory, ID3D12CommandQueue* cmdQ
     {
         LOG_ERROR("D3D12GetSwapChainPtr error: {} ({})", magic_enum::enum_name(result), (UINT) result);
         return false;
-    }
-
-    // When forcing XeLL, always tell XeFG that FG is active, even tho we don't send anything
-    if (State::Instance().activeFgInput == FGInput::ForceXeLL)
-    {
-        XeFGProxy::SetEnabled()(_swapChainContext, true);
     }
 
     _gameCommandQueue = realQueue;
@@ -620,7 +593,7 @@ void XeFG_Dx12::CreateContext(ID3D12Device* device, FG_Constants& fgConstants)
     if (_isActive)
     {
         LOG_INFO("FG context recreated while active, pausing");
-        State::Instance().fgChanged = true;
+        State::Instance().FGchanged = true;
         UpdateTarget();
         Deactivate();
     }
@@ -636,7 +609,8 @@ void XeFG_Dx12::Activate()
         nativeAA = currentFeature->RenderWidth() == currentFeature->DisplayWidth();
 
     if (_swapChainContext != nullptr && _fgContext != nullptr && !_isActive &&
-        (IsLowResMV() || nativeAA || Config::Instance()->FGXeFGIgnoreInitChecks.value_or_default()))
+        (IsLowResMV() || nativeAA || (State::Instance().gameQuirks & GameQuirk::ForceFGRenderSizeMVs) ||
+         Config::Instance()->FGXeFGIgnoreInitChecks.value_or_default()))
     {
         auto result = XeFGProxy::SetEnabled()(_swapChainContext, true);
 
@@ -666,8 +640,6 @@ void XeFG_Dx12::Deactivate()
                 _gameCommandQueue->ExecuteCommandLists(1, (ID3D12CommandList**) &_uiCommandList[fIndex]);
             else
                 LOG_ERROR("_uiCommandList[{}]->Close() error: {:X}", fIndex, (UINT) closeResult);
-
-            _gameCommandQueue->Signal(_uiFence, _uiAllocatorFenceValues[fIndex]);
 
             _uiCommandListResetted[fIndex] = false;
         }
@@ -803,7 +775,7 @@ bool XeFG_Dx12::Dispatch()
     {
         state.WAR_xefgRequestFGToggle = false;
 
-        state.fgChanged = true;
+        state.FGchanged = true;
         UpdateTarget();
         Deactivate();
     }
@@ -825,7 +797,7 @@ bool XeFG_Dx12::Dispatch()
                      usingHudless);
 
             _haveHudless = usingHudless;
-            state.fgChanged = true;
+            state.FGchanged = true;
             UpdateTarget();
             Deactivate();
 
@@ -858,7 +830,7 @@ bool XeFG_Dx12::Dispatch()
     XeFGProxy::EnableDebugFeature()(_swapChainContext, XEFG_SWAPCHAIN_DEBUG_FEATURE_TAG_INTERPOLATED_FRAMES,
                                     Config::Instance()->FGXeFGDebugView.value_or_default(), nullptr);
     XeFGProxy::EnableDebugFeature()(_swapChainContext, XEFG_SWAPCHAIN_DEBUG_FEATURE_SHOW_ONLY_INTERPOLATION,
-                                    state.fgOnlyGenerated, nullptr);
+                                    state.FGonlyGenerated, nullptr);
 
     xefg_swapchain_frame_constant_data_t constData = {};
 
@@ -943,7 +915,7 @@ bool XeFG_Dx12::Dispatch()
     {
         LOG_ERROR("TagFrameConstants error: {} ({})", magic_enum::enum_name(result), (UINT) result);
 
-        state.fgChanged = true;
+        state.FGchanged = true;
         UpdateTarget();
         Deactivate();
 
@@ -955,7 +927,7 @@ bool XeFG_Dx12::Dispatch()
     {
         LOG_ERROR("SetPresentId error: {} ({})", magic_enum::enum_name(result), (UINT) result);
 
-        state.fgChanged = true;
+        state.FGchanged = true;
         UpdateTarget();
         Deactivate();
 
@@ -1006,7 +978,7 @@ bool XeFG_Dx12::Dispatch()
         {
             LOG_ERROR("D3D12TagFrameResource Backbuffer error: {} ({})", magic_enum::enum_name(result), (UINT) result);
 
-            state.fgChanged = true;
+            state.FGchanged = true;
             UpdateTarget();
             Deactivate();
         }
@@ -1028,8 +1000,6 @@ bool XeFG_Dx12::SetInterpolatedFrameCount(UINT interpolatedFrameCount) { return 
 void XeFG_Dx12::EvaluateState(ID3D12Device* device, FG_Constants& fgConstants)
 {
     LOG_FUNC();
-
-    OwnedLockGuard lock(Mutex, 555);
 
     auto& state = State::Instance();
 
@@ -1058,7 +1028,7 @@ void XeFG_Dx12::EvaluateState(ID3D12Device* device, FG_Constants& fgConstants)
             UpdateTarget();
         }
         // If there is a change deactivate it
-        else if (state.fgChanged)
+        else if (state.FGchanged)
         {
             LOG_DEBUG("FGChanged");
             Deactivate();
@@ -1067,7 +1037,7 @@ void XeFG_Dx12::EvaluateState(ID3D12Device* device, FG_Constants& fgConstants)
             UpdateTarget();
 
             // Destroy if Swapchain has a change destroy FG Context too
-            if (state.scChanged)
+            if (state.SCchanged)
                 DestroyFGContext();
         }
 
@@ -1079,15 +1049,15 @@ void XeFG_Dx12::EvaluateState(ID3D12Device* device, FG_Constants& fgConstants)
         LOG_DEBUG("!FGEnabled");
         Deactivate();
 
-        state.clearCapturedHudlesses = true;
+        state.ClearCapturedHudlesses = true;
         Hudfix_Dx12::ResetCounters();
     }
 
-    if (state.fgChanged)
+    if (state.FGchanged)
     {
         LOG_DEBUG("FGchanged");
 
-        state.fgChanged = false;
+        state.FGchanged = false;
 
         Hudfix_Dx12::ResetCounters();
 
@@ -1099,17 +1069,36 @@ void XeFG_Dx12::EvaluateState(ID3D12Device* device, FG_Constants& fgConstants)
             Mutex.unlockThis(2);
     }
 
-    state.scChanged = false;
+    state.SCchanged = false;
 }
 
 void XeFG_Dx12::ReleaseObjects()
 {
     for (size_t i = 0; i < BUFFER_COUNT; i++)
     {
-        SAFE_RELEASE(_uiCommandAllocator[i]);
-        SAFE_RELEASE(_uiCommandList[i]);
-        SAFE_RELEASE(_scCommandAllocator[i]);
-        SAFE_RELEASE(_scCommandList[i]);
+        if (_uiCommandAllocator[i] != nullptr)
+        {
+            _uiCommandAllocator[i]->Release();
+            _uiCommandAllocator[i] = nullptr;
+        }
+
+        if (_uiCommandList[i] != nullptr)
+        {
+            _uiCommandList[i]->Release();
+            _uiCommandList[i] = nullptr;
+        }
+
+        if (_scCommandAllocator[i] != nullptr)
+        {
+            _scCommandAllocator[i]->Release();
+            _scCommandAllocator[i] = nullptr;
+        }
+
+        if (_scCommandList[i] != nullptr)
+        {
+            _scCommandList[i]->Release();
+            _scCommandList[i] = nullptr;
+        }
     }
 
     _renderUI.reset();
@@ -1121,8 +1110,6 @@ void XeFG_Dx12::ReleaseObjects()
 
 void XeFG_Dx12::CreateObjects(ID3D12Device* InDevice)
 {
-    _device = InDevice;
-
     if (_uiCommandAllocator[0] != nullptr)
         return;
 
@@ -1168,26 +1155,6 @@ void XeFG_Dx12::CreateObjects(ID3D12Device* InDevice)
                 break;
             }
 
-            if (_uiFence == nullptr)
-            {
-                result = InDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&_uiFence));
-                if (FAILED(result))
-                {
-                    LOG_ERROR("Create UI fence failed: {:X}", (UINT) result);
-                    break;
-                }
-            }
-
-            if (_uiFenceEvent == nullptr)
-            {
-                _uiFenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
-                if (_uiFenceEvent == nullptr)
-                {
-                    LOG_ERROR("CreateEvent for UI fence failed");
-                    break;
-                }
-            }
-
             result =
                 InDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&_scCommandAllocator[i]));
             if (result != S_OK)
@@ -1217,26 +1184,6 @@ void XeFG_Dx12::CreateObjects(ID3D12Device* InDevice)
                 LOG_ERROR("_scCommandList[{}]->Close: {:X}", i, (unsigned long) result);
                 break;
             }
-
-            if (_scFence == nullptr)
-            {
-                result = InDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&_scFence));
-                if (FAILED(result))
-                {
-                    LOG_ERROR("Create SC fence failed: {:X}", (UINT) result);
-                    break;
-                }
-            }
-
-            if (_scFenceEvent == nullptr)
-            {
-                _scFenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
-                if (_scFenceEvent == nullptr)
-                {
-                    LOG_ERROR("CreateEvent for SC fence failed");
-                    break;
-                }
-            }
         }
 
     } while (false);
@@ -1250,9 +1197,9 @@ bool XeFG_Dx12::Present()
     if (Config::Instance()->FGDrawUIOverFG.value_or_default())
     {
         auto ui = GetResource(FG_ResourceType::UIColor, fIndex);
-        if (ui && (ui->validity == FG_ResourceValidity::UntilPresent ||
-                   ui->validity == FG_ResourceValidity::JustTrackCmdlist ||
-                   ui->validity == FG_ResourceValidity::UntilPresentFromDispatch))
+        if (ui != nullptr && (ui->validity == FG_ResourceValidity::UntilPresent ||
+                              ui->validity == FG_ResourceValidity::JustTrackCmdlist ||
+                              ui->validity == FG_ResourceValidity::UntilPresentFromDispatch))
         {
             LOG_DEBUG("UI[{}] resource: {:X}, copy: {}", fIndex, (size_t) ui->resource, (size_t) ui->copy);
             if (_renderUI.get() == nullptr)
@@ -1275,7 +1222,7 @@ bool XeFG_Dx12::Present()
                 }
             }
         }
-        else if (!ui)
+        else if (ui == nullptr)
         {
             LOG_WARN("UI resource is nullptr");
         }
@@ -1283,12 +1230,12 @@ bool XeFG_Dx12::Present()
 
     if (IsActive() && !IsPaused())
     {
-        if (State::Instance().fgHudlessCompare)
+        if (State::Instance().FGHudlessCompare)
         {
             auto hudless = GetResource(FG_ResourceType::HudlessColor, fIndex);
-            if (hudless && (hudless->validity == FG_ResourceValidity::UntilPresent ||
-                            hudless->validity == FG_ResourceValidity::JustTrackCmdlist ||
-                            hudless->validity == FG_ResourceValidity::UntilPresentFromDispatch))
+            if (hudless != nullptr && (hudless->validity == FG_ResourceValidity::UntilPresent ||
+                                       hudless->validity == FG_ResourceValidity::JustTrackCmdlist ||
+                                       hudless->validity == FG_ResourceValidity::UntilPresentFromDispatch))
             {
                 LOG_DEBUG("Hudless[{}] resource: {:X}, copy: {}", fIndex, (size_t) hudless->resource,
                           (size_t) hudless->copy);
@@ -1306,7 +1253,7 @@ bool XeFG_Dx12::Present()
                     }
                 }
             }
-            else if (!hudless)
+            else if (hudless == nullptr)
             {
                 LOG_WARN("Hudless resource is nullptr");
             }
@@ -1326,8 +1273,6 @@ bool XeFG_Dx12::Present()
                 _gameCommandQueue->ExecuteCommandLists(1, (ID3D12CommandList**) &_uiCommandList[fIndex]);
             else
                 LOG_ERROR("_uiCommandList[{}]->Close() error: {:X}", fIndex, (UINT) closeResult);
-
-            _gameCommandQueue->Signal(_uiFence, _uiAllocatorFenceValues[fIndex]);
 
             _uiCommandListResetted[fIndex] = false;
         }
@@ -1391,7 +1336,7 @@ bool XeFG_Dx12::SetResource(Dx12Resource* inputResource)
             return false;
 
         // Making a copy if it's just valid now to be able to use it later
-        if (State::Instance().fgHudlessCompare && inputResource->validity == FG_ResourceValidity::ValidNow)
+        if (State::Instance().FGHudlessCompare && inputResource->validity == FG_ResourceValidity::ValidNow)
             inputResource->validity = FG_ResourceValidity::ValidButMakeCopy;
 
         if (!_noHudless[fIndex] && (_frameResources[fIndex][type].validity == FG_ResourceValidity::ValidNow))
@@ -1490,7 +1435,7 @@ bool XeFG_Dx12::SetResource(Dx12Resource* inputResource)
 
                 _depthInvert->SetBufferState(cmdList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
-                if (_depthInvert->Dispatch(cmdList, fResource->GetResource(), _depthInvert->Buffer()))
+                if (_depthInvert->Dispatch(_device, cmdList, fResource->GetResource(), _depthInvert->Buffer()))
                 {
                     fResource->copy = _depthInvert->Buffer();
                 }
@@ -1546,7 +1491,7 @@ bool XeFG_Dx12::SetResource(Dx12Resource* inputResource)
 
             if (lastFormat[fIndex] != DXGI_FORMAT_UNKNOWN && lastFormat[fIndex] != desc.Format)
             {
-                State::Instance().fgChanged = true;
+                State::Instance().FGchanged = true;
                 return false;
             }
 
@@ -1592,7 +1537,7 @@ bool XeFG_Dx12::SetResource(Dx12Resource* inputResource)
 
             if (result != XEFG_SWAPCHAIN_RESULT_SUCCESS)
             {
-                State::Instance().fgChanged = true;
+                State::Instance().FGchanged = true;
                 UpdateTarget();
                 Deactivate();
 
@@ -1648,10 +1593,13 @@ bool XeFG_Dx12::ReleaseSwapchain(HWND hwnd)
             DestroySwapchainContext();
 
         _swapChainContext = nullptr;
-        State::Instance().currentFGSwapchain = nullptr;
+
+        if (!Config::Instance()->FGPreserveSwapChain.value_or_default())
+            State::Instance().currentFGSwapchain = nullptr;
     }
 
     ReleaseObjects();
+    XeLLProxy::DestroyXeLLContext();
 
     if (Config::Instance()->FGUseMutexForSwapchain.value_or_default())
     {

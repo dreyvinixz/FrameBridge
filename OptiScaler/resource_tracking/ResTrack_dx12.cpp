@@ -532,10 +532,10 @@ bool ResTrack_Dx12::IsHudFixActive()
     }
 
     if (State::Instance().currentFG == nullptr || State::Instance().currentFeature == nullptr ||
-        State::Instance().fgChanged)
+        State::Instance().FGchanged)
     {
         LOG_TRACK("State::Instance().currentFG == nullptr || State::Instance().currentFeature == nullptr || "
-                  "State::Instance().fgChanged");
+                  "State::Instance().FGchanged");
         return false;
     }
 
@@ -577,9 +577,9 @@ void ResTrack_Dx12::hkCreateRenderTargetView(ID3D12Device* This, ID3D12Resource*
     // force hdr for swapchain buffer
     if (pResource != nullptr && pDesc != nullptr && Config::Instance()->ForceHDR.value_or_default())
     {
-        for (size_t i = 0; i < State::Instance().scBuffers.size(); i++)
+        for (size_t i = 0; i < State::Instance().SCbuffers.size(); i++)
         {
-            if (State::Instance().scBuffers[i] == pResource)
+            if (State::Instance().SCbuffers[i] == pResource)
             {
                 if (Config::Instance()->UseHDR10.value_or_default())
                     pDesc->Format = DXGI_FORMAT_R10G10B10A2_UNORM;
@@ -632,9 +632,9 @@ void ResTrack_Dx12::hkCreateShaderResourceView(ID3D12Device* This, ID3D12Resourc
     // force hdr for swapchain buffer
     if (pResource != nullptr && pDesc != nullptr && Config::Instance()->ForceHDR.value_or_default())
     {
-        for (size_t i = 0; i < State::Instance().scBuffers.size(); i++)
+        for (size_t i = 0; i < State::Instance().SCbuffers.size(); i++)
         {
-            if (State::Instance().scBuffers[i] == pResource)
+            if (State::Instance().SCbuffers[i] == pResource)
             {
                 if (Config::Instance()->UseHDR10.value_or_default())
                     pDesc->Format = DXGI_FORMAT_R10G10B10A2_UNORM;
@@ -687,9 +687,9 @@ void ResTrack_Dx12::hkCreateUnorderedAccessView(ID3D12Device* This, ID3D12Resour
 {
     if (pResource != nullptr && pDesc != nullptr && Config::Instance()->ForceHDR.value_or_default())
     {
-        for (size_t i = 0; i < State::Instance().scBuffers.size(); i++)
+        for (size_t i = 0; i < State::Instance().SCbuffers.size(); i++)
         {
-            if (State::Instance().scBuffers[i] == pResource)
+            if (State::Instance().SCbuffers[i] == pResource)
             {
                 if (Config::Instance()->UseHDR10.value_or_default())
                     pDesc->Format = DXGI_FORMAT_R10G10B10A2_UNORM;
@@ -979,7 +979,7 @@ ULONG ResTrack_Dx12::hkRelease(ID3D12Resource* This)
         {
             toClean = _trackedResources[This]; // Copy vector
             _trackedResources.erase(This);
-            State::Instance().capturedHudlesses.erase(This);
+            State::Instance().CapturedHudlesses.erase(This);
         }
     }
 
@@ -2085,7 +2085,7 @@ void ResTrack_Dx12::HookToQueue(ID3D12Device* InDevice)
 
 void ResTrack_Dx12::HookDevice(ID3D12Device* device)
 {
-    if (o_CreateDescriptorHeap != nullptr || State::Instance().activeFgInput == FGInput::NvngxFG)
+    if (o_CreateDescriptorHeap != nullptr || State::Instance().activeFgInput == FGInput::Nukems)
         return;
 
     if (device == nullptr)

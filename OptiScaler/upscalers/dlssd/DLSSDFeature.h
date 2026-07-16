@@ -22,7 +22,7 @@ class DLSSDFeature : public virtual IFeature
 
   public:
     feature_version Version() override { return feature_version { _version.major, _version.minor, _version.patch }; }
-    Upscaler GetUpscalerType() const override { return Upscaler::DLSSD; }
+    std::string Name() const override { return "DLSSD"; }
 
     DLSSDFeature(unsigned int handleId, NVSDK_NGX_Parameter* InParameters);
 

@@ -18,7 +18,6 @@
 #include <vulkan/vulkan.hpp>
 
 #include <detours/detours.h>
-#include <misc/IdentifyGpu.h>
 
 #include "Hook_Utils.h"
 
@@ -37,12 +36,6 @@ PFN_vkQueuePresentKHR o_QueuePresentKHR = nullptr;
 PFN_vkCreateSwapchainKHR o_CreateSwapchainKHR = nullptr;
 static PFN_vkGetInstanceProcAddr o_vkGetInstanceProcAddr = nullptr;
 static PFN_vkGetDeviceProcAddr o_vkGetDeviceProcAddr = nullptr;
-
-// Those aren't hooked, just grabbed for use
-static PFN_vkGetPhysicalDeviceFeatures2 o_vkGetPhysicalDeviceFeatures2 = nullptr;
-PFN_vkCreateSemaphore VulkanHooks::o_vkCreateSemaphore = nullptr;
-PFN_vkSignalSemaphore VulkanHooks::o_vkSignalSemaphore = nullptr;
-PFN_vkAntiLagUpdateAMD VulkanHooks::o_vkAntiLagUpdateAMD = nullptr;
 
 // Forward declaration
 static VkResult hkvkQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR* pPresentInfo);
@@ -158,26 +151,11 @@ static VkResult hkvkCreateDevice(VkPhysicalDevice physicalDevice, const VkDevice
     VkDeviceCreateInfo localCreteInfo {};
     memcpy(&localCreteInfo, pCreateInfo, sizeof(VkDeviceCreateInfo));
 
-    // Check support for AntiLag before spoof
-    VkPhysicalDeviceFeatures2 features2 = {};
-    features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-
-    VkPhysicalDeviceAntiLagFeaturesAMD antiLagFeatures = {};
-    antiLagFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ANTI_LAG_FEATURES_AMD;
-
-    features2.pNext = &antiLagFeatures;
-
-    if (o_vkGetPhysicalDeviceFeatures2)
-    {
-        o_vkGetPhysicalDeviceFeatures2(physicalDevice, &features2);
-        State::Instance().vkAntiLagSupported = antiLagFeatures.antiLag != 0;
-    }
-
     VulkanSpoofing::hkvkCreateDevice(physicalDevice, &localCreteInfo, pAllocator, pDevice);
 
     auto result = o_vkCreateDevice(physicalDevice, &localCreteInfo, pAllocator, pDevice);
 
-    if (result == VK_SUCCESS && Config::Instance()->OverlayMenu.value_or_default())
+    if (result == VK_SUCCESS && !State::Instance().vulkanSkipHooks && Config::Instance()->OverlayMenu.value())
     {
         if (!State::Instance().vulkanSkipHooks)
         {
@@ -189,39 +167,16 @@ static VkResult hkvkCreateDevice(VkPhysicalDevice physicalDevice, const VkDevice
             _device = *pDevice;
             LOG_DEBUG("_device captured: {0:X}", (UINT64) _device);
             HookDevice(_device);
-        }
 
-        ScopedSkipSpoofing skipSpoofing {};
+            ScopedSkipSpoofing skipSpoofing {};
 
-        VkPhysicalDeviceIDProperties idProps {};
-        idProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES;
+            VkPhysicalDeviceProperties prop {};
+            vkGetPhysicalDeviceProperties(physicalDevice, &prop);
 
-        VkPhysicalDeviceProperties2 props2 {};
-        props2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
-        props2.pNext = &idProps;
+            auto szName = std::string(prop.deviceName);
 
-        vkGetPhysicalDeviceProperties2(physicalDevice, &props2);
-
-        if (idProps.deviceLUIDValid == VK_TRUE)
-        {
-            auto primaryGpu = IdentifyGpu::getPrimaryGpu();
-            auto luid = (PLUID) idProps.deviceLUID;
-            if (!IsEqualLUID(*luid, primaryGpu.luid))
-                LOG_WARN("VkDevice created with non-primary GPU");
-        }
-    }
-
-    if (State::Instance().vkAntiLagSupported)
-    {
-        if (result == VK_SUCCESS && o_vkGetDeviceProcAddr)
-        {
-            VulkanHooks::o_vkAntiLagUpdateAMD =
-                (PFN_vkAntiLagUpdateAMD) o_vkGetDeviceProcAddr(*pDevice, "vkAntiLagUpdateAMD");
-        }
-        else
-        {
-            State::Instance().vkAntiLagSupported = false;
-            LOG_WARN("Vulkan AntiLag can't be enabled");
+            if (szName.size() > 0)
+                State::Instance().DeviceAdapterNames[*pDevice] = szName;
         }
     }
 
@@ -243,9 +198,7 @@ static VkResult hkvkQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR* pPres
     // get upscaler time
     UpscalerTimeVk::ReadUpscalingTime(_device);
 
-    // ??? TODO: if we are hooking dxvk's vulkan calls then this present call could be either coming from dxvk or from a
-    // native vk game
-    if (!IdentifyGpu::getPrimaryGpu().usesDxvk)
+    if (!State::Instance().isRunningOnDXVK)
         State::Instance().swapchainApi = Vulkan;
 
     // Tick feature to let it know if it's frozen
@@ -404,15 +357,6 @@ void VulkanHooks::Hook(HMODULE vulkan1)
 
     // address = KernelBaseProxy::GetProcAddress_()(vulkan1, "vkCmdPipelineBarrier");
     // o_vkCmdPipelineBarrier = (PFN_vkCmdPipelineBarrier) address;
-
-    address = KernelBaseProxy::GetProcAddress_()(vulkan1, "vkGetPhysicalDeviceFeatures2");
-    o_vkGetPhysicalDeviceFeatures2 = (PFN_vkGetPhysicalDeviceFeatures2) address;
-
-    address = KernelBaseProxy::GetProcAddress_()(vulkan1, "vkCreateSemaphore");
-    o_vkCreateSemaphore = (PFN_vkCreateSemaphore) address;
-
-    address = KernelBaseProxy::GetProcAddress_()(vulkan1, "vkSignalSemaphore");
-    o_vkSignalSemaphore = (PFN_vkSignalSemaphore) address;
 
     DetourTransactionBegin();
     DetourUpdateThread(GetCurrentThread());

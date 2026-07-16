@@ -27,7 +27,6 @@ class IFeature_Vk : public virtual IFeature
     IFeature_Vk(unsigned int InHandleId, NVSDK_NGX_Parameter* InParameters) : IFeature(InHandleId, InParameters) {}
 
     bool IsWithDx12() override { return false; }
-    API Api() const override { return API::Vulkan; }
 
     virtual ~IFeature_Vk() {}
 };

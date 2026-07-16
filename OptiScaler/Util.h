@@ -6,6 +6,7 @@
 #include <dxgi1_6.h>
 #include <d3d11.h>
 #include <d3d12.h>
+#include <xess.h>
 
 namespace Util
 {
@@ -15,37 +16,6 @@ typedef struct _version_t
     uint16_t minor;
     uint16_t patch;
     uint16_t reserved;
-
-    _version_t() : major(0), minor(0), patch(0), reserved(0) {}
-
-    constexpr _version_t(uint16_t maj, uint16_t min, uint16_t pat, uint16_t res)
-        : major(maj), minor(min), patch(pat), reserved(res)
-    {
-    }
-
-    bool operator==(const _version_t& other) const
-    {
-        return major == other.major && minor == other.minor && patch == other.patch && reserved == other.reserved;
-    }
-
-    bool operator!=(const _version_t& other) const { return !(*this == other); }
-
-    bool operator<(const _version_t& other) const
-    {
-        if (major != other.major)
-            return major < other.major;
-        if (minor != other.minor)
-            return minor < other.minor;
-        if (patch != other.patch)
-            return patch < other.patch;
-        return reserved < other.reserved;
-    }
-
-    bool operator>(const _version_t& other) const { return other < *this; }
-
-    bool operator<=(const _version_t& other) const { return !(other < *this); }
-
-    bool operator>=(const _version_t& other) const { return !(*this < other); }
 } version_t;
 
 struct MonitorInfo
@@ -60,14 +30,6 @@ struct MonitorInfo
     std::wstring name; // e.g., \\.\DISPLAY1
 };
 
-struct Luid
-{
-    DWORD LowPart;
-    LONG HighPart;
-
-    auto operator<=>(const Luid&) const = default;
-};
-
 std::filesystem::path ExePath();
 std::filesystem::path DllPath();
 std::optional<std::filesystem::path> NvngxPath();
@@ -76,14 +38,14 @@ double MillisecondsNow();
 std::wstring ToLower(std::wstring value);
 
 HWND GetProcessWindow();
-bool GetFileVersion(std::wstring dllPath, version_t* fileVersionOut, version_t* productVersionOut = nullptr);
-bool IsSubpath(const std::filesystem::path& path, const std::filesystem::path& base);
+bool GetDLLVersion(std::wstring dllPath, version_t* versionOut);
+bool GetDLLVersion(std::wstring dllPath, xess_version_t* versionOut);
 bool GetRealWindowsVersion(OSVERSIONINFOW& osInfo);
 std::string GetWindowsName(const OSVERSIONINFOW& os);
 void GetExeInfo();
 std::wstring GetWindowTitle(HWND hwnd);
 std::optional<std::filesystem::path> FindFilePath(const std::filesystem::path& startDir,
-                                                  const std::filesystem::path& fileName);
+                                                  const std::filesystem::path fileName);
 std::string WhoIsTheCaller(void* returnAddress);
 HMODULE GetCallerModule(void* returnAddress);
 MonitorInfo GetMonitorInfoForWindow(HWND hwnd);
@@ -94,13 +56,6 @@ void GetDeviceRemovedReason(ID3D11Device* pDevice);
 void GetDeviceRemovedReason(ID3D12Device* pDevice);
 void LoadProxyLibrary(const std::wstring& name, const std::wstring& optiPath, const std::wstring& overridePath,
                       HMODULE* memoryModule, HMODULE* loadedModule);
-
-std::map<Luid, std::filesystem::path> GetDriverStore();
-
-template <typename T> void DelayedDestroy(std::unique_ptr<T> ptr)
-{
-    std::thread([p = std::move(ptr)]() mutable { std::this_thread::sleep_for(std::chrono::seconds(2)); }).detach();
-}
 
 }; // namespace Util
 

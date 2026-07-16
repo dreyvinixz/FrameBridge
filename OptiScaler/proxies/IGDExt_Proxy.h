@@ -210,8 +210,8 @@ class IGDExtProxy
 
         INTCExtensionAppInfo1 appInfo {};
 
-        appInfo.pApplicationName = string_to_wstring(State::Instance().gameName.empty() ? State::Instance().gameExe
-                                                                                        : State::Instance().gameName)
+        appInfo.pApplicationName = string_to_wstring(State::Instance().GameName.empty() ? State::Instance().GameExe
+                                                                                        : State::Instance().GameName)
                                        .c_str();
 
         appInfo.pApplicationName = L"Unreal Engine";

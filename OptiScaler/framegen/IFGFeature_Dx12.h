@@ -31,17 +31,6 @@ struct Dx12Resource
     ID3D12Resource* GetResource() { return (copy == nullptr) ? resource : copy; }
 };
 
-struct LockedDx12Resource
-{
-    Dx12Resource* resource = nullptr;
-    std::shared_lock<std::shared_mutex> lock;
-
-    Dx12Resource* operator->() { return resource; }
-    Dx12Resource& operator*() { return *resource; }
-
-    explicit operator bool() const { return resource != nullptr; }
-};
-
 class IFGFeature_Dx12 : public virtual IFGFeature
 {
   private:
@@ -50,7 +39,6 @@ class IFGFeature_Dx12 : public virtual IFGFeature
 
     bool InitCopyCmdList();
     void DestroyCopyCmdList();
-    bool WaitForUIAllocator(UINT index);
 
   protected:
     ID3D12Device* _device = nullptr;
@@ -65,16 +53,10 @@ class IFGFeature_Dx12 : public virtual IFGFeature
     ID3D12GraphicsCommandList* _scCommandList[BUFFER_COUNT] {};
     ID3D12CommandAllocator* _scCommandAllocator[BUFFER_COUNT] {};
     bool _scCommandListResetted[BUFFER_COUNT] { false, false, false, false };
-    UINT64 _scAllocatorFenceValues[BUFFER_COUNT] {};
-    ID3D12Fence* _scFence = nullptr;
-    HANDLE _scFenceEvent = nullptr;
 
     ID3D12GraphicsCommandList* _uiCommandList[BUFFER_COUNT] {};
     ID3D12CommandAllocator* _uiCommandAllocator[BUFFER_COUNT] {};
     bool _uiCommandListResetted[BUFFER_COUNT] { false, false, false, false };
-    UINT64 _uiAllocatorFenceValues[BUFFER_COUNT] {};
-    ID3D12Fence* _uiFence = nullptr;
-    HANDLE _uiFenceEvent = nullptr;
 
     std::unordered_map<FG_ResourceType, Dx12Resource> _frameResources[BUFFER_COUNT] {};
     std::unordered_map<FG_ResourceType, ID3D12Resource*> _resourceCopy[BUFFER_COUNT] {};
@@ -121,7 +103,7 @@ class IFGFeature_Dx12 : public virtual IFGFeature
     ID3D12GraphicsCommandList* GetUICommandList(int index = -1);
     ID3D12GraphicsCommandList* GetSCCommandList(int index = -1);
 
-    LockedDx12Resource GetResource(FG_ResourceType type, int index = -1);
+    Dx12Resource* GetResource(FG_ResourceType type, int index = -1);
     bool GetResourceCopy(FG_ResourceType type, D3D12_RESOURCE_STATES bufferState, ID3D12Resource* output);
     ID3D12CommandQueue* GetCommandQueue();
 

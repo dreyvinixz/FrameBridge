@@ -4,7 +4,7 @@
 #include "resource.h"
 
 #include "NVNGX_DLSS.h"
-#include <framegen/nvngx/Nvngx_FG.h>
+#include "FG/DLSSG_Mod.h"
 #include "NVNGX_Parameter.h"
 #include "proxies/NVNGX_Proxy.h"
 
@@ -14,8 +14,6 @@
 
 #include <vulkan/vulkan.hpp>
 #include <ankerl/unordered_dense.h>
-#include <imgui/ImGuiNotify.hpp>
-#include <misc/IdentifyGpu.h>
 
 VkInstance vkInstance;
 VkPhysicalDevice vkPD;
@@ -40,7 +38,6 @@ class ScopedInitVk
         previousState = _skipInit;
         _skipInit = true;
     }
-
     ~ScopedInitVk() { _skipInit = previousState; }
 };
 
@@ -106,15 +103,11 @@ static void UpdateInitPaths(NVSDK_NGX_FeatureCommonInfo* InFeatureInfo)
         // OptiDll Path
         State::Instance().NVNGX_FeatureInfo_Paths.push_back(Config::Instance()->MainDllPath.value());
 
-        // WAR: Doom Ethernal is sending junk data
-        if (InFeatureInfo->PathListInfo.Length < 10)
+        // Original paths from NVNGX
+        for (size_t i = 0; i < InFeatureInfo->PathListInfo.Length; i++)
         {
-            // Original paths from NVNGX
-            for (size_t i = 0; i < InFeatureInfo->PathListInfo.Length; i++)
-            {
-                const wchar_t* path = InFeatureInfo->PathListInfo.Path[i];
-                State::Instance().NVNGX_FeatureInfo_Paths.push_back(std::wstring(path));
-            }
+            const wchar_t* path = InFeatureInfo->PathListInfo.Path[i];
+            State::Instance().NVNGX_FeatureInfo_Paths.push_back(std::wstring(path));
         }
 
         // Exe path
@@ -188,22 +181,50 @@ NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_VULKAN_Init_Ext2(
     if (InFeatureInfo != nullptr && InSDKVersion > 0x0000013)
         State::Instance().NVNGX_Logger = InFeatureInfo->LoggingInfo;
 
-    if (State::Instance().nvngxVkInited)
+    if (State::Instance().NvngxVkInited)
     {
         LOG_WARN("NVNGX already inited");
         return NVSDK_NGX_Result_Success;
     }
 
-    if (State::Instance().activeFgInput == FGInput::NvngxFG)
+    if (State::Instance().activeFgInput == FGInput::Nukems)
     {
-        Nvngx_FG::InitDLSSGMod_Vulkan();
-        Nvngx_FG::VULKAN_Init_Ext2(InApplicationId, InApplicationDataPath, InInstance, InPD, InDevice, InGIPA, InGDPA,
+        DLSSGMod::InitDLSSGMod_Vulkan();
+        DLSSGMod::VULKAN_Init_Ext2(InApplicationId, InApplicationDataPath, InInstance, InPD, InDevice, InGIPA, InGDPA,
                                    InSDKVersion, &localFeatureInfo);
     }
 
-    LOG_INFO("AppId: {0}", InApplicationId);
-    LOG_INFO("SDK: {0:x}", (unsigned int) InSDKVersion);
-    LOG_INFO(L"InApplicationDataPath {0}", std::wstring(InApplicationDataPath));
+    State::Instance().NVNGX_FeatureInfo_Paths.clear();
+
+    if (InFeatureInfo != nullptr)
+    {
+        if (InSDKVersion > 0x0000013)
+            State::Instance().NVNGX_Logger = localFeatureInfo.LoggingInfo;
+
+        // Doom Ethernal is sending junk data
+        if (localFeatureInfo.PathListInfo.Length < 10)
+        {
+            for (size_t i = 0; i < localFeatureInfo.PathListInfo.Length; i++)
+            {
+                const wchar_t* path = localFeatureInfo.PathListInfo.Path[i];
+                State::Instance().NVNGX_FeatureInfo_Paths.push_back(std::wstring(path));
+            }
+        }
+    }
+
+    LOG_INFO("InApplicationId: {0}", InApplicationId);
+    LOG_INFO("InSDKVersion: {0:x}", (UINT) InSDKVersion);
+    std::wstring string(InApplicationDataPath);
+
+    LOG_DEBUG("InApplicationDataPath {0}", wstring_to_string(string));
+
+    if (State::Instance().NVNGX_FeatureInfo_Paths.size() > 0)
+    {
+        for (size_t i = 0; i < State::Instance().NVNGX_FeatureInfo_Paths.size(); ++i)
+        {
+            LOG_DEBUG("PathListInfo[{0}]: {1}", i, wstring_to_string(State::Instance().NVNGX_FeatureInfo_Paths[i]));
+        }
+    }
 
     if (InInstance)
     {
@@ -249,7 +270,7 @@ NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_VULKAN_Init_Ext2(
 
     UpscalerTimeVk::Init(InDevice, InPD);
 
-    State::Instance().nvngxVkInited = true;
+    State::Instance().NvngxVkInited = true;
 
     return NVSDK_NGX_Result_Success;
 }
@@ -290,8 +311,8 @@ NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_VULKAN_Init_Ext(unsigned long long InAp
         }
     }
 
-    Nvngx_FG::InitDLSSGMod_Vulkan();
-    Nvngx_FG::VULKAN_Init_Ext(InApplicationId, InApplicationDataPath, InInstance, InPD, InDevice, InSDKVersion,
+    DLSSGMod::InitDLSSGMod_Vulkan();
+    DLSSGMod::VULKAN_Init_Ext(InApplicationId, InApplicationDataPath, InInstance, InPD, InDevice, InSDKVersion,
                               &localFeatureInfo);
 
     ScopedInitVk scopedInit {};
@@ -385,8 +406,8 @@ NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_VULKAN_Init(unsigned long long InApplic
         }
     }
 
-    Nvngx_FG::InitDLSSGMod_Vulkan();
-    Nvngx_FG::VULKAN_Init(InApplicationId, InApplicationDataPath, InInstance, InPD, InDevice, InGIPA, InGDPA,
+    DLSSGMod::InitDLSSGMod_Vulkan();
+    DLSSGMod::VULKAN_Init(InApplicationId, InApplicationDataPath, InInstance, InPD, InDevice, InGIPA, InGDPA,
                           &localFeatureInfo, InSDKVersion);
 
     ScopedInitVk scopedInit {};
@@ -437,12 +458,6 @@ NVSDK_NGX_VULKAN_Init_ProjectID(const char* InProjectId, NVSDK_NGX_EngineType In
                                                &localFeatureInfo);
 }
 
-/**
- * @brief [Deprecated NGX API] Superceeded by NVSDK_NGX_AllocateParameters and NVSDK_NGX_GetCapabilityParameters.
- *
- * Retrieves a common NVSDK parameter map for providing params to the SDK. The lifetime of this
- * map is NOT managed by the application. It is expected to be managed internally by the SDK.
- */
 NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_VULKAN_GetParameters(NVSDK_NGX_Parameter** OutParameters)
 {
     LOG_FUNC();
@@ -460,15 +475,11 @@ NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_VULKAN_GetParameters(NVSDK_NGX_Paramete
         if (result == NVSDK_NGX_Result_Success)
         {
             InitNGXParameters(*OutParameters);
-            SetNGXParamAllocType(*(*OutParameters), NGX_AllocTypes::NVPersistent);
             return result;
         }
     }
 
-    // Get custom parameters if using custom backend
-    static NVNGX_Parameters oldParams = NVNGX_Parameters("OptiVk", true);
-    *OutParameters = &oldParams;
-    InitNGXParameters(*OutParameters);
+    *OutParameters = GetNGXParameters("OptiVk");
 
     LOG_DEBUG("Returning custom Opti parameters");
 
@@ -480,12 +491,6 @@ NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_VULKAN_GetFeatureInstanceExtensionRequi
     VkExtensionProperties** OutExtensionProperties)
 {
     LOG_DEBUG("FeatureID: {0}", (UINT) FeatureDiscoveryInfo->FeatureID);
-
-    if (State::Instance().activeFgInput == FGInput::NvngxFG && Nvngx_FG::isVulkanAvailable() &&
-        FeatureDiscoveryInfo->FeatureID == NVSDK_NGX_Feature_FrameGeneration)
-    {
-        return NVSDK_NGX_Result_Success;
-    }
 
     if (Config::Instance()->DLSSEnabled.value_or_default() && NVNGXProxy::NVNGXModule() != nullptr &&
         NVNGXProxy::VULKAN_GetFeatureInstanceExtensionRequirements() != nullptr)
@@ -573,12 +578,6 @@ NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_VULKAN_GetFeatureDeviceExtensionRequire
 {
     LOG_DEBUG("FeatureID: {0}", (UINT) FeatureDiscoveryInfo->FeatureID);
 
-    if (State::Instance().activeFgInput == FGInput::NvngxFG && Nvngx_FG::isVulkanAvailable() &&
-        FeatureDiscoveryInfo->FeatureID == NVSDK_NGX_Feature_FrameGeneration)
-    {
-        return NVSDK_NGX_Result_Success;
-    }
-
     if (Config::Instance()->DLSSEnabled.value_or_default() && NVNGXProxy::NVNGXModule() != nullptr &&
         NVNGXProxy::VULKAN_GetFeatureDeviceExtensionRequirements() != nullptr)
     {
@@ -660,10 +659,6 @@ NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_VULKAN_GetFeatureDeviceExtensionRequire
     return NVSDK_NGX_Result_Success;
 }
 
-/**
- * @brief Allocates a new parameter map used to provide parameters needed by the DLSS API. The lifetime of this map
- * is managed by the calling application with DestroyParameters().
- */
 NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_VULKAN_AllocateParameters(NVSDK_NGX_Parameter** OutParameters)
 {
     LOG_FUNC();
@@ -676,13 +671,11 @@ NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_VULKAN_AllocateParameters(NVSDK_NGX_Par
         LOG_INFO("NVNGXProxy::VULKAN_AllocateParameters result: {0:X}", (UINT) result);
 
         if (result == NVSDK_NGX_Result_Success)
-        {
-            SetNGXParamAllocType(*(*OutParameters), NGX_AllocTypes::NVDynamic);
             return result;
-        }
     }
 
-    auto* params = new NVNGX_Parameters("OptiVk", false);
+    auto params = new NVNGX_Parameters();
+    params->Name = "OptiVk";
     *OutParameters = params;
 
     return NVSDK_NGX_Result_Success;
@@ -694,10 +687,10 @@ NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_VULKAN_GetFeatureRequirements(
 {
     LOG_DEBUG("for FeatureID: {0}", (int) FeatureDiscoveryInfo->FeatureID);
 
-    Nvngx_FG::InitDLSSGMod_Vulkan();
+    DLSSGMod::InitDLSSGMod_Vulkan();
 
     if (FeatureDiscoveryInfo->FeatureID == NVSDK_NGX_Feature_SuperSampling ||
-        (State::Instance().activeFgInput == FGInput::NvngxFG && Nvngx_FG::isVulkanAvailable() &&
+        (State::Instance().activeFgInput == FGInput::Nukems && DLSSGMod::isVulkanAvailable() &&
          FeatureDiscoveryInfo->FeatureID == NVSDK_NGX_Feature_FrameGeneration))
     {
         if (OutSupported == nullptr)
@@ -736,11 +729,6 @@ NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_VULKAN_GetFeatureRequirements(
     return NVSDK_NGX_Result_FAIL_FeatureNotSupported;
 }
 
-/**
- * @brief Allocates a new NVSDK parameter map pre-populated with NGX capabilities and information about available
- * features. The output parameter map may also be used in the same ways as a parameter map allocated with
- * AllocateParameters(). The lifetime of this map is managed by the calling application with DestroyParameters().
- */
 NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_VULKAN_GetCapabilityParameters(NVSDK_NGX_Parameter** OutParameters)
 {
     LOG_FUNC();
@@ -757,17 +745,12 @@ NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_VULKAN_GetCapabilityParameters(NVSDK_NG
 
         if (result == NVSDK_NGX_Result_Success)
         {
-            // Init external NGX table with current configuration and mark as dynamic+external
             InitNGXParameters(*OutParameters);
-            SetNGXParamAllocType(*(*OutParameters), NGX_AllocTypes::NVDynamic);
             return result;
         }
     }
 
-    // Get custom parameters if using custom backend
-    auto& params = *(new NVNGX_Parameters("OptiVk", false));
-    InitNGXParameters(&params);
-    *OutParameters = &params;
+    *OutParameters = GetNGXParameters("OptiVk");
 
     return NVSDK_NGX_Result_Success;
 }
@@ -781,15 +764,11 @@ NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_VULKAN_PopulateParameters_Impl(NVSDK_NG
 
     InitNGXParameters(InParameters);
 
-    Nvngx_FG::VULKAN_PopulateParameters_Impl(InParameters);
+    DLSSGMod::VULKAN_PopulateParameters_Impl(InParameters);
 
     return NVSDK_NGX_Result_Success;
 }
 
-/**
- * @brief Destroys a given input parameter map created with AllocateParameters or GetCapabilityParameters.
- Must not be called on maps returned by GetParameters(). Unsupported tables will not be freed.
- */
 NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_VULKAN_DestroyParameters(NVSDK_NGX_Parameter* InParameters)
 {
     LOG_FUNC();
@@ -797,18 +776,29 @@ NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_VULKAN_DestroyParameters(NVSDK_NGX_Para
     if (InParameters == nullptr)
         return NVSDK_NGX_Result_Fail;
 
-    const bool success = TryDestroyNGXParameters(InParameters, NVNGXProxy::VULKAN_DestroyParameters());
+    if (Config::Instance()->DLSSEnabled.value_or_default() && NVNGXProxy::NVNGXModule() != nullptr &&
+        NVNGXProxy::VULKAN_DestroyParameters() != nullptr)
+    {
+        LOG_INFO("calling NVNGXProxy::VULKAN_DestroyParameters");
+        auto result = NVNGXProxy::VULKAN_DestroyParameters()(InParameters);
+        LOG_INFO("calling NVNGXProxy::VULKAN_DestroyParameters result: {0:X}", (UINT) result);
 
-    return success ? NVSDK_NGX_Result_Success : NVSDK_NGX_Result_Fail;
+        return result;
+    }
+
+    delete InParameters;
+    InParameters = nullptr;
+
+    return NVSDK_NGX_Result_Success;
 }
 
 NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_VULKAN_GetScratchBufferSize(NVSDK_NGX_Feature InFeatureId,
                                                                      const NVSDK_NGX_Parameter* InParameters,
                                                                      size_t* OutSizeInBytes)
 {
-    if (Nvngx_FG::isVulkanAvailable() && InFeatureId == NVSDK_NGX_Feature_FrameGeneration)
+    if (DLSSGMod::isVulkanAvailable() && InFeatureId == NVSDK_NGX_Feature_FrameGeneration)
     {
-        return Nvngx_FG::VULKAN_GetScratchBufferSize(InFeatureId, InParameters, OutSizeInBytes);
+        return DLSSGMod::VULKAN_GetScratchBufferSize(InFeatureId, InParameters, OutSizeInBytes);
     }
 
     LOG_WARN("-> 52428800");
@@ -822,9 +812,9 @@ NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_VULKAN_CreateFeature1(VkDevice InDevice
                                                                NVSDK_NGX_Parameter* InParameters,
                                                                NVSDK_NGX_Handle** OutHandle)
 {
-    if (Nvngx_FG::isVulkanAvailable() && InFeatureID == NVSDK_NGX_Feature_FrameGeneration)
+    if (DLSSGMod::isVulkanAvailable() && InFeatureID == NVSDK_NGX_Feature_FrameGeneration)
     {
-        auto result = Nvngx_FG::VULKAN_CreateFeature1(InDevice, InCmdList, InFeatureID, InParameters, OutHandle);
+        auto result = DLSSGMod::VULKAN_CreateFeature1(InDevice, InCmdList, InFeatureID, InParameters, OutHandle);
         LOG_INFO("Creating new modded DLSSG feature with HandleId: {0}", (*OutHandle)->Id);
         return result;
     }
@@ -852,16 +842,16 @@ NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_VULKAN_CreateFeature1(VkDevice InDevice
 
     if (InFeatureID == NVSDK_NGX_Feature_SuperSampling)
     {
-        Upscaler upscalerChoice = Upscaler::FSR22; // Default FSR 2.2.1
+        std::string upscalerChoice = "fsr22"; // Default XeSS
 
         // If original NVNGX available use DLSS as base upscaler
-        if (IdentifyGpu::getPrimaryGpu().dlssCapable && NVNGXProxy::IsVulkanInited())
-            upscalerChoice = Upscaler::DLSS;
+        if (Config::Instance()->DLSSEnabled.value_or_default() && NVNGXProxy::IsVulkanInited())
+            upscalerChoice = "dlss";
 
         if (Config::Instance()->VulkanUpscaler.has_value())
             upscalerChoice = Config::Instance()->VulkanUpscaler.value();
 
-        LOG_INFO("Creating new {} upscaler", UpscalerDisplayName(upscalerChoice));
+        LOG_INFO("Creating new {} upscaler", upscalerChoice);
 
         VkContexts[handleId] = {};
 
@@ -877,7 +867,7 @@ NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_VULKAN_CreateFeature1(VkDevice InDevice
 
         VkContexts[handleId] = {};
 
-        if (!FeatureProvider_Vk::GetFeature(Upscaler::DLSSD, handleId, InParameters, &VkContexts[handleId].feature))
+        if (!FeatureProvider_Vk::GetFeature("dlssd", handleId, InParameters, &VkContexts[handleId].feature))
         {
             LOG_ERROR("DLSSD can't created");
             return NVSDK_NGX_Result_Fail;
@@ -892,7 +882,7 @@ NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_VULKAN_CreateFeature1(VkDevice InDevice
     else
         (*OutHandle)->Id = handleId;
 
-    State::Instance().autoExposure.reset();
+    State::Instance().AutoExposure.reset();
 
     {
         ScopedSkipSpoofing skipSpoofing;
@@ -917,9 +907,9 @@ NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_VULKAN_CreateFeature(VkCommandBuffer In
 {
     LOG_FUNC();
 
-    if (Nvngx_FG::isVulkanAvailable() && InFeatureID == NVSDK_NGX_Feature_FrameGeneration)
+    if (DLSSGMod::isVulkanAvailable() && InFeatureID == NVSDK_NGX_Feature_FrameGeneration)
     {
-        auto result = Nvngx_FG::VULKAN_CreateFeature(InCmdBuffer, InFeatureID, InParameters, OutHandle);
+        auto result = DLSSGMod::VULKAN_CreateFeature(InCmdBuffer, InFeatureID, InParameters, OutHandle);
         LOG_INFO("Creating new modded DLSSG feature with HandleId: {0}", (*OutHandle)->Id);
         return result;
     }
@@ -963,7 +953,7 @@ NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_VULKAN_ReleaseFeature(NVSDK_NGX_Handle*
     else if (handleId >= DLSSG_MOD_ID_OFFSET)
     {
         LOG_INFO("VULKAN_ReleaseFeature modded DLSSG with HandleId: {0}", handleId);
-        return Nvngx_FG::VULKAN_ReleaseFeature(InHandle);
+        return DLSSGMod::VULKAN_ReleaseFeature(InHandle);
     }
 
     if (!shutdown)
@@ -993,8 +983,6 @@ NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_VULKAN_EvaluateFeature(VkCommandBuffer 
                                                                 NVSDK_NGX_Parameter* InParameters,
                                                                 PFN_NVSDK_NGX_ProgressCallback InCallback)
 {
-    State& state = State::Instance();
-
     if (InFeatureHandle == nullptr)
     {
         LOG_DEBUG("InFeatureHandle is null");
@@ -1013,15 +1001,26 @@ NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_VULKAN_EvaluateFeature(VkCommandBuffer 
 
     auto handleId = InFeatureHandle->Id;
     if (VkContexts[handleId].feature == nullptr) // prevent source api name flicker when dlssg is active
-        state.setInputApiName = state.currentInputApiName;
+        State::Instance().setInputApiName = State::Instance().currentInputApiName;
 
-    const auto targetApiName =
-        !state.setInputApiName.has_value() ? ApiUpscalerInput::DLSS_VK : state.setInputApiName.value();
+    if (State::Instance().setInputApiName.length() == 0)
+    {
+        if (std::strcmp(State::Instance().currentInputApiName.c_str(), "DLSS") != 0)
+        {
+            State::Instance().AutoExposure.reset();
+            State::Instance().currentInputApiName = "DLSS";
+        }
+    }
+    else
+    {
+        if (std::strcmp(State::Instance().currentInputApiName.c_str(), State::Instance().setInputApiName.c_str()) != 0)
+        {
+            State::Instance().AutoExposure.reset();
+            State::Instance().currentInputApiName = State::Instance().setInputApiName;
+        }
+    }
 
-    if (state.currentInputApiName != targetApiName)
-        state.currentInputApiName = targetApiName;
-
-    state.setInputApiName.reset();
+    State::Instance().setInputApiName.clear();
 
     if (handleId < DLSS_MOD_ID_OFFSET)
     {
@@ -1039,7 +1038,7 @@ NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_VULKAN_EvaluateFeature(VkCommandBuffer 
     }
     else if (handleId >= DLSSG_MOD_ID_OFFSET)
     {
-        return Nvngx_FG::VULKAN_EvaluateFeature(InCmdList, InFeatureHandle, InParameters, InCallback);
+        return DLSSGMod::VULKAN_EvaluateFeature(InCmdList, InFeatureHandle, InParameters, InCallback);
     }
 
     evalCounter++;
@@ -1052,34 +1051,27 @@ NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_VULKAN_EvaluateFeature(VkCommandBuffer 
     IFeature_Vk* deviceContext = nullptr;
     auto contextData = &VkContexts[handleId];
 
-    if (state.changeBackend[handleId])
+    if (State::Instance().changeBackend[handleId])
     {
-        auto successfulPhase =
-            FeatureProvider_Vk::ChangeFeature(state.newBackend, vkInstance, vkPD, vkDevice, InCmdList, vkGIPA, vkGDPA,
-                                              handleId, InParameters, contextData);
+        FeatureProvider_Vk::ChangeFeature(State::Instance().newBackend, vkInstance, vkPD, vkDevice, InCmdList, vkGIPA,
+                                          vkGDPA, handleId, InParameters, contextData);
         evalCounter = 0;
 
-        if (contextData->changeBackendCounter != 0 || !successfulPhase)
-        {
-            return NVSDK_NGX_Result_Success;
-        }
+        return NVSDK_NGX_Result_Success;
     }
 
     deviceContext = VkContexts[handleId].feature.get();
-    state.currentFeature = deviceContext;
+    State::Instance().currentFeature = deviceContext;
 
     UpscalerTimeVk::UpscaleStart(InCmdList);
 
     auto upscaleResult = deviceContext->Evaluate(InCmdList, InParameters);
 
-    if (!upscaleResult)
-        ImGui::InsertNotification({ ImGuiToastType::Error, 10000, "Upscaler failed to run!" });
-
     if ((!upscaleResult || !deviceContext->IsInited()) &&
-        Config::Instance()->VulkanUpscaler.value_or_default() != Upscaler::FSR22)
+        Config::Instance()->VulkanUpscaler.value_or_default() != "fsr22")
     {
-        state.newBackend = Upscaler::FSR22;
-        state.changeBackend[handleId] = true;
+        State::Instance().newBackend = "fsr22";
+        State::Instance().changeBackend[handleId] = true;
         return NVSDK_NGX_Result_Success;
     }
 
@@ -1116,10 +1108,10 @@ NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_VULKAN_Shutdown(void)
     // Disabled for now to check if it cause any issues
     // MenuOverlayVk::UnHookVk();
 
-    Nvngx_FG::VULKAN_Shutdown();
+    DLSSGMod::VULKAN_Shutdown();
 
     shutdown = false;
-    State::Instance().nvngxVkInited = false;
+    State::Instance().NvngxVkInited = false;
 
     return NVSDK_NGX_Result_Success;
 }
@@ -1135,7 +1127,7 @@ NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_VULKAN_Shutdown1(VkDevice InDevice)
         NVNGXProxy::SetVulkanInited(false);
     }
 
-    Nvngx_FG::VULKAN_Shutdown1(InDevice);
+    DLSSGMod::VULKAN_Shutdown1(InDevice);
 
     shutdown = false;
 

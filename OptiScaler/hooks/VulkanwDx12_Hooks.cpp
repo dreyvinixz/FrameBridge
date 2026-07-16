@@ -10,7 +10,6 @@
 #include <detours/detours.h>
 
 #include <vulkan/vulkan_core.h>
-#include <misc/IdentifyGpu.h>
 
 static PFN_vkQueueSubmit o_vkQueueSubmit = nullptr;
 static PFN_vkQueueSubmit2 o_vkQueueSubmit2 = nullptr;
@@ -1051,35 +1050,30 @@ void Vulkan_wDx12::hk_vkCmdPipelineBarrier(VkCommandBuffer commandBuffer, VkPipe
                                            uint32_t imageMemoryBarrierCount,
                                            const VkImageMemoryBarrier* pImageMemoryBarriers)
 {
-    auto primaryGpu = IdentifyGpu::getPrimaryGpu();
     if (State::Instance().gameQuirks & GameQuirk::VulkanDLSSBarrierFixup &&
-        (primaryGpu.vendorId != VendorId::Nvidia || !primaryGpu.dlssCapable))
+        (!State::Instance().isRunningOnNvidia || State::Instance().isPascalOrOlder))
     {
         // AMD drivers on the cards around RDNA2 didn't treat VK_IMAGE_LAYOUT_UNDEFINED in the same way Nvidia does.
         // Doesn't seem like a bug, just a different way of handling an UB but we need to adjust.
 
-        for (size_t i = 0; i < imageMemoryBarrierCount; i++)
+        // DLSSG Present
+        if (imageMemoryBarrierCount == 2)
         {
-            if (pImageMemoryBarriers[i].oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
-                pImageMemoryBarriers[i].newLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
+            if (pImageMemoryBarriers[0].oldLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR &&
+                pImageMemoryBarriers[0].newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
+                pImageMemoryBarriers[1].oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
+                pImageMemoryBarriers[1].newLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
             {
-                LOG_TRACE("Changing an UNDEFINED barrier in DLSSG Present, imageMemoryBarrierCount: {}",
-                          imageMemoryBarrierCount);
+                LOG_TRACE("Changing an UNDEFINED barrier in DLSSG Present");
 
-                VkImageMemoryBarrier* newImageBarriers = new VkImageMemoryBarrier[imageMemoryBarrierCount];
+                VkImageMemoryBarrier newImageBarriers[2];
+                std::memcpy(newImageBarriers, pImageMemoryBarriers, sizeof(newImageBarriers));
 
-                std::memcpy(newImageBarriers, pImageMemoryBarriers,
-                            sizeof(*newImageBarriers) * imageMemoryBarrierCount);
+                newImageBarriers[1].oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 
-                newImageBarriers[i].oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-
-                o_vkCmdPipelineBarrier(commandBuffer, srcStageMask, dstStageMask, dependencyFlags, memoryBarrierCount,
-                                       pMemoryBarriers, bufferMemoryBarrierCount, pBufferMemoryBarriers,
-                                       imageMemoryBarrierCount, newImageBarriers);
-
-                delete[] newImageBarriers;
-
-                return;
+                return o_vkCmdPipelineBarrier(commandBuffer, srcStageMask, dstStageMask, dependencyFlags,
+                                              memoryBarrierCount, pMemoryBarriers, bufferMemoryBarrierCount,
+                                              pBufferMemoryBarriers, imageMemoryBarrierCount, newImageBarriers);
             }
         }
 

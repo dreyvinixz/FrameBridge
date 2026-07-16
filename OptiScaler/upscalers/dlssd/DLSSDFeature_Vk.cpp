@@ -252,9 +252,6 @@ bool DLSSDFeatureVk::Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Parameter* 
                                      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, range);
 
                 RcasConstants rcasConstants {};
-                rcasConstants.DepthIsLinear = DepthLinear();
-                rcasConstants.DepthIsReversed = DepthInverted();
-                rcasConstants.IsHdr = IsHdr();
                 rcasConstants.Sharpness = _sharpness;
                 InParameters->Get(NVSDK_NGX_Parameter_MV_Scale_X, &rcasConstants.MvScaleX);
                 InParameters->Get(NVSDK_NGX_Parameter_MV_Scale_Y, &rcasConstants.MvScaleY);
@@ -276,21 +273,9 @@ bool DLSSDFeatureVk::Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Parameter* 
 
                 VkExtent2D outExtent = { DisplayWidth(), DisplayHeight() };
 
-                VkImageInfo InResourceInfo {};
-                InResourceInfo.ImageView = RCAS->GetImageView();
-                InResourceInfo.Image = RCAS->GetImage();
-                // Missing the rest of the info
-
-                VkImageInfo OutResourceInfo {};
-                OutResourceInfo.ImageView = finalOutputView;
-                OutResourceInfo.Image = finalOutputImage;
-                OutResourceInfo.Width = DisplayWidth();
-                OutResourceInfo.Height = DisplayHeight();
-                // Missing the rest of the info
-
-                RCAS->Dispatch(Device, InCmdBuffer, rcasConstants, &InResourceInfo,
-                               (VkImageInfo*) &paramVelocity->Resource.ImageViewInfo, &OutResourceInfo,
-                               (VkImageInfo*) &paramDepth->Resource.ImageViewInfo);
+                RCAS->Dispatch(Device, InCmdBuffer, rcasConstants, RCAS->GetImageView(),
+                               paramVelocity->Resource.ImageViewInfo.ImageView, finalOutputView, outExtent,
+                               paramDepth->Resource.ImageViewInfo.ImageView);
 
                 paramOutput->Resource.ImageViewInfo.Image = finalOutputImage;
                 paramOutput->Resource.ImageViewInfo.ImageView = finalOutputView;
