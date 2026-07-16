@@ -58,7 +58,6 @@ Name: framegen; Description: Install DLSSG-to-FSR3 frame generation module (Nuke
 
 ; Optional/debug files
 Name: optional; Description: Install optional files; Flags: fixed; Types: full debug custom
-Name: optional/fgdebug; Description: (optional) Debug configuration for DLSSG-to-FSR3 module; Types: debug custom
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -71,7 +70,6 @@ Name: "gtx_compat"; Description: "Apply GTX/Kepler Compatibility Patch (Forces D
 ; ============================================================
 ; Frame Generation
 ; ============================================================
-Source: "assets\dlssg\dlssg_to_fsr3.ini"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist; Components: optional/fgdebug
 Source: "assets\dlssg\dlssg_to_fsr3_amd_is_better.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist; Components: framegen
 Source: "assets\dlssg\READ ME.txt"; DestDir: "{app}/licenses"; DestName: "READ ME (DLSSG to FSR3 mod).txt"; Flags: ignoreversion skipifsourcedoesntexist; Components: framegen
 Source: "assets\dlssg\LICENSE.txt"; DestDir: "{app}/licenses"; DestName: "LICENSE (DLSSG to FSR3 mod).txt"; Flags: ignoreversion skipifsourcedoesntexist; Components: framegen
@@ -125,6 +123,7 @@ Type: files; Name: "{app}\nvngx-wrapper.dll"
 Type: files; Name: "{app}\_nvngx.dll"
 Type: files; Name: "{app}\nvapi64-proxy.dll"
 Type: files; Name: "{app}\dlss-finder.exe"
+Type: files; Name: "{app}\dlssg_to_fsr3.ini"
 
 [INI]
 ; Create a manifest to track which proxy was installed, so the next update can safely remove it without touching user files
