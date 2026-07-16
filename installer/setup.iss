@@ -73,16 +73,13 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 ; ============================================================
 Source: "assets\dlssg\dlssg_to_fsr3.ini"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist; Components: optional/fgdebug
 Source: "assets\dlssg\dlssg_to_fsr3_amd_is_better.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist; Components: framegen
-Source: "assets\dlssg\nvngx.dll"; DestDir: "{app}"; DestName: "nvngx-wrapper.dll"; Flags: ignoreversion skipifsourcedoesntexist; Components: framegen
 Source: "assets\dlssg\READ ME.txt"; DestDir: "{app}/licenses"; DestName: "READ ME (DLSSG to FSR3 mod).txt"; Flags: ignoreversion skipifsourcedoesntexist; Components: framegen
 Source: "assets\dlssg\LICENSE.txt"; DestDir: "{app}/licenses"; DestName: "LICENSE (DLSSG to FSR3 mod).txt"; Flags: ignoreversion skipifsourcedoesntexist; Components: framegen
 
 ; ============================================================
 ; OptiScaler (compiled from source or downloaded)
 ; ============================================================
-Source: "build\OptiScaler.dll"; DestDir: "{app}"; DestName: "dlss-enabler-upscaler.dll"; Flags: ignoreversion skipifsourcedoesntexist; Components: upscalers
 Source: "assets\configs\OptiScaler.ini"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist; Components: upscalers
-Source: "assets\configs\dlss-enabler.ini"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist; Components: upscalers
 
 ; XeSS and FidelityFX libraries
 Source: "build\libxess.dll"; DestDir: "{app}"; Flags: uninsneveruninstall skipifsourcedoesntexist; Components: upscalers
@@ -90,8 +87,6 @@ Source: "build\libxess_dx11.dll"; DestDir: "{app}"; Flags: ignoreversion skipifs
 Source: "build\amd_fidelityfx_*.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist; Components: upscalers
 Source: "build\D3D12_OptiScaler\*"; DestDir: "{app}\D3D12_OptiScaler"; Flags: ignoreversion skipifsourcedoesntexist; Components: upscalers
 
-; Fakenvapi (bundled with OptiScaler 0.9+)
-Source: "build\fakenvapi.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist; Components: upscalers
 
 ; License files
 Source: "build\licenses\XeSS_LICENSE.txt"; DestDir: "{app}/licenses"; Flags: ignoreversion skipifsourcedoesntexist; Components: upscalers
@@ -99,13 +94,13 @@ Source: "build\licenses\FidelityFX_LICENSE.md"; DestDir: "{app}/licenses"; Flags
 Source: "build\licenses\DirectX_LICENSE.txt"; DestDir: "{app}/licenses"; Flags: ignoreversion skipifsourcedoesntexist; Components: upscalers
 
 ; ============================================================
-; Injection Options (Lightweight DLSS Enabler Proxy)
+; Injection Options (OptiScaler Runtime)
 ; ============================================================
-Source: "build\dlss-enabler.dll"; DestDir: "{app}"; DestName: "version.dll"; Flags: confirmoverwrite skipifsourcedoesntexist; Components: mainfiles/dllversion
-Source: "build\dlss-enabler.dll"; DestDir: "{app}"; DestName: "winmm.dll"; Flags: confirmoverwrite skipifsourcedoesntexist; Components: mainfiles/dllwinmm
-Source: "build\dlss-enabler.dll"; DestDir: "{app}"; DestName: "d3d12.dll"; Flags: confirmoverwrite skipifsourcedoesntexist; Components: mainfiles/dlld3d12
-Source: "build\dlss-enabler.dll"; DestDir: "{app}"; DestName: "dxgi.dll"; Flags: confirmoverwrite skipifsourcedoesntexist; Components: mainfiles/dlldxgi
-Source: "build\dlss-enabler.dll"; DestDir: "{app}"; DestName: "OptiScaler.asi"; Flags: confirmoverwrite skipifsourcedoesntexist; Components: mainfiles/asiversion
+Source: "build\OptiScaler.dll"; DestDir: "{app}"; DestName: "version.dll"; Flags: confirmoverwrite skipifsourcedoesntexist; Components: mainfiles/dllversion
+Source: "build\OptiScaler.dll"; DestDir: "{app}"; DestName: "winmm.dll"; Flags: confirmoverwrite skipifsourcedoesntexist; Components: mainfiles/dllwinmm
+Source: "build\OptiScaler.dll"; DestDir: "{app}"; DestName: "d3d12.dll"; Flags: confirmoverwrite skipifsourcedoesntexist; Components: mainfiles/dlld3d12
+Source: "build\OptiScaler.dll"; DestDir: "{app}"; DestName: "dxgi.dll"; Flags: confirmoverwrite skipifsourcedoesntexist; Components: mainfiles/dlldxgi
+Source: "build\OptiScaler.dll"; DestDir: "{app}"; DestName: "OptiScaler.asi"; Flags: confirmoverwrite skipifsourcedoesntexist; Components: mainfiles/asiversion
 
 ; ============================================================
 ; Documentation
@@ -119,11 +114,16 @@ Source: "assets\framebridge.ico"; DestDir: "{app}"; Flags: ignoreversion; Compon
 [Run]
 Filename: "{app}\docs\README.md"; Description: "View the FrameBridge README file"; Flags: postinstall shellexec skipifsilent skipifdoesntexist
 Filename: "{app}\OptiScaler.ini"; Description: "Edit OptiScaler settings (optional)"; Flags: postinstall shellexec skipifsilent unchecked
-Filename: "{app}\dlss-enabler.ini"; Description: "Edit DLSS Enabler proxy settings (optional)"; Flags: postinstall shellexec skipifsilent unchecked
 
 [InstallDelete]
 Type: files; Name: "{app}\dlss-enabler-xess.dll"
 Type: files; Name: "{app}\dlss-enabler-fsr.dll"
+Type: files; Name: "{app}\dlss-enabler.ini"
+Type: files; Name: "{app}\dlss-enabler-upscaler.dll"
+Type: files; Name: "{app}\version.dll"
+Type: files; Name: "{app}\dxgi.dll"
+Type: files; Name: "{app}\winmm.dll"
+Type: files; Name: "{app}\d3d12.dll"
 Type: files; Name: "{app}\FSR2FSR3.asi"
 Type: files; Name: "{app}\nvngx-wrapper.dll"
 Type: files; Name: "{app}\_nvngx.dll"
