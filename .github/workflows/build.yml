@@ -80,13 +80,7 @@ jobs:
         Invoke-WebRequest -Uri "https://raw.githubusercontent.com/Nukem9/dlssg-to-fsr3/master/resources/dlssg_to_fsr3.ini" -OutFile "installer\assets\dlssg\dlssg_to_fsr3.ini"
         Invoke-WebRequest -Uri "https://raw.githubusercontent.com/Nukem9/dlssg-to-fsr3/master/resources/read_me_generic_dll.txt" -OutFile "installer\assets\dlssg\READ ME.txt"
         
-        # Copy the genuine nvngx.dll from our dependencies folder instead of creating a 0-byte fake
-        Copy-Item -Path "installer\dependencies\nvngx.dll" -Destination "installer\assets\dlssg\nvngx.dll" -Force
-        
-        # Create mock nvidia-env for installer compatibility
-        New-Item -ItemType File -Path "installer\assets\nvidia-env\dxgi.dll" -Force
-        New-Item -ItemType File -Path "installer\assets\nvidia-env\dlss-finder.bin" -Force
-        New-Item -ItemType File -Path "installer\assets\nvidia-env\nvapi64-proxy.dll" -Force
+
 
     - name: Update Inno Setup Version
       shell: powershell

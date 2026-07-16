@@ -50,10 +50,6 @@ Name: mainfiles/asiversion; Description: Install as an ASI plugin (if the game i
 Name: mainfiles/dlldxgi; Description: Install as a dxgi.dll file (if nothing above works); Types: custom; Flags: exclusive
 Name: mainfiles/dlld3d12; Description: Install as a d3d12.dll file (for specific DirectX 12 games); Types: custom; Flags: exclusive
 
-; Non-NVIDIA GPU support
-Name: nonnvidia; Description: Enable support for AMD and Intel GPUs (DON'T INSTALL if you have a NVIDIA GPU); Types: experimental custom
-Name: nonnvidia/localdir; Description: Install NVIDIA Runtime files into game directory; Types: experimental custom; Flags: exclusive
-
 ; OptiScaler upscaler (compiled from source)
 Name: upscalers; Description: Install OptiScaler upscaler with XeSS and FSR support; Flags: fixed; Types: full debug custom
 
@@ -70,26 +66,14 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 [Tasks]
 
 [Files]
-; ============================================================
-; Cleanup - create placeholder files
-; ============================================================
-Source: "assets\configs\OptiScaler.ini"; DestDir: "{app}"; DestName: "dlss-enabler-xess.dll"; Flags: ignoreversion deleteafterinstall; Components: framegen
-Source: "assets\configs\OptiScaler.ini"; DestDir: "{app}"; DestName: "dlss-enabler-fsr.dll"; Flags: ignoreversion deleteafterinstall; Components: framegen
+
 
 ; ============================================================
-; NVIDIA Environment (runtime for non-NVIDIA GPUs)
-; ============================================================
-Source: "assets\nvidia-env\dxgi.dll"; DestDir: "{app}"; Components: nonnvidia/localdir mainfiles/dlldxgi
-Source: "assets\nvidia-env\dlss-finder.bin"; DestName: "dlss-finder.exe"; DestDir: "{app}"; Components: nonnvidia/localdir
-Source: "assets\nvidia-env\nvapi64-proxy.dll"; DestName: "nvapi64-proxy.dll"; DestDir: "{app}"; Components: nonnvidia/localdir
-
-; ============================================================
-; DLSSG-to-FSR3 module (Nukem9)
+; Frame Generation
 ; ============================================================
 Source: "assets\dlssg\dlssg_to_fsr3.ini"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist; Components: optional/fgdebug
 Source: "assets\dlssg\dlssg_to_fsr3_amd_is_better.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist; Components: framegen
-Source: "assets\dlssg\nvngx.dll"; DestDir: "{app}"; DestName: "nvngx-wrapper.dll"; Flags: ignoreversion skipifsourcedoesntexist; Components: framegen
-Source: "assets\dlssg\nvngx.dll"; DestDir: "{app}"; DestName: "_nvngx.dll"; Flags: ignoreversion skipifsourcedoesntexist; Components: nonnvidia/localdir
+Source: "assets\dlssg\nvngx.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist; Components: framegen
 Source: "assets\dlssg\READ ME.txt"; DestDir: "{app}/licenses"; DestName: "READ ME (DLSSG to FSR3 mod).txt"; Flags: ignoreversion skipifsourcedoesntexist; Components: framegen
 Source: "assets\dlssg\LICENSE.txt"; DestDir: "{app}/licenses"; DestName: "LICENSE (DLSSG to FSR3 mod).txt"; Flags: ignoreversion skipifsourcedoesntexist; Components: framegen
 
@@ -136,4 +120,12 @@ Source: "assets\framebridge.ico"; DestDir: "{app}"; Flags: ignoreversion; Compon
 Filename: "{app}\docs\README.md"; Description: "View the FrameBridge README file"; Flags: postinstall shellexec skipifsilent skipifdoesntexist
 Filename: "{app}\OptiScaler.ini"; Description: "Edit OptiScaler settings (optional)"; Flags: postinstall shellexec skipifsilent unchecked
 Filename: "{app}\dlss-enabler.ini"; Description: "Edit DLSS Enabler proxy settings (optional)"; Flags: postinstall shellexec skipifsilent unchecked
-Filename: "{app}\dlss-finder.exe"; Parameters: "/s"; StatusMsg: "Disabling NVIDIA signature checks for DLSS 3.7"; WorkingDir: "{app}"; Description: "DLSS 3.7 activation step"; Flags: skipifsilent skipifdoesntexist
+
+[InstallDelete]
+Type: files; Name: "{app}\dlss-enabler-xess.dll"
+Type: files; Name: "{app}\dlss-enabler-fsr.dll"
+Type: files; Name: "{app}\FSR2FSR3.asi"
+Type: files; Name: "{app}\nvngx-wrapper.dll"
+Type: files; Name: "{app}\_nvngx.dll"
+Type: files; Name: "{app}\nvapi64-proxy.dll"
+Type: files; Name: "{app}\dlss-finder.exe"
