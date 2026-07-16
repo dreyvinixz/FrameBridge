@@ -46,6 +46,7 @@ Name: mainfiles/dllversion; Description: Install as a version.dll file (optimal 
 Name: mainfiles/dllwinmm; Description: Install as a winmm.dll file (if version.dll didn't work); Types: custom; Flags: exclusive
 Name: mainfiles/asiversion; Description: Install as an ASI plugin (if the game is heavily modded); Types: custom debug; Flags: exclusive
 Name: mainfiles/dlldxgi; Description: Install as a dxgi.dll file (if nothing above works); Types: custom; Flags: exclusive
+Name: mainfiles/dlld3d12; Description: Install as a d3d12.dll file (required for Final Fantasy 7 Rebirth); Types: custom; Flags: exclusive
 
 ; Non-NVIDIA GPU support
 Name: nonnvidia; Description: Enable support for AMD and Intel GPUs (DON'T INSTALL if you have a NVIDIA GPU); Types: experimental custom
@@ -118,6 +119,7 @@ Source: "build\OptiScaler.dll"; DestDir: "{app}/plugins"; DestName: "framebridge
 Source: "build\OptiScaler.dll"; DestDir: "{app}"; DestName: "framebridge.dll"; Flags: confirmoverwrite skipifsourcedoesntexist; Components: mainfiles/dlldxgi
 Source: "build\OptiScaler.dll"; DestDir: "{app}"; DestName: "version.dll"; Flags: confirmoverwrite skipifsourcedoesntexist; Components: mainfiles/dllversion
 Source: "build\OptiScaler.dll"; DestDir: "{app}"; DestName: "winmm.dll"; Flags: confirmoverwrite skipifsourcedoesntexist; Components: mainfiles/dllwinmm
+Source: "build\OptiScaler.dll"; DestDir: "{app}"; DestName: "d3d12.dll"; Flags: confirmoverwrite skipifsourcedoesntexist; Components: mainfiles/dlld3d12
 
 ; ============================================================
 ; Documentation
