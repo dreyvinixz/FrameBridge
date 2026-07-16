@@ -100,9 +100,8 @@ Source: "assets\configs\OptiScaler.ini"; DestDir: "{app}"; DestName: "nvngx.ini"
 ; XeSS and FidelityFX libraries
 Source: "build\libxess.dll"; DestDir: "{app}"; Flags: uninsneveruninstall skipifsourcedoesntexist; Components: upscalers
 Source: "build\libxess_dx11.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist; Components: upscalers
-Source: "build\amd_fidelityfx_dx12.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist; Components: upscalers
-Source: "build\amd_fidelityfx_vk.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist; Components: upscalers
-Source: "build\D3D12Core.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist; Components: upscalers
+Source: "build\amd_fidelityfx_*.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist; Components: upscalers
+Source: "build\D3D12_OptiScaler\*"; DestDir: "{app}\D3D12_OptiScaler"; Flags: ignoreversion skipifsourcedoesntexist; Components: upscalers
 
 ; Fakenvapi (bundled with OptiScaler 0.9+)
 Source: "build\fakenvapi.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist; Components: upscalers

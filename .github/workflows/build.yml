@@ -54,6 +54,7 @@ jobs:
         Copy-Item -Path "x64\Release\a\OptiScaler.dll" -Destination "installer\build\" -Force
         Copy-Item -Path "x64\Release\a\OptiScaler\libxess*.dll" -Destination "installer\build\" -Force
         Copy-Item -Path "x64\Release\a\OptiScaler\amd_fidelityfx_*.dll" -Destination "installer\build\" -Force
+        if (Test-Path "x64\Release\a\OptiScaler\D3D12_OptiScaler") { Copy-Item -Path "x64\Release\a\OptiScaler\D3D12_OptiScaler" -Destination "installer\build\D3D12_OptiScaler" -Recurse -Force }
         if (Test-Path "x64\Release\a\fakenvapi.dll") { Copy-Item -Path "x64\Release\a\fakenvapi.dll" -Destination "installer\build\" -Force }
         
         # Copy INI configuration
