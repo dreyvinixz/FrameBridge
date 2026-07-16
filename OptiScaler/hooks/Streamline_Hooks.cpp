@@ -413,8 +413,6 @@ void StreamlineHooks::streamlineLogCallback_sl1(sl1::LogType type, const char* m
             LOG_ERROR("{}", trimmed_msg);
             break;
         }
-
-        
     }
 
     if (o_logCallback_sl1)

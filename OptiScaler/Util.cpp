@@ -485,8 +485,8 @@ bool Util::GetFileVersion(std::wstring dllPath, version_t* fileVersionOut, versi
 
 std::filesystem::path Util::GetStreamlineDirectory(const std::filesystem::path& basePath)
 {
-    std::filesystem::path path = basePath.empty() ? std::filesystem::path(Config::Instance()->MainDllPath.value())
-                                                 : basePath;
+    std::filesystem::path path =
+        basePath.empty() ? std::filesystem::path(Config::Instance()->MainDllPath.value()) : basePath;
     return path / L"streamline";
 }
 
