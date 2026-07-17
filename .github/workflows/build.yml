@@ -40,7 +40,7 @@ jobs:
 
     - name: Build OptiScaler Core
       working-directory: ${{ github.workspace }}
-      run: msbuild /m /p:Configuration=Release /p:Platform=x64 /p:OutDir=x64\Release\ OptiScaler.sln /verbosity:minimal
+      run: msbuild /m /p:Configuration=Release /p:Platform=x64 OptiScaler.sln /verbosity:minimal
 
     - name: Locate build outputs
       shell: pwsh
@@ -65,10 +65,10 @@ jobs:
         New-Item -ItemType Directory -Force -Path "installer\assets\dlssg"
         
         # Move MSBuild outputs
-        Copy-Item -Path "x64\Release\OptiScaler.dll" -Destination "installer\build\" -Force
-        Copy-Item -Path "x64\Release\libxess*.dll" -Destination "installer\build\" -Force
-        Copy-Item -Path "x64\Release\amd_fidelityfx_*.dll" -Destination "installer\build\" -Force
-        if (Test-Path "x64\Release\D3D12_OptiScaler") { Copy-Item -Path "x64\Release\D3D12_OptiScaler" -Destination "installer\build\D3D12_OptiScaler" -Recurse -Force }
+        Copy-Item -Path "x64\Release\a\OptiScaler.dll" -Destination "installer\build\" -Force
+        Copy-Item -Path "x64\Release\a\libxess*.dll" -Destination "installer\build\" -Force
+        Copy-Item -Path "x64\Release\a\amd_fidelityfx_*.dll" -Destination "installer\build\" -Force
+        if (Test-Path "x64\Release\a\D3D12_Optiscaler") { Copy-Item -Path "x64\Release\a\D3D12_Optiscaler" -Destination "installer\build\D3D12_OptiScaler" -Recurse -Force }
         
         # Copy INI configuration
         Copy-Item -Path "OptiScaler.ini" -Destination "installer\assets\configs\OptiScaler.ini" -Force
