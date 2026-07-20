@@ -79,15 +79,15 @@ struct BenchmarkTimer
             long long p95 = samples[950];
             long long p99 = samples[990];
             long long max_val = samples[999];
-            LOG_INFO("[FrameBridge Benchmark] Evaluate samples: 1000 | Avg: {:.3f} ms | P50: {:.3f} ms | P95: {:.3f} "
-                     "ms | P99: {:.3f} ms | Max: {:.3f} ms | Path: {}",
-                     avg / 1000.0, p50 / 1000.0, p95 / 1000.0, p99 / 1000.0, max_val / 1000.0,
 #ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-                     "Legacy"
+            LOG_INFO("[FrameBridge Benchmark] Evaluate samples: 1000 | Avg: {:.3f} ms | P50: {:.3f} ms | P95: {:.3f} "
+                     "ms | P99: {:.3f} ms | Max: {:.3f} ms | Path: Legacy",
+                     avg / 1000.0, p50 / 1000.0, p95 / 1000.0, p99 / 1000.0, max_val / 1000.0);
 #else
-                     "Snapshot"
+            LOG_INFO("[FrameBridge Benchmark] Evaluate samples: 1000 | Avg: {:.3f} ms | P50: {:.3f} ms | P95: {:.3f} "
+                     "ms | P99: {:.3f} ms | Max: {:.3f} ms | Path: Snapshot",
+                     avg / 1000.0, p50 / 1000.0, p95 / 1000.0, p99 / 1000.0, max_val / 1000.0);
 #endif
-            );
             samples.clear();
         }
     }
