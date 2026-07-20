@@ -194,6 +194,12 @@
     <ClInclude Include="State.h">
       <Filter>Config</Filter>
     </ClInclude>
+    <ClInclude Include="runtime\RuntimeCapabilities.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="runtime\RuntimeCapabilityTypes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="shaders\bias\Bias_Common.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -1032,6 +1038,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="upscalers\xess\XeSSFeature_Vk.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="runtime\RuntimeCapabilities.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="framegen\ffx\FSRFG_Dx12.cpp">
