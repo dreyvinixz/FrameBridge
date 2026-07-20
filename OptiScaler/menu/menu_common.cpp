@@ -15,6 +15,7 @@
 #include <hooks/Reflex_Hooks.h>
 
 #include <version_check.h>
+#include <runtime/RuntimeCapabilities.h>
 
 #include <imgui/imgui_internal.h>
 
@@ -1219,7 +1220,8 @@ void MenuCommon::GetCurrentBackendInfo(const API api, std::string* code, std::st
 
 void MenuCommon::AddDx11Backends(std::string* code, std::string* name)
 {
-    const auto& runtime = State::Instance().fsr4RuntimeInfo;
+    const auto snapshot = RuntimeCapabilities::Instance().GetSnapshot();
+    const auto& runtime = snapshot.capabilities.fsr4;
     bool using_int8 = runtime.precision == Fsr4PrecisionMode::INT8 || (runtime.precision == Fsr4PrecisionMode::Unknown && Config::Instance()->Fsr4ForceEnableInt8.value_or_default());
 
     std::string selectedUpscalerName = "";
@@ -1228,7 +1230,18 @@ void MenuCommon::AddDx11Backends(std::string* code, std::string* name)
         (using_int8 && FfxApiProxy::Dx12Module_SR() != nullptr &&
          FfxApiProxy::VersionDx12_SR() >= feature_version { 4, 1, 1 });
 
-    std::string fsr3xName = fsr4Possible ? "FSR 3.X/4 w/Dx12" : "FSR 3.X w/Dx12";
+    std::string fsr3xName = "FSR 3.X w/Dx12";
+    if (fsr4Possible)
+    {
+        if (runtime.precision == Fsr4PrecisionMode::INT8)
+            fsr3xName = runtime.forced_int8 ? "FSR 4 (INT8 Forced) w/Dx12" : "FSR 4 (INT8 Native) w/Dx12";
+        else if (runtime.precision == Fsr4PrecisionMode::FP8)
+            fsr3xName = "FSR 4 (FP8 Native) w/Dx12";
+        else if (runtime.precision == Fsr4PrecisionMode::Fallback)
+            fsr3xName = "FSR 4 (Fallback) w/Dx12";
+        else
+            fsr3xName = "FSR 4 (Unknown) w/Dx12";
+    }
 
     if (State::Instance().newBackend == "fsr22" || (State::Instance().newBackend == "" && *code == "fsr22"))
         selectedUpscalerName = "FSR 2.2.1";
@@ -1280,7 +1293,8 @@ void MenuCommon::AddDx11Backends(std::string* code, std::string* name)
 
 void MenuCommon::AddDx12Backends(std::string* code, std::string* name)
 {
-    const auto& runtime = State::Instance().fsr4RuntimeInfo;
+    const auto snapshot = RuntimeCapabilities::Instance().GetSnapshot();
+    const auto& runtime = snapshot.capabilities.fsr4;
     bool using_int8 = runtime.precision == Fsr4PrecisionMode::INT8 || (runtime.precision == Fsr4PrecisionMode::Unknown && Config::Instance()->Fsr4ForceEnableInt8.value_or_default());
 
     std::string selectedUpscalerName = "";
@@ -1289,7 +1303,18 @@ void MenuCommon::AddDx12Backends(std::string* code, std::string* name)
         (using_int8 && FfxApiProxy::Dx12Module_SR() != nullptr &&
          FfxApiProxy::VersionDx12_SR() >= feature_version { 4, 1, 1 });
 
-    std::string fsr3xName = fsr4Possible ? "FSR 3.X/4" : "FSR 3.X";
+    std::string fsr3xName = "FSR 3.X";
+    if (fsr4Possible)
+    {
+        if (runtime.precision == Fsr4PrecisionMode::INT8)
+            fsr3xName = runtime.forced_int8 ? "FSR 4 (INT8 Forced)" : "FSR 4 (INT8 Native)";
+        else if (runtime.precision == Fsr4PrecisionMode::FP8)
+            fsr3xName = "FSR 4 (FP8 Native)";
+        else if (runtime.precision == Fsr4PrecisionMode::Fallback)
+            fsr3xName = "FSR 4 (Fallback)";
+        else
+            fsr3xName = "FSR 4 (Unknown)";
+    }
 
     if (State::Instance().newBackend == "fsr21" || (State::Instance().newBackend == "" && *code == "fsr21"))
         selectedUpscalerName = "FSR 2.1.2";
@@ -1326,7 +1351,8 @@ void MenuCommon::AddDx12Backends(std::string* code, std::string* name)
 
 void MenuCommon::AddVulkanBackends(std::string* code, std::string* name)
 {
-    const auto& runtime = State::Instance().fsr4RuntimeInfo;
+    const auto snapshot = RuntimeCapabilities::Instance().GetSnapshot();
+    const auto& runtime = snapshot.capabilities.fsr4;
     bool using_int8 = runtime.precision == Fsr4PrecisionMode::INT8 || (runtime.precision == Fsr4PrecisionMode::Unknown && Config::Instance()->Fsr4ForceEnableInt8.value_or_default());
 
     std::string selectedUpscalerName = "";
@@ -1335,7 +1361,18 @@ void MenuCommon::AddVulkanBackends(std::string* code, std::string* name)
         (using_int8 && FfxApiProxy::Dx12Module_SR() != nullptr &&
          FfxApiProxy::VersionDx12_SR() >= feature_version { 4, 1, 1 });
 
-    std::string fsr3xName = fsr4Possible ? "FSR 3.X/4 w/Dx12" : "FSR 3.X w/Dx12";
+    std::string fsr3xName = "FSR 3.X w/Dx12";
+    if (fsr4Possible)
+    {
+        if (runtime.precision == Fsr4PrecisionMode::INT8)
+            fsr3xName = runtime.forced_int8 ? "FSR 4 (INT8 Forced) w/Dx12" : "FSR 4 (INT8 Native) w/Dx12";
+        else if (runtime.precision == Fsr4PrecisionMode::FP8)
+            fsr3xName = "FSR 4 (FP8 Native) w/Dx12";
+        else if (runtime.precision == Fsr4PrecisionMode::Fallback)
+            fsr3xName = "FSR 4 (Fallback) w/Dx12";
+        else
+            fsr3xName = "FSR 4 (Unknown) w/Dx12";
+    }
 
     if (State::Instance().newBackend == "fsr21" || (State::Instance().newBackend == "" && *code == "fsr21"))
         selectedUpscalerName = "FSR 2.1.2";
