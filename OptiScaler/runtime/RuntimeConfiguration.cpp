@@ -51,10 +51,10 @@ void RuntimeConfiguration::RefreshFromConfig()
     _snapshot.fsr31.minDisOccAcc = config->FsrMinDisOccAcc.value_or_default();
 
     // Resource Barriers
-    _snapshot.fsr31.colorResourceBarrier = config->ColorResourceBarrier.value_for_config_ignore_default();
-    _snapshot.fsr31.mvResourceBarrier = config->MVResourceBarrier.value_for_config_ignore_default();
-    _snapshot.fsr31.outputResourceBarrier = config->OutputResourceBarrier.value_for_config_ignore_default();
-    _snapshot.fsr31.depthResourceBarrier = config->DepthResourceBarrier.value_for_config_ignore_default();
-    _snapshot.fsr31.exposureResourceBarrier = config->ExposureResourceBarrier.value_for_config_ignore_default();
-    _snapshot.fsr31.maskResourceBarrier = config->MaskResourceBarrier.value_for_config_ignore_default();
+    _snapshot.fsr31.colorResourceBarrier = config->ColorResourceBarrier.value_for_config();
+    _snapshot.fsr31.mvResourceBarrier = config->MVResourceBarrier.value_for_config();
+    _snapshot.fsr31.outputResourceBarrier = config->OutputResourceBarrier.value_for_config();
+    _snapshot.fsr31.depthResourceBarrier = config->DepthResourceBarrier.value_for_config();
+    _snapshot.fsr31.exposureResourceBarrier = config->ExposureResourceBarrier.value_for_config();
+    _snapshot.fsr31.maskResourceBarrier = config->MaskResourceBarrier.value_for_config();
 }
