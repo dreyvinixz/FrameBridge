@@ -100,21 +100,36 @@ class FfxApiProxy
     {
         LOG_DEBUG("Called with a1: {:X}, device: {:X}", (uintptr_t) a1, (uintptr_t) device);
         
-        uint8_t hardware_result = 0;
-        if (o_amdInt8Check)
-            hardware_result = o_amdInt8Check(a1, device);
+        auto& runtime = State::Instance().fsr4RuntimeInfo;
+
+        if (!o_amdInt8Check)
+        {
+            runtime.hardware_supported = false;
+            runtime.precision = Fsr4PrecisionMode::Unknown;
             
-        State::Instance().fsr4RuntimeInfo.hardware_supported = (hardware_result == 1);
+            if (Config::Instance()->Fsr4ForceEnableInt8.value_or_default())
+            {
+                runtime.forced_int8 = true;
+                runtime.precision = Fsr4PrecisionMode::INT8;
+                return 1;
+            }
+            
+            runtime.forced_int8 = false;
+            return 0;
+        }
+
+        uint8_t hardware_result = o_amdInt8Check(a1, device);
+        runtime.hardware_supported = (hardware_result == 1);
         
         if (Config::Instance()->Fsr4ForceEnableInt8.value_or_default())
         {
-            State::Instance().fsr4RuntimeInfo.forced_int8 = true;
-            State::Instance().fsr4RuntimeInfo.precision = Fsr4PrecisionMode::INT8;
+            runtime.forced_int8 = true;
+            runtime.precision = Fsr4PrecisionMode::INT8;
             return 1;
         }
         
-        State::Instance().fsr4RuntimeInfo.forced_int8 = false;
-        State::Instance().fsr4RuntimeInfo.precision = (hardware_result == 1) ? Fsr4PrecisionMode::INT8 : Fsr4PrecisionMode::FP8;
+        runtime.forced_int8 = false;
+        runtime.precision = (hardware_result == 1) ? Fsr4PrecisionMode::INT8 : Fsr4PrecisionMode::FP8;
         return hardware_result;
     }
 

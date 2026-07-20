@@ -1219,10 +1219,13 @@ void MenuCommon::GetCurrentBackendInfo(const API api, std::string* code, std::st
 
 void MenuCommon::AddDx11Backends(std::string* code, std::string* name)
 {
+    const auto& runtime = State::Instance().fsr4RuntimeInfo;
+    bool using_int8 = runtime.precision == Fsr4PrecisionMode::INT8 || (runtime.precision == Fsr4PrecisionMode::Unknown && Config::Instance()->Fsr4ForceEnableInt8.value_or_default());
+
     std::string selectedUpscalerName = "";
     bool fsr4Possible =
         Config::Instance()->Fsr4Update.value_or_default() || State::Instance().isRunningOnRDNA4.value_or(false) ||
-        (State::Instance().fsr4RuntimeInfo.precision == Fsr4PrecisionMode::INT8 || Config::Instance()->Fsr4ForceEnableInt8.value_or_default()) && FfxApiProxy::Dx12Module_SR() != nullptr &&
+        (using_int8 && FfxApiProxy::Dx12Module_SR() != nullptr &&
          FfxApiProxy::VersionDx12_SR() >= feature_version { 4, 1, 1 });
 
     std::string fsr3xName = fsr4Possible ? "FSR 3.X/4 w/Dx12" : "FSR 3.X w/Dx12";
@@ -1277,10 +1280,13 @@ void MenuCommon::AddDx11Backends(std::string* code, std::string* name)
 
 void MenuCommon::AddDx12Backends(std::string* code, std::string* name)
 {
+    const auto& runtime = State::Instance().fsr4RuntimeInfo;
+    bool using_int8 = runtime.precision == Fsr4PrecisionMode::INT8 || (runtime.precision == Fsr4PrecisionMode::Unknown && Config::Instance()->Fsr4ForceEnableInt8.value_or_default());
+
     std::string selectedUpscalerName = "";
     bool fsr4Possible =
         Config::Instance()->Fsr4Update.value_or_default() || State::Instance().isRunningOnRDNA4.value_or(false) ||
-        (State::Instance().fsr4RuntimeInfo.precision == Fsr4PrecisionMode::INT8 || Config::Instance()->Fsr4ForceEnableInt8.value_or_default()) && FfxApiProxy::Dx12Module_SR() != nullptr &&
+        (using_int8 && FfxApiProxy::Dx12Module_SR() != nullptr &&
          FfxApiProxy::VersionDx12_SR() >= feature_version { 4, 1, 1 });
 
     std::string fsr3xName = fsr4Possible ? "FSR 3.X/4" : "FSR 3.X";
@@ -1320,10 +1326,13 @@ void MenuCommon::AddDx12Backends(std::string* code, std::string* name)
 
 void MenuCommon::AddVulkanBackends(std::string* code, std::string* name)
 {
+    const auto& runtime = State::Instance().fsr4RuntimeInfo;
+    bool using_int8 = runtime.precision == Fsr4PrecisionMode::INT8 || (runtime.precision == Fsr4PrecisionMode::Unknown && Config::Instance()->Fsr4ForceEnableInt8.value_or_default());
+
     std::string selectedUpscalerName = "";
     bool fsr4Possible =
         Config::Instance()->Fsr4Update.value_or_default() || State::Instance().isRunningOnRDNA4.value_or(false) ||
-        (State::Instance().fsr4RuntimeInfo.precision == Fsr4PrecisionMode::INT8 || Config::Instance()->Fsr4ForceEnableInt8.value_or_default()) && FfxApiProxy::Dx12Module_SR() != nullptr &&
+        (using_int8 && FfxApiProxy::Dx12Module_SR() != nullptr &&
          FfxApiProxy::VersionDx12_SR() >= feature_version { 4, 1, 1 });
 
     std::string fsr3xName = fsr4Possible ? "FSR 3.X/4 w/Dx12" : "FSR 3.X w/Dx12";
