@@ -1,6 +1,8 @@
 name: Build Benchmark DLLs
 
 on:
+  push:
+    branches: [ "feature/*" ]
   workflow_dispatch:
 
 permissions:
