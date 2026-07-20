@@ -57,19 +57,19 @@
 - `[x]` Build
 - `[x]` Verify FSR3.1 behavior
 - `[x]` Implement A/B benchmark path
-- `[ ]` Establish reproducible benchmark scenario
-- `[ ]` Measure legacy Config path
-- `[ ]` Measure RuntimeConfiguration path
-- `[ ]` Measure average Evaluate() CPU time
-- `[ ]` Measure P50
-- `[ ]` Measure P95
-- `[ ]` Measure P99
-- `[ ]` Measure maximum
-- `[ ]` Measure GetSnapshot() overhead
-- `[ ]` Compare results
-- `[ ]` Verify allocation behavior
-- `[ ]` Re-measure after optimization
-- `[ ]` Commit: perf: cache FSR3.1 runtime configuration
+- `[x]` Establish reproducible benchmark scenario
+- `[x]` Measure legacy Config path
+- `[x]` Measure RuntimeConfiguration path
+- `[x]` Measure average Evaluate() CPU time
+- `[x]` Measure P50
+- `[x]` Measure P95
+- `[x]` Measure P99
+- `[x]` Measure maximum
+- `[x]` Measure GetSnapshot() overhead
+- `[x]` Compare results
+- `[x]` Verify allocation behavior
+- `[x]` Re-measure after optimization
+- `[x]` Commit: perf: cache FSR3.1 runtime configuration
 
 ## Etapa 5B - Event-Driven Runtime Updates
 - `[ ]` Define configuration change categories
