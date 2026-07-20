@@ -7,10 +7,7 @@ RuntimeConfiguration& RuntimeConfiguration::Instance()
     return instance;
 }
 
-RuntimeConfigurationSnapshot RuntimeConfiguration::GetSnapshot() const
-{
-    return _snapshot;
-}
+RuntimeConfigurationSnapshot RuntimeConfiguration::GetSnapshot() const { return _snapshot; }
 
 void RuntimeConfiguration::RefreshFromConfig()
 {
@@ -60,4 +57,3 @@ void RuntimeConfiguration::RefreshFromConfig()
     _snapshot.fsr31.exposureResourceBarrier = config->ExposureResourceBarrier.value_for_config_ignore_default();
     _snapshot.fsr31.maskResourceBarrier = config->MaskResourceBarrier.value_for_config_ignore_default();
 }
-

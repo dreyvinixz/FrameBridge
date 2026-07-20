@@ -61,26 +61,30 @@ bool FSR31FeatureDx12::Init(ID3D12Device* InDevice, ID3D12GraphicsCommandList* I
     return false;
 }
 
-
 #ifdef FRAMEBRIDGE_ENABLE_EVALUATE_TIMER
-struct BenchmarkTimer {
+struct BenchmarkTimer
+{
     std::chrono::high_resolution_clock::time_point start;
     BenchmarkTimer() { start = std::chrono::high_resolution_clock::now(); }
-    ~BenchmarkTimer() {
+    ~BenchmarkTimer()
+    {
         auto end = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
         static std::vector<long long> samples;
         samples.push_back(duration);
-        if (samples.size() >= 1000) {
+        if (samples.size() >= 1000)
+        {
             std::sort(samples.begin(), samples.end());
             long long sum = 0;
-            for (auto s : samples) sum += s;
+            for (auto s : samples)
+                sum += s;
             double avg = sum / 1000.0;
             long long p50 = samples[500];
             long long p95 = samples[950];
             long long p99 = samples[990];
             long long max_val = samples[999];
-            LOG_INFO("[FrameBridge Benchmark] Evaluate samples: 1000 | Avg: {:.3f} ms | P50: {:.3f} ms | P95: {:.3f} ms | P99: {:.3f} ms | Max: {:.3f} ms | Path: {}",
+            LOG_INFO("[FrameBridge Benchmark] Evaluate samples: 1000 | Avg: {:.3f} ms | P50: {:.3f} ms | P95: {:.3f} "
+                     "ms | P99: {:.3f} ms | Max: {:.3f} ms | Path: {}",
                      avg / 1000.0, p50 / 1000.0, p95 / 1000.0, p99 / 1000.0, max_val / 1000.0,
 #ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
                      "Legacy"
@@ -111,21 +115,24 @@ bool FSR31FeatureDx12::Evaluate(ID3D12GraphicsCommandList* InCommandList, NVSDK_
 #ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
         Config::Instance()->RcasEnabled.set_volatile_value(false);
 #else
-        Config::Instance()->RcasEnabled.set_volatile_value(false); config.fsr31.rcasEnabled = false;
+        Config::Instance()->RcasEnabled.set_volatile_value(false);
+    config.fsr31.rcasEnabled = false;
 #endif
 
     if (!OutputScaler->IsInit())
 #ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
         Config::Instance()->OutputScalingEnabled.set_volatile_value(false);
 #else
-        Config::Instance()->OutputScalingEnabled.set_volatile_value(false); config.fsr31.outputScalingEnabled = false;
+        Config::Instance()->OutputScalingEnabled.set_volatile_value(false);
+    config.fsr31.outputScalingEnabled = false;
 #endif
 
     if (Config::Instance()->DADepthIsLinear.value_for_config_ignore_default() == std::nullopt)
 #ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
         Config::Instance()->DADepthIsLinear.set_volatile_value(false);
 #else
-        Config::Instance()->DADepthIsLinear.set_volatile_value(false); config.fsr31.daDepthIsLinear = false;
+        Config::Instance()->DADepthIsLinear.set_volatile_value(false);
+    config.fsr31.daDepthIsLinear = false;
 #endif
 
     struct ffxDispatchDescUpscale params = { 0 };
@@ -260,7 +267,8 @@ bool FSR31FeatureDx12::Evaluate(ID3D12GraphicsCommandList* InCommandList, NVSDK_
 #ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
             Config::Instance()->ColorResourceBarrier.set_volatile_value(D3D12_RESOURCE_STATE_RENDER_TARGET);
 #else
-            Config::Instance()->ColorResourceBarrier.set_volatile_value(D3D12_RESOURCE_STATE_RENDER_TARGET); config.fsr31.colorResourceBarrier = D3D12_RESOURCE_STATE_RENDER_TARGET;
+            Config::Instance()->ColorResourceBarrier.set_volatile_value(D3D12_RESOURCE_STATE_RENDER_TARGET);
+            config.fsr31.colorResourceBarrier = D3D12_RESOURCE_STATE_RENDER_TARGET;
 #endif
             ResourceBarrier(InCommandList, paramColor, D3D12_RESOURCE_STATE_RENDER_TARGET,
                             D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
@@ -303,7 +311,8 @@ bool FSR31FeatureDx12::Evaluate(ID3D12GraphicsCommandList* InCommandList, NVSDK_
 #ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
             Config::Instance()->MVResourceBarrier.set_volatile_value(D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 #else
-            Config::Instance()->MVResourceBarrier.set_volatile_value(D3D12_RESOURCE_STATE_UNORDERED_ACCESS); config.fsr31.mvResourceBarrier = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+            Config::Instance()->MVResourceBarrier.set_volatile_value(D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+            config.fsr31.mvResourceBarrier = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
 #endif
             ResourceBarrier(InCommandList, paramVelocity, D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
                             D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
@@ -872,7 +881,8 @@ bool FSR31FeatureDx12::Evaluate(ID3D12GraphicsCommandList* InCommandList, NVSDK_
 #ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
                 Config::Instance()->RcasEnabled.set_volatile_value(false);
 #else
-                Config::Instance()->RcasEnabled.set_volatile_value(false); config.fsr31.rcasEnabled = false;
+                Config::Instance()->RcasEnabled.set_volatile_value(false);
+                config.fsr31.rcasEnabled = false;
 #endif
                 return true;
             }
@@ -886,7 +896,8 @@ bool FSR31FeatureDx12::Evaluate(ID3D12GraphicsCommandList* InCommandList, NVSDK_
 #ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
                 Config::Instance()->RcasEnabled.set_volatile_value(false);
 #else
-                Config::Instance()->RcasEnabled.set_volatile_value(false); config.fsr31.rcasEnabled = false;
+                Config::Instance()->RcasEnabled.set_volatile_value(false);
+                config.fsr31.rcasEnabled = false;
 #endif
                 return true;
             }
@@ -903,7 +914,8 @@ bool FSR31FeatureDx12::Evaluate(ID3D12GraphicsCommandList* InCommandList, NVSDK_
 #ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
             Config::Instance()->OutputScalingEnabled.set_volatile_value(false);
 #else
-            Config::Instance()->OutputScalingEnabled.set_volatile_value(false); config.fsr31.outputScalingEnabled = false;
+            Config::Instance()->OutputScalingEnabled.set_volatile_value(false);
+            config.fsr31.outputScalingEnabled = false;
 #endif
             State::Instance().changeBackend[Handle()->Id] = true;
             return true;
@@ -1114,7 +1126,8 @@ bool FSR31FeatureDx12::InitFSR3(const NVSDK_NGX_Parameter* InParameters)
 #ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
                 Config::Instance()->OutputScalingMultiplier.set_volatile_value(ssMulti);
 #else
-                Config::Instance()->OutputScalingMultiplier.set_volatile_value(ssMulti); config.fsr31.outputScalingMultiplier = ssMulti;
+                Config::Instance()->OutputScalingMultiplier.set_volatile_value(ssMulti);
+                config.fsr31.outputScalingMultiplier = ssMulti;
 #endif
             }
             else if (ssMulti > 3.0f)
@@ -1123,7 +1136,8 @@ bool FSR31FeatureDx12::InitFSR3(const NVSDK_NGX_Parameter* InParameters)
 #ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
                 Config::Instance()->OutputScalingMultiplier.set_volatile_value(ssMulti);
 #else
-                Config::Instance()->OutputScalingMultiplier.set_volatile_value(ssMulti); config.fsr31.outputScalingMultiplier = ssMulti;
+                Config::Instance()->OutputScalingMultiplier.set_volatile_value(ssMulti);
+                config.fsr31.outputScalingMultiplier = ssMulti;
 #endif
             }
 
@@ -1149,7 +1163,8 @@ bool FSR31FeatureDx12::InitFSR3(const NVSDK_NGX_Parameter* InParameters)
 #ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
             Config::Instance()->OutputScalingMultiplier.set_volatile_value(1.0f);
 #else
-            Config::Instance()->OutputScalingMultiplier.set_volatile_value(1.0f); config.fsr31.outputScalingMultiplier = 1.0f;
+            Config::Instance()->OutputScalingMultiplier.set_volatile_value(1.0f);
+            config.fsr31.outputScalingMultiplier = 1.0f;
 #endif
 
             // if output scaling active let it to handle downsampling
@@ -1226,7 +1241,8 @@ bool FSR31FeatureDx12::InitFSR3(const NVSDK_NGX_Parameter* InParameters)
 #ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
             Config::Instance()->FfxUpscalerIndex.set_volatile_value(0);
 #else
-            Config::Instance()->FfxUpscalerIndex.set_volatile_value(0); config.fsr31.ffxUpscalerIndex = 0;
+            Config::Instance()->FfxUpscalerIndex.set_volatile_value(0);
+        config.fsr31.ffxUpscalerIndex = 0;
 #endif
 
         ffxOverrideVersion override = { 0 };

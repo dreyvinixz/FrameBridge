@@ -56,14 +56,14 @@ struct RuntimeConfigurationSnapshot
 
 class RuntimeConfiguration
 {
-public:
+  public:
     static RuntimeConfiguration& Instance();
 
     RuntimeConfigurationSnapshot GetSnapshot() const;
 
     void RefreshFromConfig();
 
-private:
+  private:
     RuntimeConfiguration() = default;
     ~RuntimeConfiguration() = default;
 
@@ -72,4 +72,3 @@ private:
 
     RuntimeConfigurationSnapshot _snapshot;
 };
-
