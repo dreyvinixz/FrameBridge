@@ -39,11 +39,7 @@ bool FSR31FeatureDx12::Init(ID3D12Device* InDevice, ID3D12GraphicsCommandList* I
 
     if (InitFSR3(InParameters))
     {
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-        if (!Config::Instance()->OverlayMenu.value_or_default() && (Imgui == nullptr || Imgui.get() == nullptr))
-#else
         if (!config.fsr31.overlayMenu && (Imgui == nullptr || Imgui.get() == nullptr))
-#endif
             Imgui = std::make_unique<Menu_Dx12>(Util::GetProcessWindow(), InDevice);
 
         OutputScaler = std::make_unique<OS_Dx12>("Output Scaling", InDevice, (TargetWidth() < DisplayWidth()));
@@ -59,87 +55,46 @@ bool FSR31FeatureDx12::Init(ID3D12Device* InDevice, ID3D12GraphicsCommandList* I
 bool FSR31FeatureDx12::Evaluate(ID3D12GraphicsCommandList* InCommandList, NVSDK_NGX_Parameter* InParameters)
 {
     LOG_FUNC();
-#ifndef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-    auto config = RuntimeConfiguration::Instance().GetSnapshot();
-#endif
+
+    const auto config = RuntimeConfiguration::Instance().GetSnapshot();
 
     if (!IsInited())
         return false;
 
     if (!RCAS->IsInit())
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-        Config::Instance()->RcasEnabled.set_volatile_value(false);
-#else
         Config::Instance()->RcasEnabled.set_volatile_value(false); config.fsr31.rcasEnabled = false;
-#endif
 
     if (!OutputScaler->IsInit())
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-        Config::Instance()->OutputScalingEnabled.set_volatile_value(false);
-#else
         Config::Instance()->OutputScalingEnabled.set_volatile_value(false); config.fsr31.outputScalingEnabled = false;
-#endif
 
     if (Config::Instance()->DADepthIsLinear.value_for_config_ignore_default() == std::nullopt)
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-        Config::Instance()->DADepthIsLinear.set_volatile_value(false);
-#else
         Config::Instance()->DADepthIsLinear.set_volatile_value(false); config.fsr31.daDepthIsLinear = false;
-#endif
 
     struct ffxDispatchDescUpscale params = { 0 };
     params.header.type = FFX_API_DISPATCH_DESC_TYPE_UPSCALE;
 
     params.flags = 0;
 
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-    if (Config::Instance()->FsrDebugView.value_or_default() &&
-#else
     if (config.fsr31.debugView &&
-#endif
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-        (Version() < feature_version { 4, 0, 0 } || Config::Instance()->Fsr4EnableDebugView.value_or_default()))
-#else
         (Version() < feature_version { 4, 0, 0 } || config.fsr31.enableDebugViewForFsr4))
-#endif
     {
         params.flags |= FFX_UPSCALE_FLAG_DRAW_DEBUG_VIEW;
     }
 
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-    if (Config::Instance()->FsrNonLinearPQ.value_or_default())
-#else
     if (config.fsr31.nonLinearPQ)
-#endif
         params.flags |= FFX_UPSCALE_FLAG_NON_LINEAR_COLOR_PQ;
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-    else if (Config::Instance()->FsrNonLinearSRGB.value_or_default())
-#else
     else if (config.fsr31.nonLinearSRGB)
-#endif
         params.flags |= FFX_UPSCALE_FLAG_NON_LINEAR_COLOR_SRGB;
 
     InParameters->Get(NVSDK_NGX_Parameter_Jitter_Offset_X, &params.jitterOffset.x);
     InParameters->Get(NVSDK_NGX_Parameter_Jitter_Offset_Y, &params.jitterOffset.y);
 
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-    if (Config::Instance()->OverrideSharpness.value_or_default())
-#else
     if (config.fsr31.overrideSharpness)
-#endif
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-        _sharpness = Config::Instance()->Sharpness.value_or_default();
-#else
         _sharpness = config.fsr31.sharpness;
-#endif
     else
         _sharpness = GetSharpness(InParameters);
 
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-    if (Config::Instance()->RcasEnabled.value_or_default())
-#else
     if (config.fsr31.rcasEnabled)
-#endif
     {
         params.enableSharpening = false;
         params.sharpness = 0.0f;
@@ -156,16 +111,8 @@ bool FSR31FeatureDx12::Evaluate(ID3D12GraphicsCommandList* InCommandList, NVSDK_
     // Force enable RCAS when in FSR4 debug view mode
     // it crashes when sharpening is disabled
     // Debug view expects RCAS output (now sure why)
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-    if (Version() >= feature_version { 4, 0, 2 } && Config::Instance()->FsrDebugView.value_or_default() &&
-#else
     if (Version() >= feature_version { 4, 0, 2 } && config.fsr31.debugView &&
-#endif
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-        Config::Instance()->Fsr4EnableDebugView.value_or_default() && !params.enableSharpening)
-#else
         config.fsr31.enableDebugViewForFsr4 && !params.enableSharpening)
-#endif
     {
         params.enableSharpening = true;
         params.sharpness = 0.01f;
@@ -180,11 +127,7 @@ bool FSR31FeatureDx12::Evaluate(ID3D12GraphicsCommandList* InCommandList, NVSDK_
     GetRenderResolution(InParameters, &params.renderSize.width, &params.renderSize.height);
 
     bool useSS =
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-        Config::Instance()->OutputScalingEnabled.value_or_default() && (LowResMV() || RenderWidth() == DisplayWidth());
-#else
         config.fsr31.outputScalingEnabled && (LowResMV() || RenderWidth() == DisplayWidth());
-#endif
 
     LOG_DEBUG("Input Resolution: {0}x{1}", params.renderSize.width, params.renderSize.height);
 
@@ -198,29 +141,17 @@ bool FSR31FeatureDx12::Evaluate(ID3D12GraphicsCommandList* InCommandList, NVSDK_
     {
         LOG_DEBUG("Color exist..");
 
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-        if (Config::Instance()->ColorResourceBarrier.has_value())
-#else
         if (config.fsr31.colorResourceBarrier.has_value())
-#endif
         {
             ResourceBarrier(InCommandList, paramColor,
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-                            (D3D12_RESOURCE_STATES) Config::Instance()->ColorResourceBarrier.value(),
-#else
                             (D3D12_RESOURCE_STATES) config.fsr31.colorResourceBarrier.value(),
-#endif
                             D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
         }
         else if (State::Instance().NVNGX_Engine == NVSDK_NGX_ENGINE_TYPE_UNREAL ||
                  State::Instance().GameEngine == GameEngineType::Unreal ||
                  State::Instance().gameQuirks & GameQuirk::ForceUnrealEngine)
         {
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-            Config::Instance()->ColorResourceBarrier.set_volatile_value(D3D12_RESOURCE_STATE_RENDER_TARGET);
-#else
             Config::Instance()->ColorResourceBarrier.set_volatile_value(D3D12_RESOURCE_STATE_RENDER_TARGET); config.fsr31.colorResourceBarrier = D3D12_RESOURCE_STATE_RENDER_TARGET;
-#endif
             ResourceBarrier(InCommandList, paramColor, D3D12_RESOURCE_STATE_RENDER_TARGET,
                             D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
         }
@@ -241,29 +172,17 @@ bool FSR31FeatureDx12::Evaluate(ID3D12GraphicsCommandList* InCommandList, NVSDK_
     {
         LOG_DEBUG("MotionVectors exist..");
 
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-        if (Config::Instance()->MVResourceBarrier.has_value())
-#else
         if (config.fsr31.mvResourceBarrier.has_value())
-#endif
         {
             ResourceBarrier(InCommandList, paramVelocity,
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-                            (D3D12_RESOURCE_STATES) Config::Instance()->MVResourceBarrier.value(),
-#else
                             (D3D12_RESOURCE_STATES) config.fsr31.mvResourceBarrier.value(),
-#endif
                             D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
         }
         else if (State::Instance().NVNGX_Engine == NVSDK_NGX_ENGINE_TYPE_UNREAL ||
                  State::Instance().GameEngine == GameEngineType::Unreal ||
                  State::Instance().gameQuirks & GameQuirk::ForceUnrealEngine)
         {
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-            Config::Instance()->MVResourceBarrier.set_volatile_value(D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-#else
             Config::Instance()->MVResourceBarrier.set_volatile_value(D3D12_RESOURCE_STATE_UNORDERED_ACCESS); config.fsr31.mvResourceBarrier = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-#endif
             ResourceBarrier(InCommandList, paramVelocity, D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
                             D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
         }
@@ -284,17 +203,9 @@ bool FSR31FeatureDx12::Evaluate(ID3D12GraphicsCommandList* InCommandList, NVSDK_
     {
         LOG_DEBUG("Output exist..");
 
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-        if (Config::Instance()->OutputResourceBarrier.has_value())
-#else
         if (config.fsr31.outputResourceBarrier.has_value())
-#endif
             ResourceBarrier(InCommandList, paramOutput,
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-                            (D3D12_RESOURCE_STATES) Config::Instance()->OutputResourceBarrier.value(),
-#else
                             (D3D12_RESOURCE_STATES) config.fsr31.outputResourceBarrier.value(),
-#endif
                             D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
         if (useSS)
@@ -311,21 +222,9 @@ bool FSR31FeatureDx12::Evaluate(ID3D12GraphicsCommandList* InCommandList, NVSDK_
         else
             params.output = ffxApiGetResourceDX12(paramOutput, FFX_API_RESOURCE_STATE_UNORDERED_ACCESS);
 
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-        if (Config::Instance()->RcasEnabled.value_or_default() &&
-#else
         if (config.fsr31.rcasEnabled &&
-#endif
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-            (_sharpness > 0.0f || (Config::Instance()->MotionSharpnessEnabled.value_or_default() &&
-#else
             (_sharpness > 0.0f || (config.fsr31.motionSharpnessEnabled &&
-#endif
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-                                   Config::Instance()->MotionSharpness.value_or_default() > 0.0f)) &&
-#else
                                    config.fsr31.motionSharpness > 0.0f)) &&
-#endif
             RCAS->IsInit() &&
             RCAS->CreateBufferResource(Device, (ID3D12Resource*) params.output.resource,
                                        D3D12_RESOURCE_STATE_UNORDERED_ACCESS))
@@ -348,17 +247,9 @@ bool FSR31FeatureDx12::Evaluate(ID3D12GraphicsCommandList* InCommandList, NVSDK_
     {
         LOG_DEBUG("Depth exist..");
 
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-        if (Config::Instance()->DepthResourceBarrier.has_value())
-#else
         if (config.fsr31.depthResourceBarrier.has_value())
-#endif
             ResourceBarrier(InCommandList, paramDepth,
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-                            (D3D12_RESOURCE_STATES) Config::Instance()->DepthResourceBarrier.value(),
-#else
                             (D3D12_RESOURCE_STATES) config.fsr31.depthResourceBarrier.value(),
-#endif
                             D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 
         params.depth = ffxApiGetResourceDX12(paramDepth, FFX_API_RESOURCE_STATE_COMPUTE_READ);
@@ -385,17 +276,9 @@ bool FSR31FeatureDx12::Evaluate(ID3D12GraphicsCommandList* InCommandList, NVSDK_
         {
             LOG_DEBUG("ExposureTexture exist..");
 
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-            if (Config::Instance()->ExposureResourceBarrier.has_value())
-#else
             if (config.fsr31.exposureResourceBarrier.has_value())
-#endif
                 ResourceBarrier(InCommandList, paramExp,
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-                                (D3D12_RESOURCE_STATES) Config::Instance()->ExposureResourceBarrier.value(),
-#else
                                 (D3D12_RESOURCE_STATES) config.fsr31.exposureResourceBarrier.value(),
-#endif
                                 D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 
             params.exposure = ffxApiGetResourceDX12(paramExp, FFX_API_RESOURCE_STATE_COMPUTE_READ);
@@ -444,17 +327,9 @@ bool FSR31FeatureDx12::Evaluate(ID3D12GraphicsCommandList* InCommandList, NVSDK_
                 LOG_DEBUG("Input Bias mask exist..");
                 Config::Instance()->DisableReactiveMask.set_volatile_value(false);
 
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-                if (Config::Instance()->MaskResourceBarrier.has_value())
-#else
                 if (config.fsr31.maskResourceBarrier.has_value())
-#endif
                     ResourceBarrier(InCommandList, paramReactiveMask2,
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-                                    (D3D12_RESOURCE_STATES) Config::Instance()->MaskResourceBarrier.value(),
-#else
                                     (D3D12_RESOURCE_STATES) config.fsr31.maskResourceBarrier.value(),
-#endif
                                     D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 
                 if (paramTransparency == nullptr && Config::Instance()->FsrUseMaskForTransparency.value_or_default())
@@ -516,86 +391,38 @@ bool FSR31FeatureDx12::Evaluate(ID3D12GraphicsCommandList* InCommandList, NVSDK_
 
     LOG_DEBUG("Sharpness: {0}", params.sharpness);
 
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-    if (!Config::Instance()->FsrUseFsrInputValues.value_or_default() ||
-#else
     if (!config.fsr31.useFsrInputValues ||
-#endif
         InParameters->Get("FSR.cameraNear", &params.cameraNear) != NVSDK_NGX_Result_Success)
     {
         if (DepthInverted())
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-            params.cameraFar = Config::Instance()->FsrCameraNear.value_or_default();
-#else
             params.cameraFar = config.fsr31.cameraNear;
-#endif
         else
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-            params.cameraNear = Config::Instance()->FsrCameraNear.value_or_default();
-#else
             params.cameraNear = config.fsr31.cameraNear;
-#endif
     }
 
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-    if (!Config::Instance()->FsrUseFsrInputValues.value_or_default() ||
-#else
     if (!config.fsr31.useFsrInputValues ||
-#endif
         InParameters->Get("FSR.cameraFar", &params.cameraFar) != NVSDK_NGX_Result_Success)
     {
         if (DepthInverted())
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-            params.cameraNear = Config::Instance()->FsrCameraFar.value_or_default();
-#else
             params.cameraNear = config.fsr31.cameraFar;
-#endif
         else
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-            params.cameraFar = Config::Instance()->FsrCameraFar.value_or_default();
-#else
             params.cameraFar = config.fsr31.cameraFar;
-#endif
     }
 
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-    if (!Config::Instance()->FsrUseFsrInputValues.value_or_default() ||
-#else
     if (!config.fsr31.useFsrInputValues ||
-#endif
         InParameters->Get("FSR.cameraFovAngleVertical", &params.cameraFovAngleVertical) != NVSDK_NGX_Result_Success)
     {
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-        if (Config::Instance()->FsrVerticalFov.has_value())
-#else
         if (config.fsr31.verticalFov.has_value())
-#endif
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-            params.cameraFovAngleVertical = Config::Instance()->FsrVerticalFov.value() * 0.0174532925199433f;
-#else
             params.cameraFovAngleVertical = config.fsr31.verticalFov.value() * 0.0174532925199433f;
-#endif
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-        else if (Config::Instance()->FsrHorizontalFov.value_or_default() > 0.0f)
-#else
         else if (config.fsr31.horizontalFov > 0.0f)
-#endif
             params.cameraFovAngleVertical =
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-                2.0f * atan((tan(Config::Instance()->FsrHorizontalFov.value() * 0.0174532925199433f) * 0.5f) /
-#else
                 2.0f * atan((tan(config.fsr31.horizontalFov * 0.0174532925199433f) * 0.5f) /
-#endif
                             (float) TargetHeight() * (float) TargetWidth());
         else
             params.cameraFovAngleVertical = 1.0471975511966f;
     }
 
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-    if (!Config::Instance()->FsrUseFsrInputValues.value_or_default() ||
-#else
     if (!config.fsr31.useFsrInputValues ||
-#endif
         InParameters->Get("FSR.frameTimeDelta", &params.frameTimeDelta) != NVSDK_NGX_Result_Success)
     {
         if (InParameters->Get(NVSDK_NGX_Parameter_FrameTimeDeltaInMsec, &params.frameTimeDelta) !=
@@ -606,28 +433,16 @@ bool FSR31FeatureDx12::Evaluate(ID3D12GraphicsCommandList* InCommandList, NVSDK_
 
     LOG_DEBUG("FrameTimeDeltaInMsec: {0}", params.frameTimeDelta);
 
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-    if (!Config::Instance()->FsrUseFsrInputValues.value_or_default() ||
-#else
     if (!config.fsr31.useFsrInputValues ||
-#endif
         InParameters->Get("FSR.viewSpaceToMetersFactor", &params.viewSpaceToMetersFactor) != NVSDK_NGX_Result_Success)
         params.viewSpaceToMetersFactor = 0.0f;
 
     if (InParameters->Get(NVSDK_NGX_Parameter_DLSS_Pre_Exposure, &params.preExposure) != NVSDK_NGX_Result_Success)
         params.preExposure = 1.0f;
 
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-    if (Version() >= feature_version { 3, 1, 1 } && _velocity != Config::Instance()->FsrVelocity.value_or_default())
-#else
     if (Version() >= feature_version { 3, 1, 1 } && _velocity != config.fsr31.velocity)
-#endif
     {
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-        _velocity = Config::Instance()->FsrVelocity.value_or_default();
-#else
         _velocity = config.fsr31.velocity;
-#endif
         ffxConfigureDescUpscaleKeyValue m_upscalerKeyValueConfig {};
         m_upscalerKeyValueConfig.header.type = FFX_API_CONFIGURE_DESC_TYPE_UPSCALE_KEYVALUE;
         m_upscalerKeyValueConfig.key = FFX_API_CONFIGURE_UPSCALE_KEY_FVELOCITYFACTOR;
@@ -640,17 +455,9 @@ bool FSR31FeatureDx12::Evaluate(ID3D12GraphicsCommandList* InCommandList, NVSDK_
 
     if (Version() >= feature_version { 3, 1, 4 })
     {
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-        if (_reactiveScale != Config::Instance()->FsrReactiveScale.value_or_default())
-#else
         if (_reactiveScale != config.fsr31.reactiveScale)
-#endif
         {
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-            _reactiveScale = Config::Instance()->FsrReactiveScale.value_or_default();
-#else
             _reactiveScale = config.fsr31.reactiveScale;
-#endif
             ffxConfigureDescUpscaleKeyValue m_upscalerKeyValueConfig {};
             m_upscalerKeyValueConfig.header.type = FFX_API_CONFIGURE_DESC_TYPE_UPSCALE_KEYVALUE;
             m_upscalerKeyValueConfig.key = FFX_API_CONFIGURE_UPSCALE_KEY_FREACTIVENESSSCALE;
@@ -661,17 +468,9 @@ bool FSR31FeatureDx12::Evaluate(ID3D12GraphicsCommandList* InCommandList, NVSDK_
                 LOG_WARN("Reactive Scale configure result: {}", (UINT) result);
         }
 
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-        if (_shadingScale != Config::Instance()->FsrShadingScale.value_or_default())
-#else
         if (_shadingScale != config.fsr31.shadingScale)
-#endif
         {
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-            _shadingScale = Config::Instance()->FsrShadingScale.value_or_default();
-#else
             _shadingScale = config.fsr31.shadingScale;
-#endif
             ffxConfigureDescUpscaleKeyValue m_upscalerKeyValueConfig {};
             m_upscalerKeyValueConfig.header.type = FFX_API_CONFIGURE_DESC_TYPE_UPSCALE_KEYVALUE;
             m_upscalerKeyValueConfig.key = FFX_API_CONFIGURE_UPSCALE_KEY_FSHADINGCHANGESCALE;
@@ -682,17 +481,9 @@ bool FSR31FeatureDx12::Evaluate(ID3D12GraphicsCommandList* InCommandList, NVSDK_
                 LOG_WARN("Shading Scale configure result: {}", (UINT) result);
         }
 
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-        if (_accAddPerFrame != Config::Instance()->FsrAccAddPerFrame.value_or_default())
-#else
         if (_accAddPerFrame != config.fsr31.accAddPerFrame)
-#endif
         {
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-            _accAddPerFrame = Config::Instance()->FsrAccAddPerFrame.value_or_default();
-#else
             _accAddPerFrame = config.fsr31.accAddPerFrame;
-#endif
             ffxConfigureDescUpscaleKeyValue m_upscalerKeyValueConfig {};
             m_upscalerKeyValueConfig.header.type = FFX_API_CONFIGURE_DESC_TYPE_UPSCALE_KEYVALUE;
             m_upscalerKeyValueConfig.key = FFX_API_CONFIGURE_UPSCALE_KEY_FACCUMULATIONADDEDPERFRAME;
@@ -703,17 +494,9 @@ bool FSR31FeatureDx12::Evaluate(ID3D12GraphicsCommandList* InCommandList, NVSDK_
                 LOG_WARN("Acc. Add Per Frame configure result: {}", (UINT) result);
         }
 
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-        if (_minDisOccAcc != Config::Instance()->FsrMinDisOccAcc.value_or_default())
-#else
         if (_minDisOccAcc != config.fsr31.minDisOccAcc)
-#endif
         {
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-            _minDisOccAcc = Config::Instance()->FsrMinDisOccAcc.value_or_default();
-#else
             _minDisOccAcc = config.fsr31.minDisOccAcc;
-#endif
             ffxConfigureDescUpscaleKeyValue m_upscalerKeyValueConfig {};
             m_upscalerKeyValueConfig.header.type = FFX_API_CONFIGURE_DESC_TYPE_UPSCALE_KEYVALUE;
             m_upscalerKeyValueConfig.key = FFX_API_CONFIGURE_UPSCALE_KEY_FMINDISOCCLUSIONACCUMULATION;
@@ -726,19 +509,11 @@ bool FSR31FeatureDx12::Evaluate(ID3D12GraphicsCommandList* InCommandList, NVSDK_
     }
 
     if (InParameters->Get("FSR.upscaleSize.width", &params.upscaleSize.width) == NVSDK_NGX_Result_Success &&
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-        Config::Instance()->OutputScalingEnabled.value_or_default())
-#else
         config.fsr31.outputScalingEnabled)
-#endif
     {
         auto originalWidth = static_cast<float>(params.upscaleSize.width);
         params.upscaleSize.width =
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-            static_cast<uint32_t>(originalWidth * Config::Instance()->OutputScalingMultiplier.value_or_default());
-#else
             static_cast<uint32_t>(originalWidth * config.fsr31.outputScalingMultiplier);
-#endif
     }
     else if (params.upscaleSize.width == 0)
     {
@@ -746,19 +521,11 @@ bool FSR31FeatureDx12::Evaluate(ID3D12GraphicsCommandList* InCommandList, NVSDK_
     }
 
     if (InParameters->Get("FSR.upscaleSize.height", &params.upscaleSize.height) == NVSDK_NGX_Result_Success &&
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-        Config::Instance()->OutputScalingEnabled.value_or_default())
-#else
         config.fsr31.outputScalingEnabled)
-#endif
     {
         auto originalHeight = static_cast<float>(params.upscaleSize.height);
         params.upscaleSize.height =
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-            static_cast<uint32_t>(originalHeight * Config::Instance()->OutputScalingMultiplier.value_or_default());
-#else
             static_cast<uint32_t>(originalHeight * config.fsr31.outputScalingMultiplier);
-#endif
     }
     else if (params.upscaleSize.height == 0)
     {
@@ -782,21 +549,9 @@ bool FSR31FeatureDx12::Evaluate(ID3D12GraphicsCommandList* InCommandList, NVSDK_
     }
 
     // apply rcas
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-    if (Config::Instance()->RcasEnabled.value_or_default() &&
-#else
     if (config.fsr31.rcasEnabled &&
-#endif
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-        (_sharpness > 0.0f || (Config::Instance()->MotionSharpnessEnabled.value_or_default() &&
-#else
         (_sharpness > 0.0f || (config.fsr31.motionSharpnessEnabled &&
-#endif
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-                               Config::Instance()->MotionSharpness.value_or_default() > 0.0f)) &&
-#else
                                config.fsr31.motionSharpness > 0.0f)) &&
-#endif
         RCAS->CanRender())
     {
         if (params.output.resource != RCAS->Buffer())
@@ -828,11 +583,7 @@ bool FSR31FeatureDx12::Evaluate(ID3D12GraphicsCommandList* InCommandList, NVSDK_
                                 (ID3D12Resource*) params.motionVectors.resource, rcasConstants, OutputScaler->Buffer(),
                                 (ID3D12Resource*) params.depth.resource))
             {
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-                Config::Instance()->RcasEnabled.set_volatile_value(false);
-#else
                 Config::Instance()->RcasEnabled.set_volatile_value(false); config.fsr31.rcasEnabled = false;
-#endif
                 return true;
             }
         }
@@ -842,11 +593,7 @@ bool FSR31FeatureDx12::Evaluate(ID3D12GraphicsCommandList* InCommandList, NVSDK_
                                 (ID3D12Resource*) params.motionVectors.resource, rcasConstants, paramOutput,
                                 (ID3D12Resource*) params.depth.resource))
             {
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-                Config::Instance()->RcasEnabled.set_volatile_value(false);
-#else
                 Config::Instance()->RcasEnabled.set_volatile_value(false); config.fsr31.rcasEnabled = false;
-#endif
                 return true;
             }
         }
@@ -859,22 +606,14 @@ bool FSR31FeatureDx12::Evaluate(ID3D12GraphicsCommandList* InCommandList, NVSDK_
 
         if (!OutputScaler->Dispatch(Device, InCommandList, OutputScaler->Buffer(), paramOutput))
         {
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-            Config::Instance()->OutputScalingEnabled.set_volatile_value(false);
-#else
             Config::Instance()->OutputScalingEnabled.set_volatile_value(false); config.fsr31.outputScalingEnabled = false;
-#endif
             State::Instance().changeBackend[Handle()->Id] = true;
             return true;
         }
     }
 
     // imgui
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-    if (!Config::Instance()->OverlayMenu.value_or_default() && _frameCount > 30)
-#else
     if (!config.fsr31.overlayMenu && _frameCount > 30)
-#endif
     {
         if (Imgui != nullptr && Imgui.get() != nullptr)
         {
@@ -893,77 +632,29 @@ bool FSR31FeatureDx12::Evaluate(ID3D12GraphicsCommandList* InCommandList, NVSDK_
     }
 
     // restore resource states
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-    if (paramColor && Config::Instance()->ColorResourceBarrier.has_value())
-#else
     if (paramColor && config.fsr31.colorResourceBarrier.has_value())
-#endif
         ResourceBarrier(InCommandList, paramColor, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-                        (D3D12_RESOURCE_STATES) Config::Instance()->ColorResourceBarrier.value());
-#else
                         (D3D12_RESOURCE_STATES) config.fsr31.colorResourceBarrier.value());
-#endif
 
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-    if (paramVelocity && Config::Instance()->MVResourceBarrier.has_value())
-#else
     if (paramVelocity && config.fsr31.mvResourceBarrier.has_value())
-#endif
         ResourceBarrier(InCommandList, paramVelocity, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-                        (D3D12_RESOURCE_STATES) Config::Instance()->MVResourceBarrier.value());
-#else
                         (D3D12_RESOURCE_STATES) config.fsr31.mvResourceBarrier.value());
-#endif
 
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-    if (paramOutput && Config::Instance()->OutputResourceBarrier.has_value())
-#else
     if (paramOutput && config.fsr31.outputResourceBarrier.has_value())
-#endif
         ResourceBarrier(InCommandList, paramOutput, D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-                        (D3D12_RESOURCE_STATES) Config::Instance()->OutputResourceBarrier.value());
-#else
                         (D3D12_RESOURCE_STATES) config.fsr31.outputResourceBarrier.value());
-#endif
 
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-    if (paramDepth && Config::Instance()->DepthResourceBarrier.has_value())
-#else
     if (paramDepth && config.fsr31.depthResourceBarrier.has_value())
-#endif
         ResourceBarrier(InCommandList, paramDepth, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-                        (D3D12_RESOURCE_STATES) Config::Instance()->DepthResourceBarrier.value());
-#else
                         (D3D12_RESOURCE_STATES) config.fsr31.depthResourceBarrier.value());
-#endif
 
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-    if (paramExp && Config::Instance()->ExposureResourceBarrier.has_value())
-#else
     if (paramExp && config.fsr31.exposureResourceBarrier.has_value())
-#endif
         ResourceBarrier(InCommandList, paramExp, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-                        (D3D12_RESOURCE_STATES) Config::Instance()->ExposureResourceBarrier.value());
-#else
                         (D3D12_RESOURCE_STATES) config.fsr31.exposureResourceBarrier.value());
-#endif
 
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-    if (paramReactiveMask && Config::Instance()->MaskResourceBarrier.has_value())
-#else
     if (paramReactiveMask && config.fsr31.maskResourceBarrier.has_value())
-#endif
         ResourceBarrier(InCommandList, paramReactiveMask, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-                        (D3D12_RESOURCE_STATES) Config::Instance()->MaskResourceBarrier.value());
-#else
                         (D3D12_RESOURCE_STATES) config.fsr31.maskResourceBarrier.value());
-#endif
 
     _frameCount++;
 
@@ -973,10 +664,8 @@ bool FSR31FeatureDx12::Evaluate(ID3D12GraphicsCommandList* InCommandList, NVSDK_
 bool FSR31FeatureDx12::InitFSR3(const NVSDK_NGX_Parameter* InParameters)
 {
     LOG_FUNC();
-#ifndef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-    RuntimeConfiguration::Instance().RefreshFromConfig();
-    auto config = RuntimeConfiguration::Instance().GetSnapshot();
-#endif
+
+    const auto config = RuntimeConfiguration::Instance().GetSnapshot();
 
     if (!ModuleLoaded())
         return false;
@@ -1034,56 +723,32 @@ bool FSR31FeatureDx12::InitFSR3(const NVSDK_NGX_Parameter* InParameters)
         if (!LowResMV())
             _contextDesc.flags |= FFX_UPSCALE_ENABLE_DISPLAY_RESOLUTION_MOTION_VECTORS;
 
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-        if (Config::Instance()->FsrNonLinearColorSpace.value_or_default())
-#else
         if (config.fsr31.nonLinearColorSpace)
-#endif
         {
             _contextDesc.flags |= FFX_UPSCALE_ENABLE_NON_LINEAR_COLORSPACE;
             LOG_INFO("contextDesc.initFlags (NonLinearColorSpace) {0:b}", _contextDesc.flags);
         }
 
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-        if (Config::Instance()->Fsr4EnableDebugView.value_or_default())
-#else
         if (config.fsr31.enableDebugViewForFsr4)
-#endif
         {
             LOG_INFO("Debug view enabled!");
             _contextDesc.flags |= 512; // FFX_UPSCALE_ENABLE_DEBUG_VISUALIZATION
         }
 
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-        if (Config::Instance()->OutputScalingEnabled.value_or_default() &&
-#else
         if (config.fsr31.outputScalingEnabled &&
-#endif
             (LowResMV() || RenderWidth() == DisplayWidth()))
         {
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-            float ssMulti = Config::Instance()->OutputScalingMultiplier.value_or_default();
-#else
             float ssMulti = config.fsr31.outputScalingMultiplier;
-#endif
 
             if (ssMulti < 0.5f)
             {
                 ssMulti = 0.5f;
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-                Config::Instance()->OutputScalingMultiplier.set_volatile_value(ssMulti);
-#else
                 Config::Instance()->OutputScalingMultiplier.set_volatile_value(ssMulti); config.fsr31.outputScalingMultiplier = ssMulti;
-#endif
             }
             else if (ssMulti > 3.0f)
             {
                 ssMulti = 3.0f;
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-                Config::Instance()->OutputScalingMultiplier.set_volatile_value(ssMulti);
-#else
                 Config::Instance()->OutputScalingMultiplier.set_volatile_value(ssMulti); config.fsr31.outputScalingMultiplier = ssMulti;
-#endif
             }
 
             _targetWidth = static_cast<unsigned int>(DisplayWidth() * ssMulti);
@@ -1096,27 +761,15 @@ bool FSR31FeatureDx12::InitFSR3(const NVSDK_NGX_Parameter* InParameters)
         }
 
         // extended limits changes how resolution
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-        if (Config::Instance()->ExtendedLimits.value_or_default() && RenderWidth() > DisplayWidth())
-#else
         if (config.fsr31.extendedLimits && RenderWidth() > DisplayWidth())
-#endif
         {
             _contextDesc.maxRenderSize.width = RenderWidth();
             _contextDesc.maxRenderSize.height = RenderHeight();
 
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-            Config::Instance()->OutputScalingMultiplier.set_volatile_value(1.0f);
-#else
             Config::Instance()->OutputScalingMultiplier.set_volatile_value(1.0f); config.fsr31.outputScalingMultiplier = 1.0f;
-#endif
 
             // if output scaling active let it to handle downsampling
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-            if (Config::Instance()->OutputScalingEnabled.value_or_default() &&
-#else
             if (config.fsr31.outputScalingEnabled &&
-#endif
                 (LowResMV() || RenderWidth() == DisplayWidth()))
             {
                 _contextDesc.maxUpscaleSize.width = _contextDesc.maxRenderSize.width;
@@ -1172,30 +825,14 @@ bool FSR31FeatureDx12::InitFSR3(const NVSDK_NGX_Parameter* InParameters)
 
         _contextDesc.header.pNext = &backendDesc.header;
 
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-        if (Config::Instance()->FfxUpscalerIndex.value_or_default() < 0 ||
-#else
         if (config.fsr31.ffxUpscalerIndex < 0 ||
-#endif
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-            Config::Instance()->FfxUpscalerIndex.value_or_default() >= State::Instance().ffxUpscalerVersionIds.size())
-#else
             config.fsr31.ffxUpscalerIndex >= State::Instance().ffxUpscalerVersionIds.size())
-#endif
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-            Config::Instance()->FfxUpscalerIndex.set_volatile_value(0);
-#else
             Config::Instance()->FfxUpscalerIndex.set_volatile_value(0); config.fsr31.ffxUpscalerIndex = 0;
-#endif
 
         ffxOverrideVersion override = { 0 };
         override.header.type = FFX_API_DESC_TYPE_OVERRIDE_VERSION;
         override.versionId =
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-            State::Instance().ffxUpscalerVersionIds[Config::Instance()->FfxUpscalerIndex.value_or_default()];
-#else
             State::Instance().ffxUpscalerVersionIds[config.fsr31.ffxUpscalerIndex];
-#endif
         backendDesc.header.pNext = &override.header;
 
         LOG_DEBUG("_createContext!");
@@ -1213,11 +850,7 @@ bool FSR31FeatureDx12::InitFSR3(const NVSDK_NGX_Parameter* InParameters)
         }
 
         auto version =
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-            State::Instance().ffxUpscalerVersionNames[Config::Instance()->FfxUpscalerIndex.value_or_default()];
-#else
             State::Instance().ffxUpscalerVersionNames[config.fsr31.ffxUpscalerIndex];
-#endif
         _name = "FSR";
         parse_version(version);
     }

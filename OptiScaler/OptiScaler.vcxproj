@@ -543,6 +543,7 @@ copy NUL "$(SolutionDir)x64\Release\a\!! EXTRACT ALL FILES TO GAME FOLDER !!" /Y
     <ClInclude Include="shaders\rcas\RCAS_Dx12.h" />
     <ClInclude Include="State.h" />
     <ClInclude Include="runtime\RuntimeCapabilities.h" />
+    <ClInclude Include="runtime\RuntimeConfiguration.h" />
     <ClInclude Include="runtime\RuntimeCapabilityTypes.h" />
     <ClInclude Include="upscalers\xess\XeSSFeature_Dx11on12.h" />
     <ClInclude Include="upscalers\xess\XeSSFeature_Vk.h" />
@@ -553,6 +554,7 @@ copy NUL "$(SolutionDir)x64\Release\a\!! EXTRACT ALL FILES TO GAME FOLDER !!" /Y
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="runtime\RuntimeCapabilities.cpp" />
+    <ClCompile Include="runtime\RuntimeConfiguration.cpp" />
     <ClCompile Include="framegen\ffx\FSRFG_Dx12.cpp" />
     <ClCompile Include="framegen\IFGFeature.cpp" />
     <ClCompile Include="framegen\IFGFeature_Dx12.cpp" />

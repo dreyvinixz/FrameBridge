@@ -194,6 +194,9 @@
     <ClInclude Include="State.h">
       <Filter>Config</Filter>
     </ClInclude>
+    <ClInclude Include="runtime\RuntimeConfiguration.h">
+      <Filter>runtime</Filter>
+    </ClInclude>
     <ClInclude Include="runtime\RuntimeCapabilities.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -1039,6 +1042,9 @@
     </ClCompile>
     <ClCompile Include="upscalers\xess\XeSSFeature_Vk.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="runtime\RuntimeConfiguration.cpp">
+      <Filter>runtime</Filter>
     </ClCompile>
     <ClCompile Include="runtime\RuntimeCapabilities.cpp">
       <Filter>Source Files</Filter>

@@ -59,9 +59,6 @@ bool FSR31FeatureDx12::Init(ID3D12Device* InDevice, ID3D12GraphicsCommandList* I
 bool FSR31FeatureDx12::Evaluate(ID3D12GraphicsCommandList* InCommandList, NVSDK_NGX_Parameter* InParameters)
 {
     LOG_FUNC();
-#ifndef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-    auto config = RuntimeConfiguration::Instance().GetSnapshot();
-#endif
 
     if (!IsInited())
         return false;
@@ -973,10 +970,6 @@ bool FSR31FeatureDx12::Evaluate(ID3D12GraphicsCommandList* InCommandList, NVSDK_
 bool FSR31FeatureDx12::InitFSR3(const NVSDK_NGX_Parameter* InParameters)
 {
     LOG_FUNC();
-#ifndef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
-    RuntimeConfiguration::Instance().RefreshFromConfig();
-    auto config = RuntimeConfiguration::Instance().GetSnapshot();
-#endif
 
     if (!ModuleLoaded())
         return false;
