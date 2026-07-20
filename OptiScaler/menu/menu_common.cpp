@@ -2093,6 +2093,14 @@ void MenuCommon::Present()
 
     if (inputManual && _handle != nullptr)
         UpdateManualInput(_handle);
+
+    FrameSnapshot frame;
+    frame.frame_number = _frameCount;
+    frame.timestamp = now;
+    frame.frame_time_ms = static_cast<float>(lastFrameTime);
+    frame.render_width = State::Instance().renderWidth;
+    frame.render_height = State::Instance().renderHeight;
+    RuntimeCapabilities::Instance().PublishFrame(frame);
 }
 
 bool MenuCommon::RenderMenu()
