@@ -6,6 +6,10 @@
 
 #include "FSR31Feature_Dx12.h"
 #include <chrono>
+#ifdef FRAMEBRIDGE_ENABLE_EVALUATE_TIMER
+#include <vector>
+#include <algorithm>
+#endif
 #include "../../runtime/RuntimeConfiguration.h"
 
 NVSDK_NGX_Parameter* FSR31FeatureDx12::SetParameters(NVSDK_NGX_Parameter* InParameters)
@@ -57,26 +61,44 @@ bool FSR31FeatureDx12::Init(ID3D12Device* InDevice, ID3D12GraphicsCommandList* I
     return false;
 }
 
+
+#ifdef FRAMEBRIDGE_ENABLE_EVALUATE_TIMER
+struct BenchmarkTimer {
+    std::chrono::high_resolution_clock::time_point start;
+    BenchmarkTimer() { start = std::chrono::high_resolution_clock::now(); }
+    ~BenchmarkTimer() {
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+        static std::vector<long long> samples;
+        samples.push_back(duration);
+        if (samples.size() >= 1000) {
+            std::sort(samples.begin(), samples.end());
+            long long sum = 0;
+            for (auto s : samples) sum += s;
+            double avg = sum / 1000.0;
+            long long p50 = samples[500];
+            long long p95 = samples[950];
+            long long p99 = samples[990];
+            long long max_val = samples[999];
+            LOG_INFO("[FrameBridge Benchmark] Evaluate samples: 1000 | Avg: {:.3f} ms | P50: {:.3f} ms | P95: {:.3f} ms | P99: {:.3f} ms | Max: {:.3f} ms | Path: {}",
+                     avg / 1000.0, p50 / 1000.0, p95 / 1000.0, p99 / 1000.0, max_val / 1000.0,
+#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
+                     "Legacy"
+#else
+                     "Snapshot"
+#endif
+            );
+            samples.clear();
+        }
+    }
+};
+#endif
 bool FSR31FeatureDx12::Evaluate(ID3D12GraphicsCommandList* InCommandList, NVSDK_NGX_Parameter* InParameters)
 {
-    struct BenchmarkTimer {
-        std::chrono::high_resolution_clock::time_point start;
-        BenchmarkTimer() { start = std::chrono::high_resolution_clock::now(); }
-        ~BenchmarkTimer() {
-            auto end = std::chrono::high_resolution_clock::now();
-            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-            static int frames = 0;
-            static long long total = 0;
-            static long long max_time = 0;
-            total += duration;
-            if (duration > max_time) max_time = duration;
-            frames++;
-            if (frames >= 300) {
-                LOG_INFO("Evaluate() Benchmark: Avg {} us, Max {} us (over 300 frames)", total / 300.0, max_time);
-                frames = 0; total = 0; max_time = 0;
-            }
-        }
-    } __timer;
+#ifdef FRAMEBRIDGE_ENABLE_EVALUATE_TIMER
+    BenchmarkTimer __timer;
+#endif
+
     LOG_FUNC();
 #ifndef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
     auto config = RuntimeConfiguration::Instance().GetSnapshot();
