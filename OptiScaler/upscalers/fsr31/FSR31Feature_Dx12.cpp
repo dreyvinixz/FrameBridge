@@ -5,6 +5,7 @@
 #include <proxies/FfxApi_Proxy.h>
 
 #include "FSR31Feature_Dx12.h"
+#include <chrono>
 #include "../../runtime/RuntimeConfiguration.h"
 
 NVSDK_NGX_Parameter* FSR31FeatureDx12::SetParameters(NVSDK_NGX_Parameter* InParameters)
@@ -58,6 +59,24 @@ bool FSR31FeatureDx12::Init(ID3D12Device* InDevice, ID3D12GraphicsCommandList* I
 
 bool FSR31FeatureDx12::Evaluate(ID3D12GraphicsCommandList* InCommandList, NVSDK_NGX_Parameter* InParameters)
 {
+    struct BenchmarkTimer {
+        std::chrono::high_resolution_clock::time_point start;
+        BenchmarkTimer() { start = std::chrono::high_resolution_clock::now(); }
+        ~BenchmarkTimer() {
+            auto end = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+            static int frames = 0;
+            static long long total = 0;
+            static long long max_time = 0;
+            total += duration;
+            if (duration > max_time) max_time = duration;
+            frames++;
+            if (frames >= 300) {
+                LOG_INFO("Evaluate() Benchmark: Avg {} us, Max {} us (over 300 frames)", total / 300.0, max_time);
+                frames = 0; total = 0; max_time = 0;
+            }
+        }
+    } __timer;
     LOG_FUNC();
 #ifndef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
     auto config = RuntimeConfiguration::Instance().GetSnapshot();
