@@ -100,14 +100,14 @@ class FfxApiProxy
     inline static uint8_t hkAmdInt8Check(void* a1, ID3D12Device* device)
     {
         LOG_DEBUG("Called with a1: {:X}, device: {:X}", (uintptr_t) a1, (uintptr_t) device);
-        
+
         Fsr4RuntimeInfo info;
 
         if (!o_amdInt8Check)
         {
             info.hardware_supported = false;
             info.precision = Fsr4PrecisionMode::Unknown;
-            
+
             if (Config::Instance()->Fsr4ForceEnableInt8.value_or_default())
             {
                 info.forced_int8 = true;
@@ -115,7 +115,7 @@ class FfxApiProxy
                 RuntimeCapabilities::Instance().UpdateFsr4Info(info);
                 return 1;
             }
-            
+
             info.forced_int8 = false;
             RuntimeCapabilities::Instance().UpdateFsr4Info(info);
             return 0;
@@ -123,7 +123,7 @@ class FfxApiProxy
 
         uint8_t hardware_result = o_amdInt8Check(a1, device);
         info.hardware_supported = (hardware_result == 1);
-        
+
         if (Config::Instance()->Fsr4ForceEnableInt8.value_or_default())
         {
             info.forced_int8 = true;
@@ -131,7 +131,7 @@ class FfxApiProxy
             RuntimeCapabilities::Instance().UpdateFsr4Info(info);
             return 1;
         }
-        
+
         info.forced_int8 = false;
         info.precision = (hardware_result == 1) ? Fsr4PrecisionMode::INT8 : Fsr4PrecisionMode::FP8;
         RuntimeCapabilities::Instance().UpdateFsr4Info(info);

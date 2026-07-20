@@ -22,8 +22,6 @@ typedef enum WindowsVersion
     Windows11,
 } WindowsVersion;
 
-
-
 typedef enum API
 {
     NotSelected = 0,
@@ -237,7 +235,6 @@ class State
     std::vector<const char*> ffxFGVersionNames {};
     std::vector<uint64_t> ffxFGVersionIds {};
     std::optional<uint32_t> currentFsr4Preset {};
-
 
     // Linux checks
     bool isRunningOnLinux = false;
