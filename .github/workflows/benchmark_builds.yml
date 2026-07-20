@@ -1,0 +1,54 @@
+name: Build Benchmark DLLs
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-benchmarks:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        build_type: [Legacy, Snapshot, Final]
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+      with:
+        submodules: 'true'
+
+    - name: Inject Benchmark Macros
+      shell: powershell
+      run: |
+        $file = "OptiScaler/upscalers/fsr31/FSR31Feature_Dx12.cpp"
+        $content = Get-Content $file -Raw
+        
+        $macros = ""
+        if ("${{ matrix.build_type }}" -eq "Legacy") {
+            Write-Output "Preparing Build A: Legacy Config + Timer"
+            $macros = "#define FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK`n#define FRAMEBRIDGE_ENABLE_EVALUATE_TIMER`n"
+        } elseif ("${{ matrix.build_type }}" -eq "Snapshot") {
+            Write-Output "Preparing Build B: Snapshot Config + Timer"
+            $macros = "#define FRAMEBRIDGE_ENABLE_EVALUATE_TIMER`n"
+        } else {
+            Write-Output "Preparing Build C: Final Snapshot (No Timer)"
+            $macros = ""
+        }
+        
+        Set-Content $file -Value ($macros + $content)
+
+    - name: Add MSBuild to PATH
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Build with MSBuild
+      run: msbuild /m /p:Configuration=Release . /verbosity:minimal
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with: 
+        name: OptiScaler_${{ matrix.build_type }}_DLL
+        path: x64\Release\a\OptiScaler.dll
+        compression-level: 9
+        if-no-files-found: error
