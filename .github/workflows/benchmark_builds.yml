@@ -28,7 +28,7 @@ jobs:
             (Get-Content OptiScaler/upscalers/fsr31/FSR31Feature_Dx12.cpp) -replace '^#include <pch\.h>', "#include <pch.h>`r`n#define FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK`r`n#define FRAMEBRIDGE_BENCHMARK_PATH `"Legacy`"" | Set-Content OptiScaler/upscalers/fsr31/FSR31Feature_Dx12.cpp
         }
         elseif ("${{ matrix.build_type }}" -eq "Snapshot") {
-            (Get-Content OptiScaler/upscalers/fsr31/FSR31Feature_Dx12.cpp) -replace '^#include <pch\.h>', "#include <pch.h>`r`n#define FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK`r`n#define FRAMEBRIDGE_BENCHMARK_PATH `"Snapshot`"" | Set-Content OptiScaler/upscalers/fsr31/FSR31Feature_Dx12.cpp
+            (Get-Content OptiScaler/upscalers/fsr31/FSR31Feature_Dx12.cpp) -replace '^#include <pch\.h>', "#include <pch.h>`r`n#define FRAMEBRIDGE_BENCHMARK_PATH `"Snapshot`"" | Set-Content OptiScaler/upscalers/fsr31/FSR31Feature_Dx12.cpp
         }
         
         # Timer macro injection
