@@ -99,7 +99,23 @@ class FfxApiProxy
     inline static uint8_t hkAmdInt8Check(void* a1, ID3D12Device* device)
     {
         LOG_DEBUG("Called with a1: {:X}, device: {:X}", (uintptr_t) a1, (uintptr_t) device);
-        return 1;
+        
+        uint8_t hardware_result = 0;
+        if (o_amdInt8Check)
+            hardware_result = o_amdInt8Check(a1, device);
+            
+        State::Instance().fsr4RuntimeInfo.hardware_supported = (hardware_result == 1);
+        
+        if (Config::Instance()->Fsr4ForceEnableInt8.value_or_default())
+        {
+            State::Instance().fsr4RuntimeInfo.forced_int8 = true;
+            State::Instance().fsr4RuntimeInfo.precision = Fsr4PrecisionMode::INT8;
+            return 1;
+        }
+        
+        State::Instance().fsr4RuntimeInfo.forced_int8 = false;
+        State::Instance().fsr4RuntimeInfo.precision = (hardware_result == 1) ? Fsr4PrecisionMode::INT8 : Fsr4PrecisionMode::FP8;
+        return hardware_result;
     }
 
     static inline void parse_version(const char* version_str, feature_version* _version)
@@ -489,7 +505,7 @@ class FfxApiProxy
         if (!loadResult)
             upscaling_dx12.dll = nullptr;
 
-        if (Config::Instance()->Fsr4ForceEnableInt8.value_or_default())
+        // Always hook to track hardware support state
         {
             const char* pattern =
                 "48 83 EC 48 48 8B C2 48 85 D2 74 54 48 8D 54 24 20 48 8B C8 E8 ? ? ? ? 81 7C 24 34 91 00 00 00 44 0F "

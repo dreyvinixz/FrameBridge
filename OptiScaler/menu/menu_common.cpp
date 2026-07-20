@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "menu_common.h"
 
 #include "font/Hack_Compressed.h"
@@ -1222,7 +1222,7 @@ void MenuCommon::AddDx11Backends(std::string* code, std::string* name)
     std::string selectedUpscalerName = "";
     bool fsr4Possible =
         Config::Instance()->Fsr4Update.value_or_default() || State::Instance().isRunningOnRDNA4.value_or(false) ||
-        (Config::Instance()->Fsr4ForceEnableInt8.value_or_default() && FfxApiProxy::Dx12Module_SR() != nullptr &&
+        (State::Instance().fsr4RuntimeInfo.precision == Fsr4PrecisionMode::INT8 || Config::Instance()->Fsr4ForceEnableInt8.value_or_default()) && FfxApiProxy::Dx12Module_SR() != nullptr &&
          FfxApiProxy::VersionDx12_SR() >= feature_version { 4, 1, 1 });
 
     std::string fsr3xName = fsr4Possible ? "FSR 3.X/4 w/Dx12" : "FSR 3.X w/Dx12";
@@ -1280,7 +1280,7 @@ void MenuCommon::AddDx12Backends(std::string* code, std::string* name)
     std::string selectedUpscalerName = "";
     bool fsr4Possible =
         Config::Instance()->Fsr4Update.value_or_default() || State::Instance().isRunningOnRDNA4.value_or(false) ||
-        (Config::Instance()->Fsr4ForceEnableInt8.value_or_default() && FfxApiProxy::Dx12Module_SR() != nullptr &&
+        (State::Instance().fsr4RuntimeInfo.precision == Fsr4PrecisionMode::INT8 || Config::Instance()->Fsr4ForceEnableInt8.value_or_default()) && FfxApiProxy::Dx12Module_SR() != nullptr &&
          FfxApiProxy::VersionDx12_SR() >= feature_version { 4, 1, 1 });
 
     std::string fsr3xName = fsr4Possible ? "FSR 3.X/4" : "FSR 3.X";
@@ -1323,7 +1323,7 @@ void MenuCommon::AddVulkanBackends(std::string* code, std::string* name)
     std::string selectedUpscalerName = "";
     bool fsr4Possible =
         Config::Instance()->Fsr4Update.value_or_default() || State::Instance().isRunningOnRDNA4.value_or(false) ||
-        (Config::Instance()->Fsr4ForceEnableInt8.value_or_default() && FfxApiProxy::Dx12Module_SR() != nullptr &&
+        (State::Instance().fsr4RuntimeInfo.precision == Fsr4PrecisionMode::INT8 || Config::Instance()->Fsr4ForceEnableInt8.value_or_default()) && FfxApiProxy::Dx12Module_SR() != nullptr &&
          FfxApiProxy::VersionDx12_SR() >= feature_version { 4, 1, 1 });
 
     std::string fsr3xName = fsr4Possible ? "FSR 3.X/4 w/Dx12" : "FSR 3.X w/Dx12";

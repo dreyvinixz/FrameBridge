@@ -22,6 +22,21 @@ typedef enum WindowsVersion
     Windows11,
 } WindowsVersion;
 
+enum class Fsr4PrecisionMode
+{
+    Unknown,
+    FP8,
+    INT8,
+    Fallback
+};
+
+struct Fsr4RuntimeInfo
+{
+    Fsr4PrecisionMode precision = Fsr4PrecisionMode::Unknown;
+    bool forced_int8 = false;
+    bool hardware_supported = false;
+};
+
 typedef enum API
 {
     NotSelected = 0,
@@ -235,6 +250,7 @@ class State
     std::vector<const char*> ffxFGVersionNames {};
     std::vector<uint64_t> ffxFGVersionIds {};
     std::optional<uint32_t> currentFsr4Preset {};
+    Fsr4RuntimeInfo fsr4RuntimeInfo {};
 
     // Linux checks
     bool isRunningOnLinux = false;
