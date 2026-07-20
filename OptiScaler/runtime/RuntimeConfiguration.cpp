@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "RuntimeConfiguration.h"
 #include "../Config.h"
 

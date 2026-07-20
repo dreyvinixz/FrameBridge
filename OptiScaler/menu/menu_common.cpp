@@ -2104,8 +2104,8 @@ void MenuCommon::Present()
     frame.frame_number = _frameCount;
     frame.timestamp = now;
     frame.frame_time_ms = static_cast<float>(lastFrameTime);
-    frame.render_width = State::Instance().renderWidth;
-    frame.render_height = State::Instance().renderHeight;
+    frame.render_width = State::Instance().currentFeature ? State::Instance().currentFeature->RenderWidth() : 0;
+    frame.render_height = State::Instance().currentFeature ? State::Instance().currentFeature->RenderHeight() : 0;
     RuntimeCapabilities::Instance().PublishFrame(frame);
 }
 

@@ -44,11 +44,7 @@ bool FSR31FeatureDx12::Init(ID3D12Device* InDevice, ID3D12GraphicsCommandList* I
 
     if (InitFSR3(InParameters))
     {
-#ifdef FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK
         if (!Config::Instance()->OverlayMenu.value_or_default() && (Imgui == nullptr || Imgui.get() == nullptr))
-#else
-        if (!config.fsr31.overlayMenu && (Imgui == nullptr || Imgui.get() == nullptr))
-#endif
             Imgui = std::make_unique<Menu_Dx12>(Util::GetProcessWindow(), InDevice);
 
         OutputScaler = std::make_unique<OS_Dx12>("Output Scaling", InDevice, (TargetWidth() < DisplayWidth()));

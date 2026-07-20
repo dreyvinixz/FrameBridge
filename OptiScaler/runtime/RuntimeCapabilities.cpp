@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "RuntimeCapabilities.h"
 
 RuntimeCapabilities& RuntimeCapabilities::Instance()
