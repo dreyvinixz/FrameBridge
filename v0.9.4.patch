@@ -1,0 +1,1918 @@
+diff --git a/.github/workflows/build.yml b/.github/workflows/build.yml
+index 0e84099a..839b7f45 100644
+--- a/.github/workflows/build.yml
++++ b/.github/workflows/build.yml
+@@ -6,7 +6,7 @@
+ name: Scheduled Build
+ 
+ on:
+-  schedule:
++# schedule:
+ #    - cron: '0 4 * * *' 
+ 
+   workflow_dispatch:
+diff --git a/OptiScaler.ini b/OptiScaler.ini
+index bfac4824..a9b7a88a 100644
+--- a/OptiScaler.ini
++++ b/OptiScaler.ini
+@@ -560,10 +560,14 @@ DlssReactiveMaskBias=auto
+ ; true or false - Default (auto) depends on GPU - true for RDNA4
+ Fsr4Update=auto
+ 
+-; Select FSR4 model to use
++; Enables INT8 model for all GPUs
++; true or false - Default (auto) is false
++Fsr4ForceEnableInt8=auto
++
++; Select internal FSR4 preset to use
+ ; 0 = For FSR Native AA, 1 = Ultra Quality/Quality, 2 = Balanced, 3 = Performance, 4 = DRS, 5 = Ultra Performance
+ ; From 0 to 5 - Default (auto) is game's default
+-Fsr4Model=auto
++Fsr4Preset=auto
+ 
+ ; Enable FSR4 Debug View visualization
+ ; Might consume more VRAM
+diff --git a/OptiScaler/Config.cpp b/OptiScaler/Config.cpp
+index a1449dd3..d0265c4d 100644
+--- a/OptiScaler/Config.cpp
++++ b/OptiScaler/Config.cpp
+@@ -229,12 +229,13 @@ bool Config::Reload(std::filesystem::path iniPath)
+             FsrUseMaskForTransparency.set_from_config(readBool("FSR", "UseReactiveMaskForTransparency"));
+             DlssReactiveMaskBias.set_from_config(readFloat("FSR", "DlssReactiveMaskBias"));
+             Fsr4Update.set_from_config(readBool("FSR", "Fsr4Update"));
++            Fsr4ForceEnableInt8.set_from_config(readBool("FSR", "Fsr4ForceEnableInt8"));
+             Fsr4EnableDebugView.set_from_config(readBool("FSR", "Fsr4EnableDebugView"));
+             Fsr4EnableWatermark.set_from_config(readBool("FSR", "Fsr4EnableWatermark"));
+             Fsr4DoNotLoadAmdxc64.set_from_config(readBool("FSR", "Fsr4DoNotLoadAmdxc64"));
+ 
+-            if (auto setting = readInt("FSR", "Fsr4Model"); setting.has_value() && setting >= 0 && setting <= 5)
+-                Fsr4Model.set_from_config(setting);
++            if (auto setting = readInt("FSR", "Fsr4Preset"); setting.has_value() && setting >= 0 && setting <= 5)
++                Fsr4Preset.set_from_config(setting);
+ 
+             FsrNonLinearColorSpace.set_from_config(readBool("FSR", "FsrNonLinearColorSpace"));
+             FsrNonLinearPQ.set_from_config(readBool("FSR", "FsrNonLinearPQ"));
+@@ -970,7 +971,9 @@ bool Config::SaveIni()
+                      GetFloatValue(Instance()->DlssReactiveMaskBias.value_for_config()).c_str());
+         ini.SetValue("FSR", "Fsr4Update",
+                      GetBoolValue(Instance()->Fsr4Update.value_for_config_ignore_default()).c_str());
+-        ini.SetValue("FSR", "Fsr4Model", GetIntValue(Instance()->Fsr4Model.value_for_config()).c_str());
++        ini.SetValue("FSR", "Fsr4ForceEnableInt8",
++                     GetBoolValue(Instance()->Fsr4ForceEnableInt8.value_for_config_ignore_default()).c_str());
++        ini.SetValue("FSR", "Fsr4Preset", GetIntValue(Instance()->Fsr4Preset.value_for_config()).c_str());
+         ini.SetValue("FSR", "Fsr4EnableDebugView",
+                      GetBoolValue(Instance()->Fsr4EnableDebugView.value_for_config()).c_str());
+         ini.SetValue("FSR", "Fsr4EnableWatermark",
+diff --git a/OptiScaler/Config.h b/OptiScaler/Config.h
+index be8b5be7..d7909b76 100644
+--- a/OptiScaler/Config.h
++++ b/OptiScaler/Config.h
+@@ -406,6 +406,8 @@ class Config
+     CustomOptional<bool> FsrNonLinearSRGB { false };
+     CustomOptional<bool> FsrNonLinearPQ { false };
+     CustomOptional<bool> FsrAgilitySDKUpgrade { false };
++
++    // These default values will be overwritten at upscaler init time with optimized values
+     CustomOptional<float> FsrVelocity { 1.0f };
+     CustomOptional<float> FsrReactiveScale { 1.0f };
+     CustomOptional<float> FsrShadingScale { 1.0f };
+@@ -414,7 +416,8 @@ class Config
+ 
+     // FSR4
+     CustomOptional<bool> Fsr4Update { false };
+-    CustomOptional<uint32_t, NoDefault> Fsr4Model;
++    CustomOptional<bool> Fsr4ForceEnableInt8 { false };
++    CustomOptional<uint32_t, NoDefault> Fsr4Preset;
+     CustomOptional<bool> Fsr4EnableDebugView { false };
+     CustomOptional<bool> Fsr4EnableWatermark { false };
+     CustomOptional<bool> Fsr4DoNotLoadAmdxc64 { false };
+diff --git a/OptiScaler/State.h b/OptiScaler/State.h
+index c748bcfe..f2064148 100644
+--- a/OptiScaler/State.h
++++ b/OptiScaler/State.h
+@@ -234,7 +234,7 @@ class State
+     std::vector<uint64_t> ffxUpscalerVersionIds {};
+     std::vector<const char*> ffxFGVersionNames {};
+     std::vector<uint64_t> ffxFGVersionIds {};
+-    std::optional<uint32_t> currentFsr4Model {};
++    std::optional<uint32_t> currentFsr4Preset {};
+ 
+     // Linux checks
+     bool isRunningOnLinux = false;
+@@ -243,6 +243,7 @@ class State
+     // Other checks
+     bool isRunningOnNvidia = false;
+     std::optional<bool> isRunningOnRDNA4;
++    std::optional<bool> isRunningOnRDNA3;
+     bool isPascalOrOlder = false;
+     WorkingMode workingMode = WorkingMode::Other;
+ 
+diff --git a/OptiScaler/dllmain.cpp b/OptiScaler/dllmain.cpp
+index 03565fde..7580c65c 100644
+--- a/OptiScaler/dllmain.cpp
++++ b/OptiScaler/dllmain.cpp
+@@ -1337,6 +1337,9 @@ static void printQuirks(flag_set<GameQuirk>& quirks)
+     if (quirks & GameQuirk::IgnoreValidUntilEvaluateForFG)
+         stringQuirks.push_back("Ignore ValidUntilEvaluate resources for FG");
+ 
++    if (quirks & GameQuirk::ForceFGRenderSizeMVs)
++        stringQuirks.push_back("Force FG render size motion vectors");
++
+     state->detectedQuirks.append_range(stringQuirks);
+     for (auto& stringQuirk : stringQuirks)
+         spdlog::info("Quirk: {}", stringQuirk);
+@@ -1385,7 +1388,6 @@ static void CheckQuirks()
+         quirks.reset(GameQuirk::DisableDxgiSpoofing);
+ 
+     if (quirks & GameQuirk::RestoreComputeSigOnNonNvidia && !State::Instance().isRunningOnNvidia &&
+-        !Config::Instance()->DxgiSpoofing.value_or_default() &&
+         !Config::Instance()->RestoreComputeSignature.has_value())
+     {
+         Config::Instance()->RestoreComputeSignature.set_volatile_value(true);
+diff --git a/OptiScaler/framegen/ffx/FSRFG_Dx12.cpp b/OptiScaler/framegen/ffx/FSRFG_Dx12.cpp
+index 9df4a540..07b9b528 100644
+--- a/OptiScaler/framegen/ffx/FSRFG_Dx12.cpp
++++ b/OptiScaler/framegen/ffx/FSRFG_Dx12.cpp
+@@ -378,6 +378,11 @@ bool FSRFG_Dx12::Dispatch()
+ 
+         fgConfig.HUDLessColor = ffxApiGetResourceDX12(hudless->GetResource(), GetFfxApiState(hudless->state));
+ 
++        // Because of HudlessTransfer hudless will be always in SC format
++        // Quick fix for typeless Hudless formats
++        fgConfig.HUDLessColor.description.format =
++            (FfxApiSurfaceFormat) ffxApiGetSurfaceFormatDX12(State::Instance().currentSwapchainDesc.BufferDesc.Format);
++
+         // Reset of _paramHudless[fIndex] happens in DispatchCallback
+         // as we might use it in Preset to remove hud from swapchain
+     }
+@@ -490,7 +495,17 @@ bool FSRFG_Dx12::Dispatch()
+ 
+         ffxDispatchDescFrameGenerationPrepare dfgPrepare {};
+         dfgPrepare.header.type = FFX_API_DISPATCH_DESC_TYPE_FRAMEGENERATION_PREPARE;
+-        dfgPrepare.header.pNext = &dfgCameraData.header;
++
++        // Hacky way but should do
++        const float* cameraDataRaw = dfgCameraData.cameraPosition;
++        bool cameraDataIsZeroed = std::all_of(cameraDataRaw, cameraDataRaw + 12, [](float v) { return v == 0.0f; });
++
++        // Don't link the camera struct if it's just all zeros
++        // Specifically the driver upgrade dll is looking at this and falling back to FSR 3 FG
++        if (cameraDataIsZeroed)
++            dfgPrepare.header.pNext = &backendDesc.header;
++        else
++            dfgPrepare.header.pNext = &dfgCameraData.header;
+ 
+         // Prepare command list
+         auto allocator = _fgCommandAllocator[fIndex];
+@@ -1066,8 +1081,11 @@ void FSRFG_Dx12::CreateContext(ID3D12Device* device, FG_Constants& fgConstants)
+     if (fgConstants.flags & FG_Flags::JitteredMVs)
+         createFg.flags |= FFX_FRAMEGENERATION_ENABLE_MOTION_VECTORS_JITTER_CANCELLATION;
+ 
+-    if (fgConstants.flags & FG_Flags::DisplayResolutionMVs)
++    if ((fgConstants.flags & FG_Flags::DisplayResolutionMVs) &&
++        !(State::Instance().gameQuirks & GameQuirk::ForceFGRenderSizeMVs))
++    {
+         createFg.flags |= FFX_FRAMEGENERATION_ENABLE_DISPLAY_RESOLUTION_MOTION_VECTORS;
++    }
+ 
+     if (fgConstants.flags & FG_Flags::Async)
+         createFg.flags |= FFX_FRAMEGENERATION_ENABLE_ASYNC_WORKLOAD_SUPPORT;
+diff --git a/OptiScaler/framegen/xefg/XeFG_Dx12.cpp b/OptiScaler/framegen/xefg/XeFG_Dx12.cpp
+index c9a30abe..edf83ba5 100644
+--- a/OptiScaler/framegen/xefg/XeFG_Dx12.cpp
++++ b/OptiScaler/framegen/xefg/XeFG_Dx12.cpp
+@@ -609,7 +609,8 @@ void XeFG_Dx12::Activate()
+         nativeAA = currentFeature->RenderWidth() == currentFeature->DisplayWidth();
+ 
+     if (_swapChainContext != nullptr && _fgContext != nullptr && !_isActive &&
+-        (IsLowResMV() || nativeAA || Config::Instance()->FGXeFGIgnoreInitChecks.value_or_default()))
++        (IsLowResMV() || nativeAA || (State::Instance().gameQuirks & GameQuirk::ForceFGRenderSizeMVs) ||
++         Config::Instance()->FGXeFGIgnoreInitChecks.value_or_default()))
+     {
+         auto result = XeFGProxy::SetEnabled()(_swapChainContext, true);
+ 
+diff --git a/OptiScaler/fsr4/FSR4ModelSelection.cpp b/OptiScaler/fsr4/FSR4ModelSelection.cpp
+index 3634c8c6..d923af7f 100644
+--- a/OptiScaler/fsr4/FSR4ModelSelection.cpp
++++ b/OptiScaler/fsr4/FSR4ModelSelection.cpp
+@@ -7,6 +7,8 @@ PFN_getModelBlob FSR4ModelSelection::o_getModelBlobSDK = nullptr;
+ PFN_getModelBlob FSR4ModelSelection::o_getModelBlobDriver = nullptr;
+ PFN_createModel FSR4ModelSelection::o_createModelSDK = nullptr;
+ PFN_createModel FSR4ModelSelection::o_createModelDriver = nullptr;
++PFN_createModel2 FSR4ModelSelection::o_createModelDriver2 = nullptr;
++PFN_createModel2 FSR4ModelSelection::o_createModelSDK2 = nullptr;
+ 
+ uint32_t getCorrectedPreset(uint32_t preset)
+ {
+@@ -24,12 +26,12 @@ uint32_t getCorrectedPreset(uint32_t preset)
+             correctedPreset = 1;
+     }
+ 
+-    if (Config::Instance()->Fsr4Model.has_value())
++    if (Config::Instance()->Fsr4Preset.has_value())
+     {
+-        correctedPreset = Config::Instance()->Fsr4Model.value();
++        correctedPreset = Config::Instance()->Fsr4Preset.value();
+     }
+ 
+-    State::Instance().currentFsr4Model = correctedPreset;
++    State::Instance().currentFsr4Preset = correctedPreset;
+ 
+     return correctedPreset;
+ }
+@@ -67,6 +69,17 @@ uint64_t FSR4ModelSelection::hkcreateModelSDK(void* context, uint32_t preset)
+     return result;
+ }
+ 
++uint64_t FSR4ModelSelection::hkcreateModelSDK2(void* context, uint32_t preset, void** model)
++{
++    LOG_FUNC();
++
++    preset = getCorrectedPreset(preset);
++
++    auto result = o_createModelSDK2(context, preset, model);
++
++    return result;
++}
++
+ uint64_t FSR4ModelSelection::hkcreateModelDriver(void* context, uint32_t preset)
+ {
+     LOG_FUNC();
+@@ -78,6 +91,17 @@ uint64_t FSR4ModelSelection::hkcreateModelDriver(void* context, uint32_t preset)
+     return result;
+ }
+ 
++uint64_t FSR4ModelSelection::hkcreateModelDriver2(void* context, uint32_t preset, void** model)
++{
++    LOG_FUNC();
++
++    preset = getCorrectedPreset(preset);
++
++    auto result = o_createModelDriver2(context, preset, model);
++
++    return result;
++}
++
+ void FSR4ModelSelection::Hook(HMODULE module, FSR4Source source)
+ {
+     if (module == nullptr)
+@@ -122,6 +146,8 @@ void FSR4ModelSelection::Hook(HMODULE module, FSR4Source source)
+         }
+     }
+ 
++    /// Hooks for getModelBlob
++
+     // Older SDK and Driver use this
+     const char* modelBlobPattern = "83 F9 05 0F 87";
+     if (!o_getModelBlobSDK && source == FSR4Source::SDK)
+@@ -167,6 +193,8 @@ void FSR4ModelSelection::Hook(HMODULE module, FSR4Source source)
+         }
+     }
+ 
++    /// Hooks for createModel
++
+     // From amd_fidelityfx_upscaler_dx12 4.0.3.604 from FFX 2.1 SDK
+     // Used by some versions of SDK and Driver
+     const char* pattern403 =
+@@ -177,6 +205,15 @@ void FSR4ModelSelection::Hook(HMODULE module, FSR4Source source)
+     {
+         o_createModelSDK = (PFN_createModel) scanner::GetAddress(module, pattern403);
+ 
++        if (!o_createModelSDK)
++        {
++            // From amd_fidelityfx_upscaler_dx12 4.1.0 from FFX 2.2 SDK
++            const char* pattern410 =
++                "48 8B C4 48 89 58 18 55 56 57 41 54 41 55 41 56 41 57 48 8D A8 28 F2 FF FF 48 81 EC A0 "
++                "0E 00 00 0F 29 70 B8 0F 29 78 A8 48 8B ? ? ? ? ? 48 33 C4 48 89 85 78 0D 00 00 44 8B F2";
++            o_createModelSDK = (PFN_createModel) scanner::GetAddress(module, pattern410);
++        }
++
+         LOG_DEBUG("Hooking model selection, o_createModelSDK: {:X}", (uintptr_t) o_createModelSDK);
+ 
+         if (o_createModelSDK)
+@@ -193,36 +230,32 @@ void FSR4ModelSelection::Hook(HMODULE module, FSR4Source source)
+                 o_createModelSDK = nullptr;
+             }
+         }
+-        else
+-            LOG_ERROR("Couldn't hook model selection");
+     }
+ 
+-    // From amd_fidelityfx_upscaler_dx12 4.1.0 from FFX 2.2 SDK
+-    const char* pattern410 = "48 8B C4 48 89 58 18 55 56 57 41 54 41 55 41 56 41 57 48 8D A8 28 F2 FF FF 48 81 EC A0 "
+-                             "0E 00 00 0F 29 70 B8 0F 29 78 A8 48 8B ? ? ? ? ? 48 33 C4 48 89 85 78 0D 00 00 44 8B F2";
+-
+-    if (!o_createModelSDK && source == FSR4Source::SDK)
++    if (!o_createModelSDK && !o_createModelSDK2 && source == FSR4Source::SDK)
+     {
+-        o_createModelSDK = (PFN_createModel) scanner::GetAddress(module, pattern410);
+-
+-        LOG_DEBUG("Hooking model selection, o_createModelSDK: {:X}", (uintptr_t) o_createModelSDK);
++        // From amd_fidelityfx_upscaler_dx12 4.1.1.2740 from FFX 2.3 SDK
++        const char* pattern411 =
++            "48 8B C4 48 89 58 20 55 56 57 41 54 41 55 41 56 41 57 48 8D A8 08 F2 FF FF 48 81 EC C0 0E 00 00 0F 29 70 "
++            "B8 0F 29 78 A8 48 8B ? ? ? ? ? 48 33 C4 48 89 85 90 0D 00 00 4D 8B E8 8B FA 48 8B F1";
++        o_createModelSDK2 = (PFN_createModel2) scanner::GetAddress(module, pattern411);
+ 
+-        if (o_createModelSDK)
++        if (o_createModelSDK2)
+         {
++            LOG_DEBUG("Hooking model selection, o_createModelSDK2: {:X}", (uintptr_t) o_createModelSDK2);
++
+             DetourTransactionBegin();
+             DetourUpdateThread(GetCurrentThread());
+ 
+-            DetourAttach(&(PVOID&) o_createModelSDK, hkcreateModelSDK);
++            DetourAttach(&(PVOID&) o_createModelSDK2, hkcreateModelSDK2);
+ 
+             auto detourResult = DetourTransactionCommit();
+             if (detourResult != NO_ERROR)
+             {
+                 LOG_ERROR("Failed to attach detour: {:X}", detourResult);
+-                o_createModelSDK = nullptr;
++                o_createModelSDK2 = nullptr;
+             }
+         }
+-        else
+-            LOG_ERROR("Couldn't hook model selection");
+     }
+ 
+     else if (!o_createModelDriver && source == FSR4Source::DriverDll)
+@@ -254,11 +287,35 @@ void FSR4ModelSelection::Hook(HMODULE module, FSR4Source source)
+                 o_createModelDriver = nullptr;
+             }
+         }
+-        else
+-            LOG_ERROR("Couldn't hook model selection");
+     }
+-    else
++
++    if (!o_createModelDriver && !o_createModelDriver2 && source == FSR4Source::DriverDll)
+     {
+-        LOG_DEBUG("Didn't rehook");
++        // From amdxcffx64 2.3.0.2740
++        const char* pattern = "48 8B C4 48 89 58 ? 55 56 57 41 54 41 55 41 56 41 57 48 8D A8 ? ? ? ? 48 81 EC ? ? ? ? "
++                              "0F 29 70 ? 0F 29 78 ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 85 ? ? ? ? 4D 8B E8 8B FA 48 8B";
++        o_createModelDriver2 = (PFN_createModel2) scanner::GetAddress(module, pattern);
++
++        if (o_createModelDriver2)
++        {
++            LOG_DEBUG("Hooking model selection, o_createModelDriver2: {:X}", (uintptr_t) o_createModelDriver2);
++
++            DetourTransactionBegin();
++            DetourUpdateThread(GetCurrentThread());
++
++            DetourAttach(&(PVOID&) o_createModelDriver2, hkcreateModelDriver2);
++
++            auto detourResult = DetourTransactionCommit();
++            if (detourResult != NO_ERROR)
++            {
++                LOG_ERROR("Failed to attach detour: {:X}", detourResult);
++                o_createModelDriver2 = nullptr;
++            }
++        }
+     }
++
++    if (!o_createModelDriver && !o_getModelBlobDriver && !o_createModelDriver2 && source == FSR4Source::DriverDll)
++        LOG_ERROR("Couldn't hook model selection from the driver dll");
++    else if (!o_createModelSDK && !o_getModelBlobSDK && !o_createModelSDK2 && source == FSR4Source::SDK)
++        LOG_ERROR("Couldn't hook model selection from the SDK dll");
+ }
+diff --git a/OptiScaler/fsr4/FSR4ModelSelection.h b/OptiScaler/fsr4/FSR4ModelSelection.h
+index 7dc8e6ac..5de8f709 100644
+--- a/OptiScaler/fsr4/FSR4ModelSelection.h
++++ b/OptiScaler/fsr4/FSR4ModelSelection.h
+@@ -4,6 +4,7 @@
+ 
+ typedef uint64_t (*PFN_getModelBlob)(uint32_t preset, uint64_t unknown, uint64_t* source, uint64_t* size);
+ typedef uint64_t (*PFN_createModel)(void* context, uint32_t preset);
++typedef uint64_t (*PFN_createModel2)(void* context, uint32_t preset, void** model);
+ 
+ enum class FSR4Source
+ {
+@@ -21,7 +22,12 @@ class FSR4ModelSelection
+     static uint64_t hkcreateModelDriver(void* context, uint32_t preset);
+     static PFN_createModel o_createModelSDK;
+     static PFN_createModel o_createModelDriver;
++    static uint64_t hkcreateModelDriver2(void* context, uint32_t preset, void** model);
++    static PFN_createModel2 o_createModelDriver2;
++    static uint64_t hkcreateModelSDK2(void* context, uint32_t preset, void** model);
++    static PFN_createModel2 o_createModelSDK2;
+ 
+   public:
+     static void Hook(HMODULE module, FSR4Source source);
++    static bool IsInt8FsrHooked() { return o_createModelDriver2 || o_createModelSDK2; };
+ };
+diff --git a/OptiScaler/fsr4/FSR4Upgrade.cpp b/OptiScaler/fsr4/FSR4Upgrade.cpp
+index 3a4825d4..3e461ea6 100644
+--- a/OptiScaler/fsr4/FSR4Upgrade.cpp
++++ b/OptiScaler/fsr4/FSR4Upgrade.cpp
+@@ -136,7 +136,7 @@ std::vector<std::filesystem::path> GetDriverStore()
+ void CheckForGPU()
+ {
+     // CheckForGPU already ran before, no need to run it again
+-    if (State::Instance().isRunningOnRDNA4.has_value())
++    if (State::Instance().isRunningOnRDNA4.has_value() || State::Instance().isRunningOnRDNA3.has_value())
+         return;
+ 
+     // Call init for any case
+@@ -170,6 +170,9 @@ void CheckForGPU()
+             if (!State::Instance().isRunningOnRDNA4.has_value() || !State::Instance().isRunningOnRDNA4.value())
+                 State::Instance().isRunningOnRDNA4 = false;
+ 
++            if (!State::Instance().isRunningOnRDNA3.has_value() || !State::Instance().isRunningOnRDNA3.value())
++                State::Instance().isRunningOnRDNA3 = false;
++
+             std::wstring szName(adapterDesc.Description);
+             std::string descStr = std::format("Adapter: {}, VRAM: {} MB", wstring_to_string(szName),
+                                               adapterDesc.DedicatedVideoMemory / (1024.0 * 1024.0));
+@@ -205,6 +208,35 @@ void CheckForGPU()
+                         }
+                     }
+                 }
++
++                // Don't look, checks for RDNA 3
++                if (szName.contains(L"7900") || szName.contains(L"7800") || szName.contains(L"7700") ||
++                    szName.contains(L"7600") || szName.find(L" GFX110") != std::wstring::npos)
++                {
++                    LOG_DEBUG("RDNA3 GPU detected");
++                    State::Instance().isRunningOnRDNA3 = true;
++
++                    if (!Config::Instance()->Dx12Upscaler.has_value())
++                    {
++                        if (State::Instance().WindowsVer == WindowsVersion::Windows11)
++                        {
++                            LOG_INFO("Setting Dx12Upscaler to fsr31 because RDNA3 GPU is detected");
++                            Config::Instance()->Dx12Upscaler.set_volatile_value("fsr31");
++                        }
++                        else
++                        {
++                            if (KernelBaseProxy::GetModuleHandleW_()(L"D3D12Core.dll") != nullptr)
++                            {
++                                LOG_INFO("Setting Dx12Upscaler to fsr31 because RDNA3 GPU is detected");
++                                Config::Instance()->Dx12Upscaler.set_volatile_value("fsr31");
++                            }
++                            else
++                            {
++                                LOG_WARN("RDNA3 GPU is detected but Agility SDK is not detected!");
++                            }
++                        }
++                    }
++                }
+             }
+         }
+         else
+@@ -220,12 +252,13 @@ void CheckForGPU()
+     factory->Release();
+     factory = nullptr;
+ 
+-    // If not set at Config enable/disable Fsr4Update according to GPU detection
++    // If not set at Config, enable/disable Fsr4Update according to GPU detection
+     if (!Config::Instance()->Fsr4Update.has_value())
+-        Config::Instance()->Fsr4Update.set_volatile_value(State::Instance().isRunningOnRDNA4.value());
++        Config::Instance()->Fsr4Update.set_volatile_value(State::Instance().isRunningOnRDNA4.value() ||
++                                                          State::Instance().isRunningOnRDNA3.value());
+ 
+-    LOG_INFO("RNDA4: {}, Fsr4Update: {}", State::Instance().isRunningOnRDNA4.value(),
+-             Config::Instance()->Fsr4Update.value_or_default());
++    LOG_INFO("RDNA4: {}, RDNA3: {}, Fsr4Update: {}", State::Instance().isRunningOnRDNA4.value(),
++             State::Instance().isRunningOnRDNA3.value(), Config::Instance()->Fsr4Update.value_or_default());
+ }
+ 
+ struct ffxProviderInterface
+@@ -326,6 +359,17 @@ struct AmdExtFfxApi : public IAmdExtFfxApi
+             }
+         }
+ 
++        // Prevent RDNA3 from running MLFG when not on Linux
++        if (effectType == FFXStructType::FG && State::Instance().isRunningOnRDNA3 &&
++            State::Instance().isRunningOnRDNA3.value())
++        {
++            const char* envvar = getenv("DXIL_SPIRV_CONFIG");
++            bool rdna3fp8 = envvar && strstr(envvar, "wmma_rdna3_workaround");
++
++            if (!rdna3fp8)
++                return E_NOINTERFACE;
++        }
++
+         // Result 0x80004002 (E_NOINTERFACE) basically means that amdxcffx64 doesn't have a provider for that effect
+         if ((effectType == FFXStructType::FG || effectType == FFXStructType::Upscaling ||
+              effectType == FFXStructType::SwapchainDX12) &&
+@@ -427,6 +471,19 @@ struct AmdExtD3DDevice8 : public IAmdExtD3DDevice8
+ 
+         waveMatrixProperties->saturatingAccumulation = false;
+ 
++        if (State::Instance().isRunningOnRDNA3 && State::Instance().isRunningOnRDNA3.value())
++        {
++            const char* envvar = getenv("DXIL_SPIRV_CONFIG");
++            bool rdna3fp8 = envvar && strstr(envvar, "wmma_rdna3_workaround");
++
++            // Try to allow for MLFG on Rdna3 on Linux while forcing int8 for the upscaler
++            if (!Util::WhoIsTheCaller(_ReturnAddress()).starts_with("amd_fidelityfx_framegeneration_dx12") || !rdna3fp8)
++            {
++                if (!rdna3fp8 || FSR4ModelSelection::IsInt8FsrHooked())
++                    waveMatrixProperties->aType = float16; // Anything to fail the check
++            }
++        }
++
+         return S_OK;
+     }
+ 
+diff --git a/OptiScaler/hooks/Gdi32_Hooks.h b/OptiScaler/hooks/Gdi32_Hooks.h
+index 1182d9fb..39e620ef 100644
+--- a/OptiScaler/hooks/Gdi32_Hooks.h
++++ b/OptiScaler/hooks/Gdi32_Hooks.h
+@@ -16,7 +16,7 @@ static NTSTATUS hkD3DKMTQueryAdapterInfo(const D3DKMT_QUERYADAPTERINFO* data)
+     auto result = o_D3DKMTQueryAdapterInfo(data);
+ 
+     // LOG_INFO("Adapter into type: {}", (uint32_t)data->Type);
+-    if (data->Type == KMTQAITYPE_WDDM_2_7_CAPS)
++    if (data->Type == KMTQAITYPE_WDDM_2_7_CAPS && Config::Instance()->SpoofHAGS.value_or_default())
+     {
+         LOG_INFO("Spoofing HAGS 2.7");
+ 
+@@ -33,7 +33,7 @@ static NTSTATUS hkD3DKMTQueryAdapterInfo(const D3DKMT_QUERYADAPTERINFO* data)
+ 
+         return 0;
+     }
+-    else if (data->Type == KMTQAITYPE_WDDM_2_9_CAPS)
++    else if (data->Type == KMTQAITYPE_WDDM_2_9_CAPS && Config::Instance()->SpoofHAGS.value_or_default())
+     {
+         LOG_INFO("Spoofing HAGS 2.9");
+ 
+@@ -48,6 +48,36 @@ static NTSTATUS hkD3DKMTQueryAdapterInfo(const D3DKMT_QUERYADAPTERINFO* data)
+         d3dkmt_wddm_2_9_caps->HwSchEnabled = 1;
+         return 0;
+     }
++    else if (data->Type == KMTQAITYPE_UMDRIVERPRIVATE && data->PrivateDriverDataSize == 608 &&
++             Util::WhoIsTheCaller(_ReturnAddress()).starts_with("amd"))
++    {
++        LOG_DEBUG("Likely FSR 4 GPU Check");
++
++        auto amd_gpu_info = static_cast<uint32_t*>(data->pPrivateDriverData);
++
++        if (Config::Instance()->Fsr4Update.value_or_default() || State::Instance().isRunningOnLinux)
++        {
++            // Values as per https://gitlab.freedesktop.org/mesa/mesa/-/blob/main/src/amd/addrlib/src/amdgpu_asic_addr.h
++            // Seem to be asic family and asic revision
++            if (State::Instance().isRunningOnRDNA3.has_value() && State::Instance().isRunningOnRDNA3.value())
++            {
++                amd_gpu_info[12] = 145; // gfx11
++                amd_gpu_info[13] = 1;
++
++                return 1;
++            }
++            if (State::Instance().isRunningOnRDNA4.has_value() && State::Instance().isRunningOnRDNA4.value())
++            {
++                // Based on 9070xt
++                amd_gpu_info[12] = 152; // gfx12
++                amd_gpu_info[13] = 81;
++
++                return 1;
++            }
++        }
++
++        return result;
++    }
+ 
+     return result;
+ }
+@@ -57,24 +87,21 @@ static void hookGdi32()
+ {
+     LOG_FUNC();
+ 
+-    if (Config::Instance()->SpoofHAGS.value_or_default())
+-    {
+-        o_D3DKMTQueryAdapterInfo =
+-            reinterpret_cast<PFN_D3DKMTQueryAdapterInfo>(DetourFindFunction("gdi32.dll", "D3DKMTQueryAdapterInfo"));
++    o_D3DKMTQueryAdapterInfo =
++        reinterpret_cast<PFN_D3DKMTQueryAdapterInfo>(DetourFindFunction("gdi32.dll", "D3DKMTQueryAdapterInfo"));
+ 
+-        if (o_D3DKMTQueryAdapterInfo != nullptr)
+-        {
+-            DetourTransactionBegin();
+-            DetourUpdateThread(GetCurrentThread());
++    if (o_D3DKMTQueryAdapterInfo != nullptr)
++    {
++        DetourTransactionBegin();
++        DetourUpdateThread(GetCurrentThread());
+ 
+-            DetourAttach(&(PVOID&) o_D3DKMTQueryAdapterInfo, hkD3DKMTQueryAdapterInfo);
++        DetourAttach(&(PVOID&) o_D3DKMTQueryAdapterInfo, hkD3DKMTQueryAdapterInfo);
+ 
+-            auto detourResult = DetourTransactionCommit();
+-            if (detourResult != NO_ERROR)
+-            {
+-                LOG_ERROR("DetourTransactionCommit error: {:X}", detourResult);
+-                o_D3DKMTQueryAdapterInfo = nullptr;
+-            }
++        auto detourResult = DetourTransactionCommit();
++        if (detourResult != NO_ERROR)
++        {
++            LOG_ERROR("DetourTransactionCommit error: {:X}", detourResult);
++            o_D3DKMTQueryAdapterInfo = nullptr;
+         }
+     }
+ }
+diff --git a/OptiScaler/menu/menu_common.cpp b/OptiScaler/menu/menu_common.cpp
+index ae427804..8e60cb7f 100644
+--- a/OptiScaler/menu/menu_common.cpp
++++ b/OptiScaler/menu/menu_common.cpp
+@@ -123,6 +123,7 @@ static std::vector<std::string> splashText = { "Cope smarter, not harder",
+                                                "Neural Slop Sampling with DLSS5",
+                                                "DLSS 5 - the way it's meant to be slopped",
+                                                "Just when I think I'm out, they scale me back in",
++                                               "How to remove those corny messages?!",
+                                                "<Your funny text goes here>" };
+ 
+ static ImVec2 updateNoticePosition(-1000.0f, -1000.0f);
+@@ -1220,7 +1221,10 @@ void MenuCommon::AddDx11Backends(std::string* code, std::string* name)
+ {
+     std::string selectedUpscalerName = "";
+     bool fsr4Possible =
+-        Config::Instance()->Fsr4Update.value_or_default() || State::Instance().isRunningOnRDNA4.value_or(false);
++        Config::Instance()->Fsr4Update.value_or_default() || State::Instance().isRunningOnRDNA4.value_or(false) ||
++        (Config::Instance()->Fsr4ForceEnableInt8.value_or_default() && FfxApiProxy::Dx12Module_SR() != nullptr &&
++         FfxApiProxy::VersionDx12_SR() >= feature_version { 4, 1, 1 });
++
+     std::string fsr3xName = fsr4Possible ? "FSR 3.X/4 w/Dx12" : "FSR 3.X w/Dx12";
+ 
+     if (State::Instance().newBackend == "fsr22" || (State::Instance().newBackend == "" && *code == "fsr22"))
+@@ -1275,7 +1279,10 @@ void MenuCommon::AddDx12Backends(std::string* code, std::string* name)
+ {
+     std::string selectedUpscalerName = "";
+     bool fsr4Possible =
+-        Config::Instance()->Fsr4Update.value_or_default() || State::Instance().isRunningOnRDNA4.value_or(false);
++        Config::Instance()->Fsr4Update.value_or_default() || State::Instance().isRunningOnRDNA4.value_or(false) ||
++        (Config::Instance()->Fsr4ForceEnableInt8.value_or_default() && FfxApiProxy::Dx12Module_SR() != nullptr &&
++         FfxApiProxy::VersionDx12_SR() >= feature_version { 4, 1, 1 });
++
+     std::string fsr3xName = fsr4Possible ? "FSR 3.X/4" : "FSR 3.X";
+ 
+     if (State::Instance().newBackend == "fsr21" || (State::Instance().newBackend == "" && *code == "fsr21"))
+@@ -1315,7 +1322,10 @@ void MenuCommon::AddVulkanBackends(std::string* code, std::string* name)
+ {
+     std::string selectedUpscalerName = "";
+     bool fsr4Possible =
+-        Config::Instance()->Fsr4Update.value_or_default() || State::Instance().isRunningOnRDNA4.value_or(false);
++        Config::Instance()->Fsr4Update.value_or_default() || State::Instance().isRunningOnRDNA4.value_or(false) ||
++        (Config::Instance()->Fsr4ForceEnableInt8.value_or_default() && FfxApiProxy::Dx12Module_SR() != nullptr &&
++         FfxApiProxy::VersionDx12_SR() >= feature_version { 4, 1, 1 });
++
+     std::string fsr3xName = fsr4Possible ? "FSR 3.X/4 w/Dx12" : "FSR 3.X w/Dx12";
+ 
+     if (State::Instance().newBackend == "fsr21" || (State::Instance().newBackend == "" && *code == "fsr21"))
+@@ -2139,7 +2149,7 @@ bool MenuCommon::RenderMenu()
+ 
+                 refreshRate = Util::GetActiveRefreshRate(_handle);
+                 config->ReloadFakenvapi();
+-                auto dllPath = Util::DllPath().parent_path() / "dlssg_to_fsr3_amd_is_better.dll";
++                auto dllPath = std::filesystem::path(config->MainDllPath.value()) / L"dlssg_to_fsr3_amd_is_better.dll";
+                 state.NukemsFilesAvailable = gExists.Get(dllPath);
+ 
+                 if (State::Instance().currentFeature != nullptr)
+@@ -3292,170 +3302,101 @@ bool MenuCommon::RenderMenu()
+                             {
+                                 ImGui::Spacing();
+ 
+-                                ImGui::BeginDisabled(config->FsrNonLinearSRGB.value_or_default() ||
+-                                                     config->FsrNonLinearPQ.value_or_default());
+-
+-                                if (bool nlCS = config->FsrNonLinearColorSpace.value_or_default();
+-                                    ImGui::Checkbox("Non-Linear Color Space", &nlCS))
+-                                {
+-                                    config->FsrNonLinearColorSpace = nlCS;
+-                                    state.newBackend = currentBackend;
+-                                    MARK_ALL_BACKENDS_CHANGED();
+-                                }
+-
+-                                ImGui::EndDisabled();
+-
+-                                ShowHelpMarker("Indicates input color resource uses Non-Linear color space\n"
+-                                               "Might improve upscaling quality of FSR4\n"
+-                                               "Might increase ghosting");
+-
+-                                if (ImGui::BeginTable("nonLinear", 2, ImGuiTableFlags_SizingStretchProp))
++                                // Colorspaces
++                                const char* colorSpaces[] = { "Linear (Default)", "Non-Linear", "Non-Linear sRGB",
++                                                              "Non-Linear PQ" };
++                                int currentColorSpace = 0;
++                                if (config->FsrNonLinearPQ.value_or_default())
++                                    currentColorSpace = 3;
++                                else if (config->FsrNonLinearSRGB.value_or_default())
++                                    currentColorSpace = 2;
++                                else if (config->FsrNonLinearColorSpace.value_or_default())
++                                    currentColorSpace = 1;
++
++                                ImGui::SetNextItemWidth(150.0f * menuResScale);
++                                if (ImGui::Combo("Input Colour Space", &currentColorSpace, colorSpaces,
++                                                 IM_ARRAYSIZE(colorSpaces)))
+                                 {
++                                    bool isSrgb = (currentColorSpace == 2);
++                                    bool isPq = (currentColorSpace == 3);
+ 
+-                                    ImGui::TableNextColumn();
++                                    config->FsrNonLinearSRGB = isSrgb;
++                                    config->FsrNonLinearPQ = isPq;
+ 
+-                                    if (bool nlSRGB = config->FsrNonLinearSRGB.value_or_default();
+-                                        ImGui::Checkbox("Non-Linear sRGB Input", &nlSRGB))
++                                    if (isSrgb || isPq)
+                                     {
+-                                        config->FsrNonLinearSRGB = nlSRGB;
+-
+-                                        if (nlSRGB)
+-                                        {
+-                                            config->FsrNonLinearPQ = false;
+-                                            config->FsrNonLinearColorSpace.set_volatile_value(true);
+-                                        }
+-                                        else
+-                                        {
+-                                            // If has config value revert back to it, otherwise reset
+-                                            if (config->FsrNonLinearColorSpace.value_for_config().has_value())
+-                                            {
+-                                                config->FsrNonLinearColorSpace =
+-                                                    config->FsrNonLinearColorSpace.value_for_config();
+-                                            }
+-                                            else
+-                                            {
+-                                                config->FsrNonLinearColorSpace.reset();
+-                                            }
+-                                        }
+-
+-                                        state.newBackend = currentBackend;
+-                                        MARK_ALL_BACKENDS_CHANGED();
++                                        config->FsrNonLinearColorSpace.set_volatile_value(true);
+                                     }
+-                                    ShowHelpMarker("Indicates input color resource contains perceptual sRGB colors\n"
+-                                                   "Might improve upscaling quality of FSR4\n"
+-                                                   "Might increase ghosting");
+-
+-                                    ImGui::TableNextColumn();
+-
+-                                    if (bool nlPQ = config->FsrNonLinearPQ.value_or_default();
+-                                        ImGui::Checkbox("Non-Linear PQ Input", &nlPQ))
++                                    else if (currentColorSpace == 1) // Just non-Linear
+                                     {
+-                                        config->FsrNonLinearPQ = nlPQ;
+-
+-                                        if (nlPQ)
+-                                        {
+-                                            config->FsrNonLinearSRGB = false;
+-                                            config->FsrNonLinearColorSpace.set_volatile_value(true);
+-                                        }
+-                                        else
+-                                        {
+-                                            // If has config value revert back to it othervise reset
+-                                            if (config->FsrNonLinearColorSpace.value_for_config().has_value())
+-                                            {
+-                                                config->FsrNonLinearColorSpace =
+-                                                    config->FsrNonLinearColorSpace.value_for_config();
+-                                            }
+-                                            else
+-                                            {
+-                                                config->FsrNonLinearColorSpace.reset();
+-                                            }
+-                                        }
+-
+-                                        state.newBackend = currentBackend;
+-                                        MARK_ALL_BACKENDS_CHANGED();
++                                        config->FsrNonLinearColorSpace = true;
+                                     }
+-                                    ShowHelpMarker("Indicates input color resource contains perceptual PQ colors\n"
+-                                                   "Might improve upscaling quality of FSR4\n"
+-                                                   "Rarest, might increase ghosting and break lights");
+-
+-                                    ImGui::EndTable();
+-                                }
+-
+-                                std::array<const char*, 7> models = { "Default", "Model 0", "Model 1", "Model 2",
+-                                                                      "Model 3", "Model 4", "Model 5" };
+-
+-                                // Conversion from 0 -> 6 into nullopt + 0 -> 5 is required
+-                                uint32_t configModes = 0;
+-
+-                                if (config->Fsr4Model.has_value())
+-                                    configModes = config->Fsr4Model.value_or(0) + 1;
+-
+-                                if (configModes < 0 || configModes >= models.size())
+-                                    configModes = 0;
+-
+-                                const char* selectedModel = models[configModes];
+-
+-                                if (ImGui::BeginTable("nonLinear", 2, ImGuiTableFlags_SizingStretchProp))
+-                                {
+-
+-                                    ImGui::TableNextColumn();
+-
+-                                    if (ImGui::BeginCombo("Models", selectedModel))
++                                    else // Linear
+                                     {
+-                                        for (int n = 0; n < models.size(); n++)
+-                                        {
+-                                            uint32_t selection = 0;
+-
+-                                            if (config->Fsr4Model.has_value())
+-                                                selection = config->Fsr4Model.value_or(0) + 1;
+-
+-                                            if (ImGui::Selectable(models[n], selection == n))
+-                                            {
+-                                                if (n < 1)
+-                                                    config->Fsr4Model.reset();
+-                                                else
+-                                                    config->Fsr4Model = n - 1;
+-
+-                                                state.newBackend = currentBackend;
+-                                                MARK_ALL_BACKENDS_CHANGED();
+-                                            }
+-                                        }
+-
+-                                        ImGui::EndCombo();
++                                        config->FsrNonLinearColorSpace = false;
+                                     }
+-                                    ShowHelpMarker("Each FSR4 preset uses its own model.\n"
+-                                                   "Selecting a model won't change the upscaler preset!\n\n"
+-                                                   "Model 0 is meant for FSR Native AA\n"
+-                                                   "Model 1 is meant for Quality/Ultra Quality\n"
+-                                                   "Model 2 is meant for Balanced\n"
+-                                                   "Model 3 is meant for Performance\n"
+-                                                   "Model 5 is meant for Ultra Performance");
+ 
+-                                    // ImGui::PopItemWidth();
+-
+-                                    // ImGui::SameLine(0.0f, 6.0f);
+-
+-                                    ImGui::TableNextColumn();
+-
+-                                    if (state.currentFsr4Model.has_value())
+-                                        ImGui::Text("Current model: %d", state.currentFsr4Model.value());
++                                    state.newBackend = currentBackend;
++                                    MARK_ALL_BACKENDS_CHANGED();
++                                }
++                                ShowHelpMarker("Select the input colour space that the game uses.\n"
++                                               "Non-Linear / sRGB: Might improve FSR4 upscaling quality, might "
++                                               "increase ghosting.\n"
++                                               "PQ: Rarest, might increase ghosting and break lights.");
++
++                                // FSR 4 Presets
++                                const char* presets[] = { "Default",  "Preset 0", "Preset 1", "Preset 2",
++                                                          "Preset 3", "Preset 4", "Preset 5" };
++                                int currentPresetIdx =
++                                    config->Fsr4Preset.has_value() ? config->Fsr4Preset.value() + 1 : 0;
++
++                                if (currentPresetIdx < 0 || currentPresetIdx >= IM_ARRAYSIZE(presets))
++                                    currentPresetIdx = 0;
++
++                                ImGui::SetNextItemWidth(150.0f * menuResScale);
++                                if (ImGui::Combo("FSR4 Preset", &currentPresetIdx, presets, IM_ARRAYSIZE(presets)))
++                                {
++                                    if (currentPresetIdx == 0)
++                                        config->Fsr4Preset.reset();
+                                     else
+-                                        ImGui::Text("Failed to hook");
++                                        config->Fsr4Preset = currentPresetIdx - 1;
+ 
+-                                    ImGui::EndTable();
++                                    state.newBackend = currentBackend;
++                                    MARK_ALL_BACKENDS_CHANGED();
+                                 }
++                                ShowHelpMarker(
++                                    "Each internal FSR4 preset is tuned for a specific resolution.\n"
++                                    "Selecting an FSR4 preset won't change the in-game\nupscaler preset!!!\n\n"
++                                    "Preset 0 is meant for FSR Native AA\n"
++                                    "Preset 1 is meant for Quality/Ultra Quality\n"
++                                    "Preset 2 is meant for Balanced\n"
++                                    "Preset 3 is meant for Performance\n"
++                                    "Preset 4 is meant for DRS\n"
++                                    "Preset 5 is meant for Ultra Performance");
++
++                                // Display the active preset right next to the combo box instead of using a table
++                                ImGui::SameLine();
++                                if (state.currentFsr4Preset.has_value())
++                                    ImGui::TextDisabled("(Active: %d)", state.currentFsr4Preset.value());
++                                else if (FSR4ModelSelection::IsInt8FsrHooked())
++                                    ImGui::TextColored(toneMapColor(ImVec4(1.f, 0.8f, 0.f, 1.f)),
++                                                       "(Potential FSR3 fallback)");
++                                else
++                                    ImGui::TextDisabled("(Failed to hook)");
+                             }
+ 
+                             if (majorFsrVersion >= 3)
+                             {
+-                                if (bool dView = config->FsrDebugView.value_or_default();
+-                                    ImGui::Checkbox("Upscaler Debug View", &dView))
++                                ImGui::Spacing();
++
++                                bool debugView = config->FsrDebugView.value_or_default();
++                                if (ImGui::Checkbox("Upscaler Debug View", &debugView))
+                                 {
+-                                    config->FsrDebugView = dView;
++                                    config->FsrDebugView = debugView;
+ 
+                                     if (majorFsrVersion > 3)
+                                     {
+-                                        config->Fsr4EnableDebugView = dView;
++                                        config->Fsr4EnableDebugView = debugView;
+                                         state.newBackend = currentBackend;
+                                         MARK_ALL_BACKENDS_CHANGED();
+                                     }
+@@ -3479,10 +3420,9 @@ bool MenuCommon::RenderMenu()
+ 
+                                 if (majorFsrVersion > 3)
+                                 {
+-                                    ImGui::SameLine(0.0f, 6.0f);
+-
+-                                    if (bool fsr4wm = config->Fsr4EnableWatermark.value_or_default();
+-                                        ImGui::Checkbox("Upscaler Watermark", &fsr4wm))
++                                    ImGui::SameLine(0.0f, 20.0f * menuResScale);
++                                    bool fsr4wm = config->Fsr4EnableWatermark.value_or_default();
++                                    if (ImGui::Checkbox("Watermark", &fsr4wm))
+                                     {
+                                         LOG_DEBUG("FSR4 Watermark set to {}", fsr4wm);
+                                         config->Fsr4EnableWatermark = fsr4wm;
+@@ -3496,7 +3436,70 @@ bool MenuCommon::RenderMenu()
+                             if (currentFeature->Version() >= feature_version { 3, 1, 1 } &&
+                                 currentFeature->Version() < feature_version { 4, 0, 0 })
+                             {
+-                                if (auto ch = ScopedCollapsingHeader("FSR 3 Upscaler Fine Tuning"); ch.IsHeaderOpen())
++                                ImGui::Spacing();
++
++                                if (currentFeature != nullptr)
++                                {
++                                    ImGui::Text("FSR 3.1 Presets:");
++
++                                    ImGui::SameLine(0.0f, 6.0f);
++
++                                    // This wiill be applied by default
++                                    if (ImGui::Button("Stability"))
++                                    {
++                                        auto const scaleRatioX = (float) currentFeature->TargetWidth() /
++                                                                 (float) currentFeature->RenderWidth();
++                                        auto const scaleRatioY = (float) currentFeature->TargetHeight() /
++                                                                 (float) currentFeature->RenderHeight();
++                                        auto const scaleRatio = std::max(scaleRatioX, scaleRatioY);
++
++                                        config->FsrVelocity = 0.5f;
++                                        config->FsrReactiveScale = 0.25f;
++
++                                        config->FsrShadingScale.reset();
++                                        config->FsrAccAddPerFrame.reset();
++                                        config->FsrMinDisOccAcc.reset();
++                                        config->FsrShadingScale.set_volatile_value(0.5f / scaleRatio);
++                                        config->FsrAccAddPerFrame.set_volatile_value(scaleRatio / 10.0f);
++                                        config->FsrMinDisOccAcc.set_volatile_value(scaleRatio / 20.0f);
++                                    }
++
++                                    ImGui::SameLine(0.0f, 6.0f);
++
++                                    if (ImGui::Button("Motion"))
++                                    {
++                                        auto const scaleRatioX = (float) currentFeature->TargetWidth() /
++                                                                 (float) currentFeature->RenderWidth();
++                                        auto const scaleRatioY = (float) currentFeature->TargetHeight() /
++                                                                 (float) currentFeature->RenderHeight();
++                                        auto const scaleRatio = std::max(scaleRatioX, scaleRatioY);
++
++                                        config->FsrVelocity = 1.0f;
++                                        config->FsrReactiveScale = 0.5f;
++
++                                        config->FsrShadingScale.reset();
++                                        config->FsrAccAddPerFrame.reset();
++                                        config->FsrMinDisOccAcc.reset();
++                                        config->FsrShadingScale.set_volatile_value(1.0f / scaleRatio);
++                                        config->FsrAccAddPerFrame.set_volatile_value(scaleRatio / 10.0f);
++                                        config->FsrMinDisOccAcc.set_volatile_value(scaleRatio / 20.0f);
++                                    }
++
++                                    ImGui::SameLine(0.0f, 6.0f);
++
++                                    if (ImGui::Button("Default"))
++                                    {
++                                        config->FsrVelocity = 1.0f;
++                                        config->FsrReactiveScale = 1.0f;
++                                        config->FsrShadingScale = 1.0f;
++                                        config->FsrAccAddPerFrame = 0.333f;
++                                        config->FsrMinDisOccAcc = -0.333f;
++                                    }
++                                }
++
++                                ImGui::Spacing();
++
++                                if (auto ch = ScopedCollapsingHeader("FSR 3 Upscaler Manual Tuning"); ch.IsHeaderOpen())
+                                 {
+                                     ScopedIndent indent {};
+                                     ImGui::Spacing();
+@@ -3505,7 +3508,7 @@ bool MenuCommon::RenderMenu()
+                                     ImGui::PushItemWidth(220.0f * menuResScale);
+ 
+                                     float velocity = config->FsrVelocity.value_or_default();
+-                                    if (ImGui::SliderFloat("Velocity Factor", &velocity, 0.00f, 1.0f, "%.2f"))
++                                    if (ImGui::SliderFloat("Velocity Factor", &velocity, 0.00f, 1.0f, "%.3f"))
+                                         config->FsrVelocity = velocity;
+ 
+                                     ShowHelpMarker("Value of 0.0f can improve temporal stability of bright pixels\n"
+@@ -3516,7 +3519,7 @@ bool MenuCommon::RenderMenu()
+                                     {
+                                         // Reactive Scale
+                                         float reactiveScale = config->FsrReactiveScale.value_or_default();
+-                                        if (ImGui::SliderFloat("Reactive Scale", &reactiveScale, 0.0f, 100.0f, "%.1f"))
++                                        if (ImGui::SliderFloat("Reactive Scale", &reactiveScale, 0.0f, 1.0f, "%.3f"))
+                                             config->FsrReactiveScale = reactiveScale;
+ 
+                                         ShowHelpMarker("Meant for development purpose to test if\n"
+@@ -3524,7 +3527,7 @@ bool MenuCommon::RenderMenu()
+ 
+                                         // Shading Scale
+                                         float shadingScale = config->FsrShadingScale.value_or_default();
+-                                        if (ImGui::SliderFloat("Shading Scale", &shadingScale, 0.0f, 100.0f, "%.1f"))
++                                        if (ImGui::SliderFloat("Shading Scale", &shadingScale, 0.0f, 1.0f, "%.3f"))
+                                             config->FsrShadingScale = shadingScale;
+ 
+                                         ShowHelpMarker("Increasing this scales fsr3.1 computed shading\n"
+@@ -3533,7 +3536,7 @@ bool MenuCommon::RenderMenu()
+                                         // Accumulation Added Per Frame
+                                         float accAddPerFrame = config->FsrAccAddPerFrame.value_or_default();
+                                         if (ImGui::SliderFloat("Acc. Added Per Frame", &accAddPerFrame, 0.00f, 1.0f,
+-                                                               "%.2f"))
++                                                               "%.3f"))
+                                             config->FsrAccAddPerFrame = accAddPerFrame;
+ 
+                                         ShowHelpMarker(
+@@ -3547,7 +3550,7 @@ bool MenuCommon::RenderMenu()
+                                         // Min Disocclusion Accumulation
+                                         float minDisOccAcc = config->FsrMinDisOccAcc.value_or_default();
+                                         if (ImGui::SliderFloat("Min. Disocclusion Acc.", &minDisOccAcc, -1.0f, 1.0f,
+-                                                               "%.2f"))
++                                                               "%.3f"))
+                                             config->FsrMinDisOccAcc = minDisOccAcc;
+ 
+                                         ShowHelpMarker("Increasing this value may reduce white pixel temporal\n"
+@@ -4178,7 +4181,7 @@ bool MenuCommon::RenderMenu()
+                         if (state.currentFG->Version().major > 3)
+                         {
+                             if (bool fgwm = config->FSRFGEnableWatermark.value_or_default();
+-                                ImGui::Checkbox("Enable Watermark", &fgwm))
++                                ImGui::Checkbox("FG Watermark", &fgwm))
+                             {
+                                 LOG_DEBUG("FSRFGEnableWatermark set FGWatermark: {}", fgwm);
+                                 config->FSRFGEnableWatermark = fgwm;
+@@ -4354,7 +4357,9 @@ bool MenuCommon::RenderMenu()
+                             nativeAA = currentFeature->RenderWidth() == currentFeature->DisplayWidth();
+ 
+                         auto fgOutput = reinterpret_cast<IFGFeature_Dx12*>(state.currentFG);
+-                        const bool correctMVs = fgOutput && fgOutput->IsLowResMV() || nativeAA || ignoreChecks;
++                        const bool correctMVs = fgOutput && fgOutput->IsLowResMV() || nativeAA ||
++                                                (State::Instance().gameQuirks & GameQuirk::ForceFGRenderSizeMVs) ||
++                                                ignoreChecks;
+ 
+                         if (!correctMVs || state.realExclusiveFullscreen)
+                         {
+diff --git a/OptiScaler/misc/Quirks.h b/OptiScaler/misc/Quirks.h
+index bea09cd6..98cd156e 100644
+--- a/OptiScaler/misc/Quirks.h
++++ b/OptiScaler/misc/Quirks.h
+@@ -63,6 +63,7 @@ enum class GameQuirk : uint64_t
+     ForceDepthD32S8,
+     PregmataFixDLSSModes,
+     IgnoreValidUntilEvaluateForFG,
++    ForceFGRenderSizeMVs,
+     // Don't forget to add the new entry to printQuirks
+     _
+ };
+@@ -120,8 +121,8 @@ static const QuirkEntry quirkTable[] = {
+     QUIRK_ENTRY("pathofexile_x64steam.exe", GameQuirk::LoadD3D12Manually, GameQuirk::DisableDxgiSpoofing),
+ 
+     // Where Winds Meet
+-    // Required to avoid forced DLSS dilated MVs
+-    QUIRK_ENTRY("wwm.exe", GameQuirk::DisableXeFGChecks),
++    // SL spoof enough to unlock everything DLSS, required to avoid forced DLSS dilated MVs
++    QUIRK_ENTRY("wwm.exe", GameQuirk::DisableDxgiSpoofing, GameQuirk::ForceFGRenderSizeMVs),
+ 
+     // Arknights: Endfield
+     // Reflex hooking crashes the game
+@@ -142,9 +143,17 @@ static const QuirkEntry quirkTable[] = {
+     // Trails in the Sky 1st Chapter
+     QUIRK_ENTRY("sora_1st.exe", GameQuirk::UseFsr2Dx11Inputs, GameQuirk::DisableDxgiSpoofing),
+ 
+-    // Ninja Gaiden 4
+-    QUIRK_ENTRY("ninjagaiden4-steam.exe", GameQuirk::DisableResizeSkip, GameQuirk::DoNotPreserveFGSwapChain),
+-    QUIRK_ENTRY("ninjagaiden4-wingdk.exe", GameQuirk::DisableResizeSkip, GameQuirk::DoNotPreserveFGSwapChain),
++    // NINJA GAIDEN 4
++    // No spoof needed for DLSS inputs
++    QUIRK_ENTRY("ninjagaiden4-steam.exe", GameQuirk::DisableDxgiSpoofing, GameQuirk::DisableResizeSkip,
++                GameQuirk::DoNotPreserveFGSwapChain),
++    QUIRK_ENTRY("ninjagaiden4-wingdk.exe", GameQuirk::DisableDxgiSpoofing, GameQuirk::DisableResizeSkip,
++                GameQuirk::DoNotPreserveFGSwapChain),
++
++    // DEAD OR ALIVE 6 Last Round
++    // No spoof needed for DLSS inputs
++    QUIRK_ENTRY("doa6lr.exe", GameQuirk::DisableDxgiSpoofing, GameQuirk::DisableResizeSkip,
++                GameQuirk::DoNotPreserveFGSwapChain),
+ 
+     // The Last of Us Part I
+     QUIRK_ENTRY("tlou-i.exe", GameQuirk::AllowedFrameAhead2, GameQuirk::DisableDxgiSpoofing),
+@@ -162,7 +171,8 @@ static const QuirkEntry quirkTable[] = {
+     QUIRK_ENTRY("kunitsugamidemo.exe", GameQuirk::RestoreComputeSigOnNonNvidia, GameQuirk::DisableDxgiSpoofing),
+     QUIRK_ENTRY("monsterhunterwilds.exe", GameQuirk::RestoreComputeSigOnNonNvidia, GameQuirk::DisableDxgiSpoofing,
+                 GameQuirk::RestoreComputeSigOnNvidia),
+-    QUIRK_ENTRY("monsterhunterrise.exe", GameQuirk::RestoreComputeSigOnNvidia), // Seems to fix real DLSS
++    QUIRK_ENTRY("monsterhunterrise.exe", GameQuirk::RestoreComputeSigOnNvidia,
++                GameQuirk::RestoreComputeSigOnNonNvidia), // AMD/Intel need spoofing, Restoresig seems to fix real DLSS
+     QUIRK_ENTRY("drdr.exe", GameQuirk::RestoreComputeSigOnNonNvidia, GameQuirk::DisableDxgiSpoofing),
+     QUIRK_ENTRY("dd2ccs.exe", GameQuirk::RestoreComputeSigOnNonNvidia, GameQuirk::DisableDxgiSpoofing),
+     QUIRK_ENTRY("dd2.exe", GameQuirk::RestoreComputeSigOnNonNvidia, GameQuirk::DisableDxgiSpoofing),
+@@ -200,6 +210,8 @@ static const QuirkEntry quirkTable[] = {
+     // Avatar: Frontiers of Pandora
+     // SL spoof enough to unlock DLSSG, blocked spoofing due to broken RT/performance overhead
+     QUIRK_ENTRY("afop.exe", GameQuirk::DisableFSR2Inputs, GameQuirk::DisableFSR3Inputs, GameQuirk::DisableDxgiSpoofing),
++    QUIRK_ENTRY("afop_plus.exe", GameQuirk::DisableFSR2Inputs, GameQuirk::DisableFSR3Inputs,
++                GameQuirk::DisableDxgiSpoofing),
+ 
+     // Forza Motorsport 8
+     // Steam
+@@ -342,16 +354,45 @@ static const QuirkEntry quirkTable[] = {
+     // SL spoof enough to unlock everything DLSS, AE required to fix FSR4 ghosting
+     QUIRK_ENTRY("assettocorsaevo.exe", GameQuirk::DisableDxgiSpoofing, GameQuirk::ForceAutoExposure),
+ 
++    // Hellblade: Senua's Sacrifice
++    // No UE barriers to fix crash on upscaler init
++    QUIRK_ENTRY_UE(hellbladegame, GameQuirk::DisableDxgiSpoofing, GameQuirk::DontUseUnrealColorBarriers,
++                   GameQuirk::DontUseUnrealMVBarriers),
++
++    // Sackboy: A Big Adventure
++    // No UE barriers to fix crash on upscaler init
++    QUIRK_ENTRY_UE(sackboy, GameQuirk::DisableDxgiSpoofing, GameQuirk::ForceAutoExposure,
++                   GameQuirk::DontUseUnrealColorBarriers, GameQuirk::DontUseUnrealMVBarriers),
++
++    // OUTRIDERS
++    // No UE barriers to fix crash on upscaler init
++    QUIRK_ENTRY_UE(outriders, GameQuirk::DisableDxgiSpoofing, GameQuirk::DontUseUnrealColorBarriers,
++                   GameQuirk::DontUseUnrealMVBarriers),
++
++    // Watch Dogs: Legion
++    // AE required to fix FSR4 ghosting
++    QUIRK_ENTRY("watchdogslegion.exe", GameQuirk::ForceAutoExposure),
++    QUIRK_ENTRY("watchdogslegion_plus.exe", GameQuirk::ForceAutoExposure),
++
++    // Assassin’s Creed Shadows
++    // SL spoof enough to unlock everything DLSS
++    QUIRK_ENTRY("acshadows.exe", GameQuirk::DisableDxgiSpoofing),
++    QUIRK_ENTRY("acshadows_plus.exe", GameQuirk::DisableDxgiSpoofing),
++
++    // Assassin's Creed Black Flag Resynced
++    // SL spoof enough to unlock everything DLSS
++    QUIRK_ENTRY("acblackflag.exe", GameQuirk::DisableDxgiSpoofing),
++    QUIRK_ENTRY("acblackflag_plus.exe", GameQuirk::DisableDxgiSpoofing),
++
+     // SL spoof enough to unlock everything DLSS/No spoof needed for DLSS inputs
+     //
+     // The Witcher 3, Alan Wake 2, Crysis 3 Remastered, Marvel's Guardians of the Galaxy, UNCHARTED: Legacy of Thieves
+-    // Collection, Warhammer 40,000: Darktide, Observer: System Redux, Sackboy: A Big Adventure, Hellblade: Senua's
+-    // Sacrifice, Pumpkin Jack, Rise of the Ronin, DYNASTY WARRIORS: ORIGINS, Crysis Remastered, Crysis 2 Remastered,
+-    // Mortal Shell, Sekiro: Shadows Die Twice (for SekiroTSR mod), The Medium, NINJA GAIDEN 4 (+ WinGDK), God of War
+-    // (2018), Europa Universalis V, Need for Speed Unbound, Nioh 2 – The Complete Edition, Control Ultimate Edition,
+-    // Deathloop, Where Winds Meet, FINAL FANTASY VII REMAKE INTERGRADE (for Luma mod), Assassin’s Creed Shadows,
+-    // Farming Simulator 2025, Nioh 3, FATAL FRAME II: Crimson Butterfly REMAKE, OUTRIDERS, MOUSE: P.I. For Hire, Yet
+-    // Another Zombie Survivors, Voodoo Fishin', Forza Horizon 6, Over the Hill (demo), SHROT (demo)
++    // Collection, Warhammer 40,000: Darktide, Observer: System Redux, Pumpkin Jack, Rise of the Ronin, DYNASTY
++    // WARRIORS: ORIGINS, Crysis Remastered, Crysis 2 Remastered, Mortal Shell, Sekiro: Shadows Die Twice (for SekiroTSR
++    // mod), The Medium, God of War (2018), Europa Universalis V, Need for Speed Unbound, Nioh 2 – The Complete Edition,
++    // Control Ultimate Edition, Deathloop, FINAL FANTASY VII REMAKE INTERGRADE (for Luma mod), Farming Simulator 2025,
++    // Nioh 3, FATAL FRAME II: Crimson Butterfly REMAKE, MOUSE: P.I. For Hire, Yet Another Zombie Survivors, Voodoo
++    // Fishin', Forza Horizon 6, Over the Hill (demo), SHROT (demo)
+     QUIRK_ENTRY("witcher3.exe", GameQuirk::DisableDxgiSpoofing),
+     QUIRK_ENTRY("alanwake2.exe", GameQuirk::DisableDxgiSpoofing),
+     QUIRK_ENTRY("crysis3remastered.exe", GameQuirk::DisableDxgiSpoofing),
+@@ -362,8 +403,6 @@ static const QuirkEntry quirkTable[] = {
+     QUIRK_ENTRY("tll-l.exe", GameQuirk::DisableDxgiSpoofing),
+     QUIRK_ENTRY("darktide.exe", GameQuirk::DisableDxgiSpoofing),
+     QUIRK_ENTRY("observersystemredux.exe", GameQuirk::DisableDxgiSpoofing, GameQuirk::ForceAutoExposure),
+-    QUIRK_ENTRY_UE(sackboy, GameQuirk::DisableDxgiSpoofing, GameQuirk::ForceAutoExposure),
+-    QUIRK_ENTRY_UE(hellbladegame, GameQuirk::DisableDxgiSpoofing),
+     QUIRK_ENTRY_UE(pumpkinjack, GameQuirk::DisableDxgiSpoofing, GameQuirk::ForceAutoExposure),
+     QUIRK_ENTRY("ronin.exe", GameQuirk::DisableDxgiSpoofing),
+     QUIRK_ENTRY("dworigins.exe", GameQuirk::DisableDxgiSpoofing),
+@@ -372,21 +411,16 @@ static const QuirkEntry quirkTable[] = {
+     QUIRK_ENTRY_UE(dungeonhaven, GameQuirk::DisableDxgiSpoofing),
+     QUIRK_ENTRY("sekiro.exe", GameQuirk::DisableDxgiSpoofing), // Sekiro TSR mod required for upscalers
+     QUIRK_ENTRY_UE(medium, GameQuirk::DisableDxgiSpoofing),
+-    QUIRK_ENTRY("ninjagaiden4-steam.exe", GameQuirk::DisableDxgiSpoofing),
+-    QUIRK_ENTRY("ninjagaiden4-wingdk.exe", GameQuirk::DisableDxgiSpoofing), // NG4 WinGDK
+     QUIRK_ENTRY("gow.exe", GameQuirk::DisableDxgiSpoofing),
+     QUIRK_ENTRY("eu5.exe", GameQuirk::DisableDxgiSpoofing),
+     QUIRK_ENTRY("needforspeedunbound.exe", GameQuirk::DisableDxgiSpoofing),
+     QUIRK_ENTRY("nioh2.exe", GameQuirk::DisableDxgiSpoofing, GameQuirk::ForceAutoExposure),
+     QUIRK_ENTRY("control_dx12.exe", GameQuirk::DisableDxgiSpoofing, GameQuirk::ForceAutoExposure),
+     QUIRK_ENTRY("deathloop.exe", GameQuirk::DisableDxgiSpoofing),
+-    QUIRK_ENTRY("wwm.exe", GameQuirk::DisableDxgiSpoofing),
+     QUIRK_ENTRY("ff7remake_.exe", GameQuirk::DisableDxgiSpoofing), // Luma mod required for upscalers
+-    QUIRK_ENTRY("acshadows.exe", GameQuirk::DisableDxgiSpoofing),
+     QUIRK_ENTRY("farmingsimulator2025game.exe", GameQuirk::DisableDxgiSpoofing),
+     QUIRK_ENTRY("nioh3.exe", GameQuirk::DisableDxgiSpoofing),
+     QUIRK_ENTRY("fatalframeii.exe", GameQuirk::DisableDxgiSpoofing),
+-    QUIRK_ENTRY_UE(outriders, GameQuirk::DisableDxgiSpoofing),
+     QUIRK_ENTRY("mouse.exe", GameQuirk::DisableDxgiSpoofing),
+     QUIRK_ENTRY("yet another zombie survivors.exe", GameQuirk::DisableDxgiSpoofing),
+     QUIRK_ENTRY("voodoo fishin'.exe", GameQuirk::DisableDxgiSpoofing),
+diff --git a/OptiScaler/proxies/FfxApi_Proxy.h b/OptiScaler/proxies/FfxApi_Proxy.h
+index 9f784003..cae54f09 100644
+--- a/OptiScaler/proxies/FfxApi_Proxy.h
++++ b/OptiScaler/proxies/FfxApi_Proxy.h
+@@ -18,6 +18,8 @@
+ #include <ffx_framegeneration.h>
+ #include <ffx_upscale.h>
+ 
++#include <scanner/scanner.h>
++
+ #include <magic_enum.hpp>
+ 
+ // A mess to be able to import both
+@@ -70,6 +72,8 @@ struct FfxModule
+     PfnFfxDispatch Dispatch = nullptr;
+ };
+ 
++using AmdInt8Check = uint8_t(__fastcall*)(void* a1, ID3D12Device* device);
++
+ class FfxApiProxy
+ {
+   private:
+@@ -91,6 +95,13 @@ class FfxApiProxy
+ 
+     inline static bool _skipDestroyCalls = false;
+ 
++    inline static AmdInt8Check o_amdInt8Check = nullptr;
++    inline static uint8_t hkAmdInt8Check(void* a1, ID3D12Device* device)
++    {
++        LOG_DEBUG("Called with a1: {:X}, device: {:X}", (uintptr_t) a1, (uintptr_t) device);
++        return 1;
++    }
++
+     static inline void parse_version(const char* version_str, feature_version* _version)
+     {
+         const char* p = version_str;
+@@ -478,6 +489,33 @@ class FfxApiProxy
+         if (!loadResult)
+             upscaling_dx12.dll = nullptr;
+ 
++        if (Config::Instance()->Fsr4ForceEnableInt8.value_or_default())
++        {
++            const char* pattern =
++                "48 83 EC 48 48 8B C2 48 85 D2 74 54 48 8D 54 24 20 48 8B C8 E8 ? ? ? ? 81 7C 24 34 91 00 00 00 44 0F "
++                "B6 C0 75 23 8B 54 24 30 8D 4A FF 83 F9 0E 76 13 8D 4A E0 81 F9 DE 00 00 00 76 08 8D 4A F0 83 F9 0F";
++
++            auto o_amdInt8Check = (AmdInt8Check) scanner::GetAddress(upscaling_dx12.dll, pattern);
++
++            if (o_amdInt8Check != nullptr)
++            {
++                LOG_INFO("Found AmdInt8Check at {:X}", (size_t) o_amdInt8Check);
++
++                DetourTransactionBegin();
++                DetourUpdateThread(GetCurrentThread());
++
++                if (o_amdInt8Check != nullptr)
++                    DetourAttach(&(PVOID&) o_amdInt8Check, hkAmdInt8Check);
++
++                auto detourResult = DetourTransactionCommit();
++                if (detourResult != NO_ERROR)
++                {
++                    LOG_ERROR("DetourTransactionCommit result: {:X}", detourResult);
++                    o_amdInt8Check = nullptr;
++                }
++            }
++        }
++
+         return loadResult;
+     }
+ 
+diff --git a/OptiScaler/resource.h b/OptiScaler/resource.h
+index d6ca2e26..cf76aebb 100644
+--- a/OptiScaler/resource.h
++++ b/OptiScaler/resource.h
+@@ -28,7 +28,7 @@
+ 
+ #define VER_MAJOR_VERSION 0
+ #define VER_MINOR_VERSION 9
+-#define VER_HOTFIX_VERSION 3
++#define VER_HOTFIX_VERSION 4
+ #define VER_BUILD_NUMBER 0
+ 
+ // #define VER_PRE_RELEASE
+diff --git a/OptiScaler/shaders/hudless_compare/HC_Dx12.cpp b/OptiScaler/shaders/hudless_compare/HC_Dx12.cpp
+index 508d72d1..1f1d2291 100644
+--- a/OptiScaler/shaders/hudless_compare/HC_Dx12.cpp
++++ b/OptiScaler/shaders/hudless_compare/HC_Dx12.cpp
+@@ -7,6 +7,81 @@
+ 
+ #include <Config.h>
+ 
++inline static int GetFormatGroup(DXGI_FORMAT format)
++{
++    switch (format)
++    {
++
++    case DXGI_FORMAT_R32G32B32A32_TYPELESS:
++    case DXGI_FORMAT_R32G32B32A32_FLOAT:
++    case DXGI_FORMAT_R32G32B32A32_UINT:
++    case DXGI_FORMAT_R32G32B32A32_SINT:
++        return 1;
++
++    case DXGI_FORMAT_R32G32B32_TYPELESS:
++    case DXGI_FORMAT_R32G32B32_FLOAT:
++    case DXGI_FORMAT_R32G32B32_UINT:
++    case DXGI_FORMAT_R32G32B32_SINT:
++        return 2;
++
++    case DXGI_FORMAT_R16G16B16A16_TYPELESS:
++    case DXGI_FORMAT_R16G16B16A16_FLOAT:
++    case DXGI_FORMAT_R16G16B16A16_UNORM:
++    case DXGI_FORMAT_R16G16B16A16_UINT:
++    case DXGI_FORMAT_R16G16B16A16_SNORM:
++    case DXGI_FORMAT_R16G16B16A16_SINT:
++        return 3;
++
++    case DXGI_FORMAT_R10G10B10A2_TYPELESS:
++    case DXGI_FORMAT_R10G10B10A2_UNORM:
++    case DXGI_FORMAT_R10G10B10A2_UINT:
++        return 4;
++
++    case DXGI_FORMAT_R11G11B10_FLOAT:
++        return 5;
++
++    case DXGI_FORMAT_R8G8B8A8_TYPELESS:
++    case DXGI_FORMAT_R8G8B8A8_UNORM:
++    case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
++    case DXGI_FORMAT_R8G8B8A8_UINT:
++    case DXGI_FORMAT_R8G8B8A8_SNORM:
++    case DXGI_FORMAT_R8G8B8A8_SINT:
++        return 6;
++
++    case DXGI_FORMAT_B5G6R5_UNORM:
++        return 7;
++
++    case DXGI_FORMAT_B5G5R5A1_UNORM:
++        return 8;
++
++    case DXGI_FORMAT_B8G8R8A8_UNORM:
++    case DXGI_FORMAT_B8G8R8A8_TYPELESS:
++    case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB:
++        return 9;
++
++    case DXGI_FORMAT_R10G10B10_XR_BIAS_A2_UNORM:
++        return 10;
++
++    case DXGI_FORMAT_B8G8R8X8_UNORM:
++    case DXGI_FORMAT_B8G8R8X8_TYPELESS:
++    case DXGI_FORMAT_B8G8R8X8_UNORM_SRGB:
++        return 11;
++
++    default:
++        return -1;
++    }
++}
++
++inline static bool CompareResourceFormats(DXGI_FORMAT sc, DXGI_FORMAT hudless)
++{
++    if (sc == hudless)
++        return true;
++
++    auto scGroup = GetFormatGroup(sc);
++    auto hudlessGroup = GetFormatGroup(hudless);
++    return scGroup == hudlessGroup;
++}
++
+ bool HC_Dx12::CreateBufferResource(UINT index, ID3D12Device* InDevice, ID3D12Resource* InSource,
+                                    D3D12_RESOURCE_STATES InState)
+ {
+@@ -269,7 +344,13 @@ bool HC_Dx12::Dispatch(IDXGISwapChain3* sc, ID3D12GraphicsCommandList* cmdList,
+         srv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+         srv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+         srv.Texture2D.MipLevels = 1;
+-        srv.Format = Shader_Dx12::TranslateTypelessFormats(hudlessDesc.Format);
++
++        // Fix for typeless hudless formats
++        if (CompareResourceFormats(scDesc.BufferDesc.Format, hudlessDesc.Format))
++            srv.Format = Shader_Dx12::TranslateTypelessFormats(scDesc.BufferDesc.Format);
++        else
++            srv.Format = Shader_Dx12::TranslateTypelessFormats(hudlessDesc.Format);
++
+         _device->CreateShaderResourceView(hudless, &srv, currentHeap.GetSrvCPU(0));
+     }
+ 
+diff --git a/OptiScaler/upscalers/fsr31/FSR31Feature_Dx11.cpp b/OptiScaler/upscalers/fsr31/FSR31Feature_Dx11.cpp
+index f9989c54..67ada623 100644
+--- a/OptiScaler/upscalers/fsr31/FSR31Feature_Dx11.cpp
++++ b/OptiScaler/upscalers/fsr31/FSR31Feature_Dx11.cpp
+@@ -754,6 +754,32 @@ bool FSR31FeatureDx11::InitFSR3(const NVSDK_NGX_Parameter* InParameters)
+             _upscalerContextDesc.maxUpscaleSize.height = TargetHeight();
+         }
+ 
++        // Set stability values as default if not set by user
++        {
++            auto config = Config::Instance();
++            auto const scaleRatioX = (float) TargetWidth() / (float) RenderWidth();
++            auto const scaleRatioY = (float) TargetHeight() / (float) RenderHeight();
++            auto const scaleRatio = std::max(scaleRatioX, scaleRatioY);
++
++            if (scaleRatio > 0.0f && !std::isinf(scaleRatio))
++            {
++                if (config->FsrVelocity.value_for_config() == std::nullopt)
++                    config->FsrVelocity.set_volatile_value(0.5f);
++
++                if (config->FsrReactiveScale.value_for_config() == std::nullopt)
++                    config->FsrReactiveScale.set_volatile_value(0.25f);
++
++                if (config->FsrShadingScale.value_for_config() == std::nullopt)
++                    config->FsrShadingScale.set_volatile_value(0.5f / scaleRatio);
++
++                if (config->FsrAccAddPerFrame.value_for_config() == std::nullopt)
++                    config->FsrAccAddPerFrame.set_volatile_value(scaleRatio / 10.0f);
++
++                if (config->FsrMinDisOccAcc.value_for_config() == std::nullopt)
++                    config->FsrMinDisOccAcc.set_volatile_value(scaleRatio / 20.0f);
++            }
++        }
++
+         if (Config::Instance()->FfxUpscalerIndex.value_or_default() < 0 ||
+             Config::Instance()->FfxUpscalerIndex.value_or_default() >= State::Instance().ffxUpscalerVersionIds.size())
+             Config::Instance()->FfxUpscalerIndex.set_volatile_value(0);
+diff --git a/OptiScaler/upscalers/fsr31/FSR31Feature_Dx11On12.cpp b/OptiScaler/upscalers/fsr31/FSR31Feature_Dx11On12.cpp
+index c9d999bd..38a35b7b 100644
+--- a/OptiScaler/upscalers/fsr31/FSR31Feature_Dx11On12.cpp
++++ b/OptiScaler/upscalers/fsr31/FSR31Feature_Dx11On12.cpp
+@@ -714,6 +714,32 @@ bool FSR31FeatureDx11on12::InitFSR3(const NVSDK_NGX_Parameter* InParameters)
+             _contextDesc.maxUpscaleSize.height = TargetHeight();
+         }
+ 
++        // Set stability values as default if not set by user
++        {
++            auto config = Config::Instance();
++            auto const scaleRatioX = (float) TargetWidth() / (float) RenderWidth();
++            auto const scaleRatioY = (float) TargetHeight() / (float) RenderHeight();
++            auto const scaleRatio = std::max(scaleRatioX, scaleRatioY);
++
++            if (scaleRatio > 0.0f && !std::isinf(scaleRatio))
++            {
++                if (config->FsrVelocity.value_for_config() == std::nullopt)
++                    config->FsrVelocity.set_volatile_value(0.5f);
++
++                if (config->FsrReactiveScale.value_for_config() == std::nullopt)
++                    config->FsrReactiveScale.set_volatile_value(0.25f);
++
++                if (config->FsrShadingScale.value_for_config() == std::nullopt)
++                    config->FsrShadingScale.set_volatile_value(0.5f / scaleRatio);
++
++                if (config->FsrAccAddPerFrame.value_for_config() == std::nullopt)
++                    config->FsrAccAddPerFrame.set_volatile_value(scaleRatio / 10.0f);
++
++                if (config->FsrMinDisOccAcc.value_for_config() == std::nullopt)
++                    config->FsrMinDisOccAcc.set_volatile_value(scaleRatio / 20.0f);
++            }
++        }
++
+         ffxCreateBackendDX12Desc backendDesc = { 0 };
+         backendDesc.header.type = FFX_API_CREATE_CONTEXT_DESC_TYPE_BACKEND_DX12;
+         backendDesc.device = _dx11on12Device;
+diff --git a/OptiScaler/upscalers/fsr31/FSR31Feature_Dx12.cpp b/OptiScaler/upscalers/fsr31/FSR31Feature_Dx12.cpp
+index 31d9a8ff..a577feb1 100644
+--- a/OptiScaler/upscalers/fsr31/FSR31Feature_Dx12.cpp
++++ b/OptiScaler/upscalers/fsr31/FSR31Feature_Dx12.cpp
+@@ -788,6 +788,32 @@ bool FSR31FeatureDx12::InitFSR3(const NVSDK_NGX_Parameter* InParameters)
+             _contextDesc.maxUpscaleSize.height = TargetHeight();
+         }
+ 
++        // Set stability values as default if not set by user
++        {
++            auto config = Config::Instance();
++            auto const scaleRatioX = (float) TargetWidth() / (float) RenderWidth();
++            auto const scaleRatioY = (float) TargetHeight() / (float) RenderHeight();
++            auto const scaleRatio = std::max(scaleRatioX, scaleRatioY);
++
++            if (scaleRatio > 0.0f && !std::isinf(scaleRatio))
++            {
++                if (config->FsrVelocity.value_for_config() == std::nullopt)
++                    config->FsrVelocity.set_volatile_value(0.5f);
++
++                if (config->FsrReactiveScale.value_for_config() == std::nullopt)
++                    config->FsrReactiveScale.set_volatile_value(0.25f);
++
++                if (config->FsrShadingScale.value_for_config() == std::nullopt)
++                    config->FsrShadingScale.set_volatile_value(0.5f / scaleRatio);
++
++                if (config->FsrAccAddPerFrame.value_for_config() == std::nullopt)
++                    config->FsrAccAddPerFrame.set_volatile_value(scaleRatio / 10.0f);
++
++                if (config->FsrMinDisOccAcc.value_for_config() == std::nullopt)
++                    config->FsrMinDisOccAcc.set_volatile_value(scaleRatio / 20.0f);
++            }
++        }
++
+         ffxCreateBackendDX12Desc backendDesc = { 0 };
+         backendDesc.header.type = FFX_API_CREATE_CONTEXT_DESC_TYPE_BACKEND_DX12;
+         backendDesc.device = Device;
+diff --git a/OptiScaler/upscalers/fsr31/FSR31Feature_Vk.cpp b/OptiScaler/upscalers/fsr31/FSR31Feature_Vk.cpp
+index b71c286b..17d2743e 100644
+--- a/OptiScaler/upscalers/fsr31/FSR31Feature_Vk.cpp
++++ b/OptiScaler/upscalers/fsr31/FSR31Feature_Vk.cpp
+@@ -251,6 +251,32 @@ bool FSR31FeatureVk::InitFSR3(const NVSDK_NGX_Parameter* InParameters)
+             _contextDesc.maxUpscaleSize.height = TargetHeight();
+         }
+ 
++        // Set stability values as default if not set by user
++        {
++            auto config = Config::Instance();
++            auto const scaleRatioX = (float) TargetWidth() / (float) RenderWidth();
++            auto const scaleRatioY = (float) TargetHeight() / (float) RenderHeight();
++            auto const scaleRatio = std::max(scaleRatioX, scaleRatioY);
++
++            if (scaleRatio > 0.0f && !std::isinf(scaleRatio))
++            {
++                if (config->FsrVelocity.value_for_config() == std::nullopt)
++                    config->FsrVelocity.set_volatile_value(0.5f);
++
++                if (config->FsrReactiveScale.value_for_config() == std::nullopt)
++                    config->FsrReactiveScale.set_volatile_value(0.25f);
++
++                if (config->FsrShadingScale.value_for_config() == std::nullopt)
++                    config->FsrShadingScale.set_volatile_value(0.5f / scaleRatio);
++
++                if (config->FsrAccAddPerFrame.value_for_config() == std::nullopt)
++                    config->FsrAccAddPerFrame.set_volatile_value(scaleRatio / 10.0f);
++
++                if (config->FsrMinDisOccAcc.value_for_config() == std::nullopt)
++                    config->FsrMinDisOccAcc.set_volatile_value(scaleRatio / 20.0f);
++            }
++        }
++
+         ffxCreateBackendVKDesc backendDesc = { 0 };
+         backendDesc.header.type = FFX_API_CREATE_CONTEXT_DESC_TYPE_BACKEND_VK;
+         backendDesc.vkDevice = Device;
+diff --git a/OptiScaler/upscalers/fsr31/FSR31Feature_VkOn12.cpp b/OptiScaler/upscalers/fsr31/FSR31Feature_VkOn12.cpp
+index 527f4abb..b536f2d9 100644
+--- a/OptiScaler/upscalers/fsr31/FSR31Feature_VkOn12.cpp
++++ b/OptiScaler/upscalers/fsr31/FSR31Feature_VkOn12.cpp
+@@ -676,6 +676,32 @@ bool FSR31FeatureVkOn12::InitFSR3(const NVSDK_NGX_Parameter* InParameters)
+             _contextDesc.maxUpscaleSize.height = TargetHeight();
+         }
+ 
++        // Set stability values as default if not set by user
++        {
++            auto config = Config::Instance();
++            auto const scaleRatioX = (float) TargetWidth() / (float) RenderWidth();
++            auto const scaleRatioY = (float) TargetHeight() / (float) RenderHeight();
++            auto const scaleRatio = std::max(scaleRatioX, scaleRatioY);
++
++            if (scaleRatio > 0.0f && !std::isinf(scaleRatio))
++            {
++                if (config->FsrVelocity.value_for_config() == std::nullopt)
++                    config->FsrVelocity.set_volatile_value(0.5f);
++
++                if (config->FsrReactiveScale.value_for_config() == std::nullopt)
++                    config->FsrReactiveScale.set_volatile_value(0.25f);
++
++                if (config->FsrShadingScale.value_for_config() == std::nullopt)
++                    config->FsrShadingScale.set_volatile_value(0.5f / scaleRatio);
++
++                if (config->FsrAccAddPerFrame.value_for_config() == std::nullopt)
++                    config->FsrAccAddPerFrame.set_volatile_value(scaleRatio / 10.0f);
++
++                if (config->FsrMinDisOccAcc.value_for_config() == std::nullopt)
++                    config->FsrMinDisOccAcc.set_volatile_value(scaleRatio / 20.0f);
++            }
++        }
++
+         ffxCreateBackendDX12Desc backendDesc = { 0 };
+         backendDesc.header.type = FFX_API_CREATE_CONTEXT_DESC_TYPE_BACKEND_DX12;
+         backendDesc.device = _dx11on12Device;
+diff --git a/README.md b/README.md
+index 9e94a912..f185e6dc 100644
+--- a/README.md
++++ b/README.md
+@@ -42,17 +42,18 @@
+ 
+ > [!CAUTION]
+ > * We've been informed about some **FAKE websites** presenting themselves as OptiScaler team, so we would like to strongly highlight that we **DO NOT HAVE an official website!**  
++> * We **DON'T have an official manager app**, so please be careful when downloading or using them! And please don't bother us to provide support for something which isn't even ours!
+ > * Only **LEGIT places** are this Github, our Discord server and Nitec's NexusMods page.  
+-> * OptiScaler is **FREE**, any kind of monetary requirements are scams as we don't even have a donation link at the moment!  
++> * OptiScaler is **FREE**, any kind of monetary requirements are scams!  
+ 
+ > [!TIP]
+ > _For example, if a game has DLSS only, OptiScaler can be used to replace DLSS with XeSS or FSR 3.1 (also works for FSR2-only games, like The Outer Worlds Spacer's Choice, albeit requires manually providing nvngx_dlss.dll)._
+ 
+ **Key aspects of OptiScaler:**
+-- Enables usage of XeSS, FSR2, FSR3, **FSR4**$`^2`$ (_officially, RDNA4 only_) and DLSS in (temporal) upscaler-enabled games
++- Enables usage of XeSS, FSR2, FSR3, **FSR4**$`^2`$ (_officially, RDNA4 and RDNA3 dGPUs only_) and DLSS in (temporal) upscaler-enabled games
+ - Allows users to fine-tune their upscaling experience with a wide range of tweaks and enhancements (RCAS & MAS, Output Scaling, DLSS Presets, Ratio & DRS Overrides etc.)
+ - Since v0.7.0+, added ***experimental DX12*** frame generation support with possible HUDfix solution ([**OptiFG**](#optifg--hudfix-experimental-hud-ghosting-fix))
+-- Supports [**Fakenvapi**](#installation) integration - enables Reflex hooking and injecting _Anti-Lag 2_ (RDNA1+ only), _LatencyFlex_ (LFX) or _XeLL_ (Intel only) - _bundled since 0.9_  
++- Supports [**Fakenvapi**](#installation) integration - enables Reflex hooking and injecting _Anti-Lag 2_ (RDNA1+ only), _LatencyFlex_ (LFX) or _XeLL_ - _bundled since 0.9_  
+ - Since v0.7.7, added support for **Nukem's** FSR3-FG mod [**dlssg-to-fsr3**](#installation), only supports games with ***native DLSS-FG*** - _bundled since 0.9_
+ - Since v0.7.8, added **ASI plugin loading** support (_disabled_ by default (`LoadAsiPlugins=` in INI), loads from customisable folder, default `plugins`)
+ - New project - [**OptiPatcher**](https://github.com/optiscaler/OptiPatcher) - an ASI Plugin for OptiScaler for enabling DLSS and DLSSG inputs without spoofing in ***supported games***.
+@@ -90,7 +91,7 @@
+ ## How it works?
+ * OptiScaler acts as a middleware, it intercepts upscaler calls from the game (_**Inputs**_) and redirects them to the chosen upscaling backend (_**Output**_), allowing user to replace one technology with another one. **Inputs -> OptiScaler -> Outputs**  
+ * _Or put more bluntly, **Input** is the upscaler used in game settings, and **Output** the one selected in Opti Overlay._
+-* _Same goes for FG options which are separated into **FG Source** and **FG Output**._
++* _Same goes for FG options which are separated into **FG Input** and **FG Output**._
+ 
+ > [!NOTE]
+ > * Pressing **`Insert`** should open the Optiscaler **Overlay** in-game with all of the options (_`ShortcutKey=` can be changed in the INI file, or under **Keybinds** in the overlay_). 
+@@ -107,7 +108,7 @@ Currently **OptiScaler** can be used with DirectX 11, DirectX 12 and Vulkan, but
+ - XeSS (Default)
+ - FSR 2.1.2, 2.2.1
+ - FSR 3.X (and FSR 2.3.X)
+-- FSR 4.X (via FSR3.X update, _officially RDNA4 only_)
++- FSR 4.X (via FSR 3.X/4, _officially RDNA4 and RDNA3 dGPUs only_)
+ - DLSS
+ 
+ #### For DirectX 11
+@@ -116,7 +117,7 @@ Currently **OptiScaler** can be used with DirectX 11, DirectX 12 and Vulkan, but
+ - DLSS (native DX11)
+ - XeSS 2.X (native DX11, _Intel ARC only_)
+ - XeSS, FSR 2.1.2, 2.2.1, FSR 3.X w/Dx12 (_via D3D11on12_)$`^1`$
+-- FSR 4.X (via FSR 3.X w/Dx12 update, _officially RDNA4 only_)
++- FSR 4.X (via FSR 3.X/4 w/Dx12 interop, _officially RDNA4 and RDNA3 dGPUs only_)
+ 
+ > [!NOTE]
+ > <details>
+@@ -126,7 +127,7 @@ Currently **OptiScaler** can be used with DirectX 11, DirectX 12 and Vulkan, but
+ > </details>
+ 
+ #### For Vulkan
+-- FSR 4.X (via FSR 3.X w/Dx12 update, _officially RDNA4 only_)
++- FSR 4.X (via FSR 3.X/4 w/Dx12 interop, _officially RDNA4 and RDNA3 dGPUs only_)
+ - FSR2 2.1.2 (Default), 2.2.1
+ - FSR3 3.1 (and FSR2 2.3.2)
+ - DLSS
+diff --git a/external/FidelityFX-SDK-v2 b/external/FidelityFX-SDK-v2
+index e236f230..60f4ea81 160000
+--- a/external/FidelityFX-SDK-v2
++++ b/external/FidelityFX-SDK-v2
+@@ -1 +1 @@
+-Subproject commit e236f2304dcda35f282fdddd085f41e2ff48c86a
++Subproject commit 60f4ea81909200d8542eca14dccb2628b763a9a3
+diff --git a/setup_windows.bat b/setup_windows.bat
+index 0db75ca2..4dfb711a 100644
+--- a/setup_windows.bat
++++ b/setup_windows.bat
+@@ -10,28 +10,40 @@ echo #+#    #+# #+#            #+#         #+#     #+#    #+# #+#    #+# #+#
+ echo  ########  ###            ###     ###########  ########   ########  ###     ### ########## ########## ###    ### 
+ echo.
+ echo Coping is strong with this one...
+-echo v2.75 - now with OptiPatcher support
++echo v2.8 - now with OptiPatcher support
+ echo.
+ 
+ del "!! README_EXTRACT ALL FILES TO GAME FOLDER !!.txt" 2>nul
+ 
+ setlocal enabledelayedexpansion
+ 
++if exist OptiScaler.sln (
++    echo Detected OptiScaler.sln or .git files^^!
++    echo.
++    echo If .sln or .git files are in the folder, congratz, you have the source code.
++	echo Now please try properly downloading OptiScaler.
++	echo.
++    echo Hint - use the Releases page on GitHub, or RTFM :^)
++	echo.
++    echo.
++	echo P.S. If you somehow have both the OptiScaler.dll and .sln file, then be nice, just delete the .sln file, re-run the BAT setup and hope for the best.
++	echo.
++    goto end
++)
++
+ if not exist OptiScaler.dll (
+     echo OptiScaler "OptiScaler.dll" file is not found^^!
+-    echo Either a folder permissions issue or the repo source code was downloaded.
++    echo Detected a folder permissions issue most likely. Might have more luck running the BAT as admin.
+     echo.
++	echo OR
++	echo.
+     echo If "OptiScaler.dll" exists, please manually rename to a supported filename ^(e.g. dxgi/winmm.dll^) and you are done^^!
+ 	echo No need to run the setup BAT again after renaming.
+ 	echo.
+-    echo If .sln or .git files are in the folder, congratz, you have the source code. Now try properly downloading Opti please
+-    echo Hint - use the Releases page on GitHub, or RTFM :^)
+-    echo.
+     echo.
+     goto end
+ )
+ 
+-
+ REM Check if old pre-0.9 additional files exist, along with an existing Opti installation
+ set "OLD_FILES_FOUND=0"
+ set "OPTI_DLL_LIST="
+@@ -39,6 +51,7 @@ if exist nvapi64.dll set "OLD_FILES_FOUND=1"
+ if exist nvngx.dll set "OLD_FILES_FOUND=1"
+ if exist OptiScaler.asi set "OLD_FILES_FOUND=1"
+ if exist "Remove OptiScaler.bat" set "OLD_FILES_FOUND=1"
++if exist "Remove_OptiScaler.bat" set "OLD_FILES_FOUND=1"
+ 
+ for %%F in (dxgi.dll winmm.dll d3d12.dll dbghelp.dll version.dll wininet.dll winhttp.dll) do (
+     if exist "%%F" (
+@@ -58,15 +71,21 @@ if "!OLD_FILES_FOUND!"=="1" (
+     if exist nvapi64.dll echo   - nvapi64.dll
+     if exist nvngx.dll echo   - nvngx.dll
+     if exist OptiScaler.asi echo   - OptiScaler.asi
+-    if exist "Remove OptiScaler.bat" echo   - Remove OptiScaler.bat
++	if exist "Remove OptiScaler.bat" echo   - Remove OptiScaler.bat
++    if exist "Remove_OptiScaler.bat" echo   - Remove_OptiScaler.bat
+     for %%F in (!OPTI_DLL_LIST!) do echo   - %%F ^(original filename: OptiScaler.dll^)
+     echo.
+     echo These files may conflict with the current version of OptiScaler.
+     echo It is recommended to delete them.
+     echo.
+-    set /p "USER_CHOICE=Do you want to delete these files? (y/n): "
++    echo Do you want to delete these files?
++    echo.
++	echo [1] Yes
++    echo [2] No
+     echo.
+-    if /i "!USER_CHOICE!"=="y" (
++	set /p "USER_CHOICE=Waiting - "
++	echo.
++    if /i "!USER_CHOICE!"=="1" (
+         if exist nvapi64.dll (
+             del nvapi64.dll
+             echo Deleted nvapi64.dll
+@@ -79,10 +98,14 @@ if "!OLD_FILES_FOUND!"=="1" (
+             del OptiScaler.asi
+             echo Deleted OptiScaler.asi
+         )
+-        if exist "Remove OptiScaler.bat" (
++		if exist "Remove OptiScaler.bat" (
+             del "Remove OptiScaler.bat"
+             echo Deleted Remove OptiScaler.bat
+         )
++        if exist "Remove_OptiScaler.bat" (
++            del "Remove_OptiScaler.bat"
++            echo Deleted Remove_OptiScaler.bat
++        )
+         for %%F in (!OPTI_DLL_LIST!) do (
+             del "%%F"
+             echo Deleted %%F
+@@ -95,19 +118,26 @@ if "!OLD_FILES_FOUND!"=="1" (
+ )
+ 
+ REM Set paths based on current directory
+-set "gamePath=%~dp0"
+-set "optiScalerFile=%gamePath%\OptiScaler.dll"
++
++set "optiScalerFile=.\OptiScaler.dll"
+ set setupSuccess=false
+ 
+ REM Check if the Engine folder exists
+-if exist "%gamePath%\Engine" (
+-    echo Found Engine folder, if this is an Unreal Engine game then please extract Optiscaler to #CODENAME#\Binaries\Win64
++if exist ".\Engine" (
++    echo Found Engine folder. If this is an Unreal Engine game, then please extract Optiscaler to #CODENAME#\Binaries\Win64
++	echo Do not extract to the Engine folder^^!
++	echo.
++	echo Example - \Jedi Survivor\SwGame\Binaries\Win64, \Witchfire\Witchfire\Binaries\Win64
+     echo.
+-    
+-    set /p continueChoice="Continue installation to current folder? [y/n]: "
++    echo Continue installation to current folder?
++	echo. 
++    echo [1] Yes
++    echo [2] No
++    echo.
++	set /p continueChoice="Waiting - "
+     set continueChoice=!continueChoice: =!
+ 
+-    if "!continueChoice!"=="y" (
++    if "!continueChoice!"=="1" (
+         goto selectFilename
+     )
+ 
+@@ -159,11 +189,16 @@ if exist %selectedFilename% (
+     echo.
+     echo WARNING: %selectedFilename% already exists in the current folder.
+     echo.
+-    set /p overwriteChoice="Do you want to overwrite %selectedFilename%? [y/n]: "
++	echo Do you want to overwrite %selectedFilename%?
++	echo.
++    echo [1] Yes
++    echo [2] No
++    echo.
++	set /p overwriteChoice="Waiting - "
+     set overwriteChoice=!overwriteChoice: =!
+     
+     echo.
+-    if "!overwriteChoice!"=="y" (
++    if "!overwriteChoice!"=="1" (
+         goto checkWine
+     )
+ 
+@@ -172,7 +207,7 @@ if exist %selectedFilename% (
+ 
+ REM Wine doesn't support powershell
+ :checkWine
+-reg query HKEY_CURRENT_USER\Software\Wine >nul 2>&1
++reg query HKEY_CURRENT_USER\Software\Wine\DllOverrides >nul 2>&1
+ if %errorlevel%==0 (
+     echo.
+     echo Using wine, skipping over spoofing checks.
+@@ -193,6 +228,7 @@ if exist %windir%\system32\nvapi64.dll (
+ REM Query user for GPU type
+ echo.
+ echo Are you using an Nvidia GPU or AMD/Intel GPU?
++echo.
+ echo [1] AMD/Intel
+ echo [2] Nvidia
+ echo.
+@@ -254,9 +290,14 @@ if defined foundOptiPatcher (
+     echo.
+     echo OptiPatcher found: !foundOptiPatcher!
+     echo If the existing version works properly, might be best to keep it.
+-    set /p optiRedownload="Do you want to re-download a possibly newer version [y/n]? "
++	echo Do you want to re-download a possibly newer version?
++	echo.
++    echo [1] Yes
++    echo [2] No
++    echo.
++	set /p optiRedownload="Waiting - "
+         
+-    if /i "!optiRedownload!"=="y" (
++    if /i "!optiRedownload!"=="1" (
+         echo.
+         echo Deleting !foundOptiPatcher!...
+         del "!foundOptiPatcher!"
+@@ -294,10 +335,15 @@ if "!OPTI_MATCH!"=="YES" (
+     echo An Opti plugin used for unlocking DLSS/DLSS-FG inputs, avoiding spoofing and performance overhead in supported games.
+     echo More info available on OptiPatcher Github
+     echo.
+-    set /p downloadOptiPatcher="Download OptiPatcher.asi? [y/n]: "
++	echo Download OptiPatcher.asi?
++    echo.
++	echo [1] Yes
++    echo [2] No
++    echo.
++	set /p downloadOptiPatcher="Waiting - "
+     set downloadOptiPatcher=!downloadOptiPatcher: =!
+     
+-    if "!downloadOptiPatcher!"=="y" (
++    if "!downloadOptiPatcher!"=="1" (
+         echo.
+         echo Preparing plugins folder...
+         if not exist "plugins" mkdir "plugins"
+@@ -330,7 +376,7 @@ goto completeSetup
+ :completeSetup
+ REM Rename OptiScaler file
+ echo.
+-if "!overwriteChoice!"=="y" (
++if "!overwriteChoice!"=="1" (
+     echo Removing previous %selectedFilename%...
+     del /F %selectedFilename% 
+ )
+@@ -365,7 +411,7 @@ pause
+ 
+ if "%setupSuccess%"=="true" (
+     del "setup_linux.sh"
+-    del %0
++    del "%~nx0"
+ )
+ 
+ exit /b
+@@ -386,7 +432,7 @@ echo echo #+#    #+# #+#            #+#         #+#     #+#    #+# #+#    #+# #+
+ echo echo  ########  ###            ###     ###########  ########   ########  ###     ### ########## ########## ###    ### 
+ echo echo.
+ echo echo Coping is strong with this one...
+-echo echo v2.75 - now with OptiPatcher support
++echo echo v2.8 - now with OptiPatcher support
+ echo echo.
+ echo REM Check if OptiScaler installation exists
+ echo set "OLD_FILES_FOUND=0"
+@@ -413,10 +459,15 @@ echo     for %%%%F in ^(!OPTI_DLL_LIST!^) do echo   - %%%%F - original filename:
+ echo     echo.
+ echo ^)
+ 
+-echo set /p removeChoice="Do you want to remove OptiScaler? [y/n]: "
++echo echo Do you want to remove OptiScaler?
++echo echo.
++echo echo [1] Yes
++echo echo [2] No
++echo echo.
++echo set /p removeChoice="Waiting - "
+ echo echo.
+ 
+-echo if "%%removeChoice%%"=="y" ^(
++echo if "%%removeChoice%%"=="1" ^(
+ echo     del OptiScaler.log
+ echo     del OptiScaler.ini
+ echo     del OptiScaler.asi
+@@ -447,10 +498,10 @@ echo ^)
+ 
+ echo.
+ echo pause
+-echo if "%%removeChoice%%"=="y" ^(
+-echo     del %%0
++echo if "%%removeChoice%%"=="1" ^(
++echo     del "%%~nx0"
+ echo ^)
+-) > "Remove OptiScaler.bat"
++) > "Remove_OptiScaler.bat"
+ 
+ endlocal
+ echo.

@@ -1,0 +1,13 @@
+commit 5653b7e09ffdbffc5cf382833d3563e57c12d893
+Author: FakeMichau <49685661+FakeMichau@users.noreply.github.com>
+Date:   Fri Jun 26 02:10:41 2026 +0200
+
+    Update FFX SDK
+
+diff --git a/external/FidelityFX-SDK-v2 b/external/FidelityFX-SDK-v2
+index e236f230..60f4ea81 160000
+--- a/external/FidelityFX-SDK-v2
++++ b/external/FidelityFX-SDK-v2
+@@ -1 +1 @@
+-Subproject commit e236f2304dcda35f282fdddd085f41e2ff48c86a
++Subproject commit 60f4ea81909200d8542eca14dccb2628b763a9a3
