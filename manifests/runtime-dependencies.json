@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "status": "integration-baseline",
+  "generated_for_branch": "integration/optiscaler-20260818",
+  "runtime": {
+    "name": "OptiScaler",
+    "source_repository": "https://github.com/optiscaler/OptiScaler.git",
+    "current_framebridge_import": "62a45d44c2d74de07cd3bf90b6e23a74a27c2a5d",
+    "target_upstream_commit": "dcbabe62a939336299794e97c8dcab29f8ccd778",
+    "import_strategy": "vendor-snapshot",
+    "vendor_path": "OptiScaler"
+  },
+  "build_submodules": [
+    {
+      "path": "external/FidelityFX-SDK",
+      "source_repository": "https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK",
+      "commit": "c6efa6bf7f2027b3ec94f28578bb5965eabb9e55"
+    },
+    {
+      "path": "external/FidelityFX-SDK-v2",
+      "source_repository": "https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK.git",
+      "commit": "60f4ea81909200d8542eca14dccb2628b763a9a3"
+    },
+    {
+      "path": "external/magic_enum",
+      "source_repository": "https://github.com/Neargye/magic_enum",
+      "commit": "a733a2ea665ca5d72b7270f0334bf2e7b82bd0cc"
+    },
+    {
+      "path": "external/nvapi",
+      "source_repository": "https://github.com/NVIDIA/nvapi.git",
+      "commit": "9b181ea572f680327fe01a14a0f1f41c78034104"
+    },
+    {
+      "path": "external/simpleini",
+      "source_repository": "https://github.com/brofield/simpleini",
+      "commit": "6048871ea9ee0ec24be5bd099d161a10567d7dc2"
+    },
+    {
+      "path": "external/spdlog",
+      "source_repository": "https://github.com/gabime/spdlog.git",
+      "commit": "faa0a7a9c5a3550ed5461fab7d8e31c37fd1a2ef"
+    },
+    {
+      "path": "external/unordered_dense",
+      "source_repository": "https://github.com/martinus/unordered_dense.git",
+      "commit": "73f3cbb237e84d483afafc743f1f14ec53e12314"
+    },
+    {
+      "path": "external/vulkan",
+      "source_repository": "https://github.com/KhronosGroup/Vulkan-Headers.git",
+      "commit": "d64e9e156ac818c19b722ca142230b68e3daafe3"
+    },
+    {
+      "path": "external/xess",
+      "source_repository": "https://github.com/intel/xess.git",
+      "commit": "8fe81bdbbaf00b3c1b733fd0d830c333dc84e6f0"
+    }
+  ],
+  "release_inputs": [
+    {
+      "id": "amd-fsr4-upscaler",
+      "distribution_path": "installer/assets/fsr4/amd_fidelityfx_upscaler_dx12.dll",
+      "version": "4.0.2.0",
+      "sha256": "9123F83739E7BB39FCB135CAFC339606DEC78A74C650338AD275EE45C2D59D02",
+      "signature_status": "not-signed",
+      "source_status": "source URL must be recorded before the next release"
+    },
+    {
+      "id": "nukem-dlssg-to-fsr3",
+      "source_repository": "https://github.com/Nukem9/dlssg-to-fsr3",
+      "current_ci_download": "https://github.com/optiscaler/dlssg-to-fsr3/releases/download/0.130/dlssg-to-fsr3-master.zip",
+      "version": "0.130",
+      "sha256": "AC64CAC2F13F598B279F9C9D3B4BAB81DBD4BFA1EBA9DE268736E0202D7D655D",
+      "source_commit": "0e253f63c3c66ee7582406bfa3dec698df7ab2c1",
+      "source_assets": [
+        {
+          "path": "resources/dlssg_to_fsr3.ini",
+          "sha256": "14F77347ACEAA13771B013CF65BF358A359FD2E8981148D94C3E1B13D56BAD9D"
+        },
+        {
+          "path": "resources/read_me_generic_dll.txt",
+          "sha256": "435AFB0E5F043656BF6953AE9B766A462D0E0E379E62F9DBBC6C958FC080B199"
+        }
+      ],
+      "verification_status": "verified 2026-08-18; CI must reject hash mismatches"
+    }
+  ],
+  "release_policy": {
+    "allow_untracked_archives": false,
+    "require_pinned_source_or_asset_hash": true,
+    "require_signature_verification_when_available": true,
+    "record_final_artifact_hashes": true
+  }
+}

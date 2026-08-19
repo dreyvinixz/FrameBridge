@@ -1,19 +1,16 @@
-name: Build Benchmark DLLs
+name: Build FFX Runtime Validation DLL
 
 on:
   push:
-    branches: [ "feature/*" ]
+    branches: [ "feature/*", "integration/**" ]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  build-benchmarks:
+  build-runtime-validation:
     runs-on: windows-latest
-    strategy:
-      matrix:
-        build_type: [Legacy, Snapshot, Final]
 
     steps:
     - name: Checkout Code
@@ -21,29 +18,20 @@ jobs:
       with:
         submodules: 'true'
 
-    - name: Inject Benchmark Macros
+    - name: Verify FFX snapshot integration
       shell: pwsh
-      run: |
-        if ("${{ matrix.build_type }}" -eq "Legacy") {
-            (Get-Content OptiScaler/upscalers/fsr31/FSR31Feature_Dx12.cpp) -replace '^#include <pch\.h>', "#include <pch.h>`r`n#define FRAMEBRIDGE_RUNTIME_CONFIG_BENCHMARK`r`n#define FRAMEBRIDGE_BENCHMARK_PATH `"Legacy`"" | Set-Content OptiScaler/upscalers/fsr31/FSR31Feature_Dx12.cpp
-        }
-        elseif ("${{ matrix.build_type }}" -eq "Snapshot") {
-            (Get-Content OptiScaler/upscalers/fsr31/FSR31Feature_Dx12.cpp) -replace '^#include <pch\.h>', "#include <pch.h>`r`n#define FRAMEBRIDGE_BENCHMARK_PATH `"Snapshot`"" | Set-Content OptiScaler/upscalers/fsr31/FSR31Feature_Dx12.cpp
-        }
-        
-        # Timer macro injection
-        (Get-Content OptiScaler/upscalers/fsr31/FSR31Feature_Dx12.cpp) -replace '^#include <pch\.h>', "#include <pch.h>`r`n#define FRAMEBRIDGE_ENABLE_EVALUATE_TIMER" | Set-Content OptiScaler/upscalers/fsr31/FSR31Feature_Dx12.cpp
+      run: .\scripts\Verify-Integration.ps1
 
     - name: Add MSBuild to PATH
-      uses: microsoft/setup-msbuild@v2
+      uses: microsoft/setup-msbuild@v3
 
     - name: Build with MSBuild
-      run: msbuild /m /p:Configuration=Release . /verbosity:minimal
+      run: msbuild /m /p:Configuration=Release /p:Platform=x64 OptiScaler.sln /verbosity:minimal
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with: 
-        name: OptiScaler_${{ matrix.build_type }}_DLL
+        name: FrameBridge_FFX_Runtime_DLL
         path: x64\Release\a\OptiScaler.dll
         compression-level: 9
         if-no-files-found: error
