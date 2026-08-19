@@ -112,7 +112,8 @@ Referência operacional: [`UPSTREAM_INTEGRATION.md`](UPSTREAM_INTEGRATION.md).
 - `[x]` Verificar os assets FSR4 e DLSSG com os hashes do manifesto antes de montar o instalador
 - `[x]` Centralizar os gates estáticos de integração em `scripts/Verify-Integration.ps1`
 - `[x]` Não utilizar RARs de terceiros como insumo de release
-- `[ ]` Substituir e testar o asset FSR4 local contra o binário AMD oficial assinado antes de qualquer release
+- `[x]` Substituir o asset FSR4 local pelo binário AMD oficial assinado e fixar hash/assinatura no manifesto
+- `[ ]` Validar o novo asset FSR4 no build de release, benchmark e jogos-alvo antes de declarar a integração concluída
 
 ### 6D - Validação de Integração
 - `[ ]` Compilar Release x64

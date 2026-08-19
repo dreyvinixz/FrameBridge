@@ -69,6 +69,10 @@ $fsr4Path = Join-Path $RepositoryRoot "installer\assets\fsr4\amd_fidelityfx_upsc
 Assert-Condition -Condition (Test-Path $fsr4Path) -Message "Pinned FSR4 release asset is missing."
 $fsr4Hash = (Get-FileHash $fsr4Path -Algorithm SHA256).Hash
 Assert-Condition -Condition ($fsr4Hash -eq $fsr4.sha256) -Message "FSR4 release asset hash differs from the manifest."
+Assert-Condition -Condition ($fsr4Hash -eq $fsr4.official_sha256) -Message "FSR4 release asset does not match the pinned official AMD binary."
+$fsr4Signature = Get-AuthenticodeSignature $fsr4Path
+Assert-Condition -Condition ($fsr4Signature.Status -eq "Valid") -Message "FSR4 release asset must have a valid Authenticode signature."
+Assert-Condition -Condition ($fsr4Signature.SignerCertificate.Subject -eq $fsr4.signer_subject) -Message "FSR4 release asset signer differs from the manifest."
 
 $project = Get-Content $projectPath -Raw
 foreach ($entry in @(
