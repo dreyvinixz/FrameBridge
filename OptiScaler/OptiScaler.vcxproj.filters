@@ -413,6 +413,15 @@
     <ClInclude Include="resource_tracking\ResTrack_dx12.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="runtime\RuntimeCapabilities.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="runtime\RuntimeCapabilityTypes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="runtime\RuntimeConfiguration.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="shaders\depth_transfer\DT_Common.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -1176,6 +1185,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="resource_tracking\ResTrack_dx12.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="runtime\RuntimeCapabilities.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="runtime\RuntimeConfiguration.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="shaders\depth_transfer\DT_Dx11.cpp">

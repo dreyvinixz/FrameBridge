@@ -478,6 +478,9 @@ copy NUL "$(SolutionDir)x64\Release\a\!! EXTRACT ALL FILES TO GAME FOLDER !!" /Y
     <ClInclude Include="proxies\XeLL_Proxy.h" />
     <ClInclude Include="proxies\Ntdll_Proxy.h" />
     <ClInclude Include="resource_tracking\ResTrack_dx12.h" />
+    <ClInclude Include="runtime\RuntimeCapabilities.h" />
+    <ClInclude Include="runtime\RuntimeCapabilityTypes.h" />
+    <ClInclude Include="runtime\RuntimeConfiguration.h" />
     <ClInclude Include="shaders\hudless_compare\HC_Common.h" />
     <ClInclude Include="shaders\hudless_compare\HC_Dx12.h" />
     <ClInclude Include="shaders\hudless_compare\precompile\hudless_compare_PShader.h" />
@@ -733,6 +736,8 @@ copy NUL "$(SolutionDir)x64\Release\a\!! EXTRACT ALL FILES TO GAME FOLDER !!" /Y
     <ClCompile Include="nvapi\NvApiTypes.cpp" />
     <ClCompile Include="hooks\Reflex_Hooks.cpp" />
     <ClCompile Include="resource_tracking\ResTrack_dx12.cpp" />
+    <ClCompile Include="runtime\RuntimeCapabilities.cpp" />
+    <ClCompile Include="runtime\RuntimeConfiguration.cpp" />
     <ClCompile Include="shaders\hudless_compare\HC_Dx12.cpp" />
     <ClCompile Include="shaders\resource_flip\RF_Dx12.cpp" />
     <ClCompile Include="shaders\depth_scale\DS_Dx12.cpp" />

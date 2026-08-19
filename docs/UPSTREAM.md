@@ -1,5 +1,8 @@
 # Upstream Synchronization
 
+The active integration baseline and its validation gates are tracked in
+[`UPSTREAM_INTEGRATION.md`](UPSTREAM_INTEGRATION.md).
+
 O **FrameBridge** utiliza o OptiScaler oficial como seu motor de Runtime principal. 
 Nossa filosofia é manter o componente `OptiScaler/` o mais fiel possível ao repositório upstream oficial, permitindo auditorias transparentes e atualizações fáceis.
 

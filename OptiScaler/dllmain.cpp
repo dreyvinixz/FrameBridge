@@ -582,8 +582,13 @@ static void CheckWorkingMode()
             break;
         }
 
-        // optiscaler.dll
-        if (lCaseFilename == "optiscaler.dll")
+        // FrameBridge compatibility layer: preserve legacy installer DLL names.
+        // Keep synchronized with docs/PATCHES.md.
+        const bool isOptiScalerModule = lCaseFilename == "optiscaler.dll" ||
+                                        lCaseFilename == "dlss-enabler-upscaler.dll" ||
+                                        lCaseFilename == "nvngx-upscaler.dll";
+
+        if (isOptiScalerModule)
         {
             if (!_passThruMode)
                 LOG_INFO("OptiScaler working as OptiScaler.dll");
