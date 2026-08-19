@@ -28,11 +28,15 @@ function Assert-ProjectEntry {
 $RepositoryRoot = (Resolve-Path $RepositoryRoot).Path
 $manifestPath = Join-Path $RepositoryRoot "manifests\runtime-dependencies.json"
 $projectPath = Join-Path $RepositoryRoot "OptiScaler\OptiScaler.vcxproj"
+$configHeaderPath = Join-Path $RepositoryRoot "OptiScaler\Config.h"
+$configSourcePath = Join-Path $RepositoryRoot "OptiScaler\Config.cpp"
 $ffxPath = Join-Path $RepositoryRoot "OptiScaler\upscalers\ffx\FFXFeature_Dx12.cpp"
 $removedFsr31Path = Join-Path $RepositoryRoot "OptiScaler\upscalers\fsr31\FSR31Feature_Dx12.cpp"
 
 Assert-Condition -Condition (Test-Path $manifestPath) -Message "Missing runtime dependency manifest."
 Assert-Condition -Condition (Test-Path $projectPath) -Message "Missing OptiScaler project."
+Assert-Condition -Condition (Test-Path $configHeaderPath) -Message "Missing configuration header."
+Assert-Condition -Condition (Test-Path $configSourcePath) -Message "Missing configuration source."
 Assert-Condition -Condition (Test-Path $ffxPath) -Message "Missing active FFX DX12 backend."
 Assert-Condition -Condition (-not (Test-Path $removedFsr31Path)) -Message "Removed FSR 3.1 DX12 backend is present."
 
@@ -70,6 +74,16 @@ foreach ($entry in @(
 )) {
     Assert-ProjectEntry -ProjectContents $project -Entry $entry
 }
+
+$configHeader = Get-Content $configHeaderPath -Raw
+$configSource = Get-Content $configSourcePath -Raw
+Assert-Condition -Condition ($configHeader.Contains("void NotifyRuntimeConfigurationChanged();")) -Message "Configuration changes do not publish runtime snapshot events."
+Assert-Condition -Condition ($configSource.Contains("NotifyRuntimeConfigurationChanged();")) -Message "INI loading does not publish a final runtime snapshot event."
+$volatileMutationStart = $configHeader.IndexOf("constexpr void set_volatile_value")
+$normalMutationStart = $configHeader.IndexOf("constexpr CustomOptional& operator=(const T& value)")
+Assert-Condition -Condition ($volatileMutationStart -ge 0 -and $normalMutationStart -gt $volatileMutationStart) -Message "Cannot isolate CustomOptional mutation paths."
+$volatileMutation = $configHeader.Substring($volatileMutationStart, $normalMutationStart - $volatileMutationStart)
+Assert-Condition -Condition (-not $volatileMutation.Contains("NotifyRuntimeConfigurationChanged")) -Message "Volatile configuration writes must not refresh the snapshot from a hot path."
 
 $ffxSource = Get-Content $ffxPath -Raw
 Assert-Condition -Condition ($ffxSource.Contains("RuntimeConfiguration::Instance().GetSnapshot()")) -Message "FFX snapshot is not connected."

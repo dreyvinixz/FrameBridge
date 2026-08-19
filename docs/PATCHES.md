@@ -40,6 +40,7 @@ Changes:
 - Capture the FFX hot-path configuration once after FFX initialization.
 - Replace direct configuration reads in `EvaluateInternal()` with the snapshot.
 - Mirror automatic volatile barrier/reactive-mask decisions into the snapshot.
+- Publish snapshots when normal UI/config values change, while excluding volatile hot-path writes.
 
 Status:
-Static coverage and project-registration checks pass. Release x64 build, benchmark, and game regression validation are pending.
+Static coverage, event-isolation, and project-registration checks pass. Release x64 build, benchmark, and game regression validation are pending.

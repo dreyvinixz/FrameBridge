@@ -72,12 +72,12 @@
 - `[x]` Commit: perf: cache FSR3.1 runtime configuration
 
 ## Etapa 5B - Event-Driven Runtime Updates
-- `[ ]` Define configuration change categories
-- `[ ]` Define hot parameter updates
+- `[x]` Define configuration change categories
+- `[x]` Define hot parameter updates
 - `[ ]` Define pipeline reconfiguration events
 - `[ ]` Define resource recreation events
-- `[ ]` Connect UI/config changes to runtime updates
-- `[ ]` Remove unnecessary per-frame configuration resolution
+- `[x]` Connect UI/config changes to runtime updates
+- `[x]` Remove unnecessary per-frame configuration resolution
 - `[ ]` Build
 - `[ ]` Benchmark
 - `[ ]` Validate

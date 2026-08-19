@@ -68,7 +68,7 @@ Local compilation is pending because the current development environment has no 
 
 The three automatic in-frame decisions that write volatile configuration values (color barrier, motion-vector barrier, and reactive-mask disablement) update both the upstream `Config` value and the local snapshot. This keeps the current frame and later frames consistent without re-reading configuration each frame.
 
-This is an initialization lifecycle only. Runtime edits from the UI or config file do not yet publish into the snapshot; that belongs to stage 5B's event-driven update design. Static validation confirms that the FFX evaluation path contains no direct configuration reads and that the snapshot covers each upstream hot-path field. A Release x64 build, benchmark, and game regression run remain mandatory.
+Normal `CustomOptional` assignments and resets now publish a refreshed snapshot immediately, while `set_volatile_value()` intentionally does not. This lets UI/config changes reach the runtime without re-reading `Config` in `EvaluateInternal()` or turning automatic hot-path decisions into refresh events. `Config::LoadFromPath()` publishes once after the INI reload completes. Pipeline reconfiguration and resource-recreation event categories remain separate stage 5B work. Static validation confirms that the FFX evaluation path contains no direct configuration reads and that the snapshot covers each upstream hot-path field. A Release x64 build, benchmark, and game regression run remain mandatory.
 
 ### Runtime capability model
 

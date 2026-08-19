@@ -12,6 +12,10 @@ enum HasDefaultValue
     SoftDefault // Change always gets saved to the config
 };
 
+// Implemented by FrameBridge's runtime configuration layer. Normal configuration
+// mutations publish a new hot-path snapshot without requiring Evaluate() to read Config.
+void NotifyRuntimeConfigurationChanged();
+
 template <class T, HasDefaultValue defaultState = WithDefault> class CustomOptional : public std::optional<T>
 {
   private:
@@ -60,6 +64,7 @@ template <class T, HasDefaultValue defaultState = WithDefault> class CustomOptio
     {
         _volatile = false;
         std::optional<T>::operator=(value);
+        NotifyRuntimeConfigurationChanged();
         return *this;
     }
 
@@ -67,6 +72,7 @@ template <class T, HasDefaultValue defaultState = WithDefault> class CustomOptio
     {
         _volatile = false;
         std::optional<T>::operator=(std::move(value));
+        NotifyRuntimeConfigurationChanged();
         return *this;
     }
 
@@ -74,6 +80,7 @@ template <class T, HasDefaultValue defaultState = WithDefault> class CustomOptio
     {
         _volatile = false;
         std::optional<T>::operator=(opt);
+        NotifyRuntimeConfigurationChanged();
         return *this;
     }
 
@@ -81,6 +88,7 @@ template <class T, HasDefaultValue defaultState = WithDefault> class CustomOptio
     {
         _volatile = false;
         std::optional<T>::operator=(std::move(opt));
+        NotifyRuntimeConfigurationChanged();
         return *this;
     }
 
@@ -90,7 +98,14 @@ template <class T, HasDefaultValue defaultState = WithDefault> class CustomOptio
     {
         _volatile = false;
         std::optional<T>::operator=(T(value));
+        NotifyRuntimeConfigurationChanged();
         return *this;
+    }
+
+    constexpr void reset()
+    {
+        std::optional<T>::reset();
+        NotifyRuntimeConfigurationChanged();
     }
 
     constexpr T value_or_default() const&

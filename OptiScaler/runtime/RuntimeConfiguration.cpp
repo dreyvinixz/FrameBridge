@@ -11,6 +11,8 @@ RuntimeConfiguration& RuntimeConfiguration::Instance()
 
 RuntimeConfigurationSnapshot RuntimeConfiguration::GetSnapshot() const { return _snapshot; }
 
+void NotifyRuntimeConfigurationChanged() { RuntimeConfiguration::Instance().RefreshFromConfig(); }
+
 void RuntimeConfiguration::RefreshFromConfig()
 {
     auto config = Config::Instance();

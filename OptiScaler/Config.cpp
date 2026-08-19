@@ -812,6 +812,7 @@ bool Config::LoadFromPath(const wchar_t* InPath)
     if (Reload(newPath))
     {
         absoluteFileName = newPath;
+        NotifyRuntimeConfigurationChanged();
         return true;
     }
 
