@@ -81,7 +81,7 @@
 - `[ ]` Build
 - `[ ]` Benchmark
 - `[ ]` Validate
-- `[ ]` Commit: `refactor: make runtime configuration event-driven`
+- `[x]` Commit: `c8ec1901 refactor: publish runtime snapshots on config changes`
 
 ## Etapa 6 - Upstream Integration & FrameBridge Separation
 
@@ -105,7 +105,7 @@ Referência operacional: [`UPSTREAM_INTEGRATION.md`](UPSTREAM_INTEGRATION.md).
 
 ### 6C - Separação de Produto e Distribuição
 - `[x]` Preservar instalador, CI, perfis, diagnósticos, launcher e documentação como domínios FrameBridge
-- `[ ]` Atualizar schema/configuração e o manifesto de empacotamento para o novo runtime
+- `[x]` Atualizar schema/configuração e o manifesto de empacotamento para o novo runtime
 - `[ ]` Garantir que releases sejam montados de fontes fixadas e dependências verificadas
 - `[x]` Atualizar os workflows Windows para `OptiScaler.sln` x64 e submódulos recursivos
 - `[x]` Validar no CI a conexão do snapshot FFX e a ausência do backend DX12 FSR 3.1 removido
@@ -121,7 +121,7 @@ Referência operacional: [`UPSTREAM_INTEGRATION.md`](UPSTREAM_INTEGRATION.md).
 - `[ ]` Validar APIs e backends suportados no escopo da release
 - `[ ]` Testar instalação e execução no FINAL FANTASY VII REBIRTH
 - `[ ]` Registrar hashes dos artefatos e o commit upstream final
-- `[ ]` Commit: `chore: integrate pinned OptiScaler upstream snapshot`
+- `[x]` Commit: `c9cb7cb1 chore: import pinned OptiScaler upstream snapshot`
 
 ### 6E - Execução Contínua da Integração
 - `[ ]` Conduzir iterativamente as pendências 6B–6D até a integração estar validada para merge

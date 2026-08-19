@@ -13,17 +13,18 @@ OptiScaler supports DirectX 11, DirectX 12 and Vulkan APIs with multiple upscale
 ```ini
 [Upscalers]
 ; Select upscaler for Dx11 games
-; fsr22 (native dx11), xess (with dx12), fsr21_12 (dx11 with dx12) or fsr22_12 (dx11 with dx12)
+; fsr22 (native DX11), fsr31 (native DX11), xess (native DX11, Arc only),
+; xess_12, fsr21_12, fsr22_12, ffx_12 (FSR 2.3 / 3.1 / 4.x) or dlss
 ; Default (auto) is fsr22
 Dx11Upscaler=auto
 
 ; Select upscaler for Dx12 games
-; xess, fsr21 or fsr22
-; Default (auto) is xess
+; xess, fsr21, fsr22, ffx (FSR 2.3 / 3.1 / 4.x) or dlss
+; Default (auto) selects DLSS when available, FSR4 on capable hardware, XeSS otherwise
 Dx12Upscaler=auto
 
 ; Select upscaler for Vulkan games
-; fsr21 or fsr22
+; fsr21, fsr22, ffx, xess, fsr21_12, ffx_12 or dlss
 ; Default (auto) is fsr21
 VulkanUpscaler=auto
 ```
@@ -171,9 +172,46 @@ VerticalFov=auto
 ; If vertical fov is not defined will be used to calculate vertical fov
 ; 0.0 to 180.0 - Default (auto) is off
 HorizontalFov=auto
+
+; Use camera values supplied by the game when available
+; true or false - Default (auto) is true
+UseFsrInputValues=auto
+
+; FFX upscaler provider: 0 = FSR 4.0.2, 1 = FSR 3.1.5, 2 = FSR 2.3.4
+; Default (auto) selects a compatible provider
+UpscalerIndex=auto
+
+; FFX frame-generation provider: 0 = FSR 4.0.0, 1 = FSR 3.1.6
+; Default (auto) selects a compatible provider
+FGIndex=auto
+
+; Diagnostic and temporal tuning controls
+DebugView=auto
+VelocityFactor=auto
+ReactiveScale=auto
+ShadingScale=auto
+AccAddPerFrame=auto
+MinDisOccAcc=auto
+UseReactiveMaskForTransparency=auto
+DlssReactiveMaskBias=auto
+
+; FSR4 controls: model (0 = auto, 1 = FP8, 2 = INT8), preset and colour-space hints
+Fsr4ForceModel=auto
+Fsr4Preset=auto
+Fsr4EnableWatermark=auto
+FsrNonLinearColorSpace=auto
+FsrNonLinearSRGB=auto
+FsrNonLinearPQ=auto
+
+; Allows use of the bundled D3D12 Agility SDK when a title needs it
+FsrAgilitySDKUpgrade=auto
 ```
 
-To improve the image quality you can try to match the vertical or horizontal FOV of your game with these settings. The default is 60° vertical FOV and most of the time it works fine.
+`Dx12Upscaler=ffx` selects the current FFX DX12 backend. The official signed FSR 4.0.2 upscaler DLL is included as a pinned release input; use `UpscalerIndex=auto` unless you are diagnosing a title-specific issue.
+
+To improve image quality, try to match the vertical or horizontal FOV of your game. The default is 60° vertical FOV and most of the time it works fine. The camera, reactive-mask, barrier, velocity and temporal-tuning values are runtime parameters: changes from the menu or a completed INI reload are published for the next evaluation. `UpscalerIndex`, `FGIndex`, colour-space hints and library/bootstrap options require context recreation or a restart; do not change them while diagnosing a live frame. Output scaling changes are handled through the normal resolution/resource-recreation path.
+
+FSR4 model and preset overrides are advanced compatibility controls. Leave them on `auto` for the first launch, and only change one value at a time while collecting logs. `FsrAgilitySDKUpgrade` may require the `D3D12_OptiScaler` directory next to the runtime, as supplied by the installer.
 
 It can be changed from the in-game menu with real-time results.
 
