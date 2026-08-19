@@ -93,6 +93,12 @@ All Windows build workflows now select `OptiScaler.sln` with `Configuration=Rele
 
 The shared [`scripts/Verify-Integration.ps1`](../scripts/Verify-Integration.ps1) gate is executed locally and by the CI/release workflows. It checks the pinned manifest, FSR4 asset hash, FFX snapshot wiring, target project registration, absence of the removed FSR 3.1 DX12 backend, and the policy that no RAR is tracked. The release workflow additionally verifies the downloaded DLSSG archive/source assets against their recorded SHA-256 hashes before assembly. This does not validate a release by itself: the final CI artifact hashes, Release x64 build, benchmark, and game test must still be recorded before merge.
 
+### FSR4 release-input audit
+
+The official AMD FidelityFX SDK 2.0.0 release contains FSR 4.0.2 and a signed `Kits/FidelityFX/signedbin/amd_fidelityfx_upscaler_dx12.dll`. Its verified binary is version `4.0.2.44888` with SHA-256 `241E6E5E4D848424EB8EC9A6B22C43FE34CF0CF52D30002CA435BA42E53A9CA0` and a valid Advanced Micro Devices signature.
+
+The local FrameBridge asset has a different SHA-256 (`9123F83739E7BB39FCB135CAFC339606DEC78A74C650338AD275EE45C2D59D02`) and is not signed. It is therefore recorded as **blocked** for release; the integration gate must reject it even though its local hash is pinned. Replacing it is a deliberate compatibility change, not an automatic import: first update the manifest to the official binary, then perform Release x64, benchmark, and FINAL FANTASY VII REBIRTH regression tests before changing its eligibility to `approved`.
+
 ## Non-authoritative artefacts
 
 Third-party RAR packages are useful for reconnaissance only. They are not an upstream source of record and must not be used as a release input. FrameBridge releases are assembled from the pinned upstream source and verified vendor dependencies.

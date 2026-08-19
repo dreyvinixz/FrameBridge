@@ -64,7 +64,14 @@
       "version": "4.0.2.0",
       "sha256": "9123F83739E7BB39FCB135CAFC339606DEC78A74C650338AD275EE45C2D59D02",
       "signature_status": "not-signed",
-      "source_status": "source URL must be recorded before the next release"
+      "official_source_release": "https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK/releases/tag/v2.0.0",
+      "official_archive": "https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK/releases/download/v2.0.0/FidelityFX-SDK-v2.0.0.zip",
+      "official_distribution_path": "Kits/FidelityFX/signedbin/amd_fidelityfx_upscaler_dx12.dll",
+      "official_version": "4.0.2.44888",
+      "official_sha256": "241E6E5E4D848424EB8EC9A6B22C43FE34CF0CF52D30002CA435BA42E53A9CA0",
+      "official_signature_status": "valid",
+      "source_status": "official source verified; local asset differs from the official signed binary",
+      "release_eligibility": "blocked: replace and test the local asset before release"
     },
     {
       "id": "nukem-dlssg-to-fsr3",

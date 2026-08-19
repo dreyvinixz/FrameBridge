@@ -53,6 +53,12 @@ foreach ($asset in $manifest.release_inputs) {
 Assert-Condition -Condition $releaseInputs.ContainsKey("amd-fsr4-upscaler") -Message "FSR4 release asset is missing from the manifest."
 Assert-Condition -Condition $releaseInputs.ContainsKey("nukem-dlssg-to-fsr3") -Message "DLSSG release asset is missing from the manifest."
 
+$fsr4 = $releaseInputs["amd-fsr4-upscaler"]
+Assert-Condition -Condition ($fsr4.official_source_release -eq "https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK/releases/tag/v2.0.0") -Message "FSR4 official release source must be pinned."
+Assert-Condition -Condition ($fsr4.official_sha256 -match "^[0-9A-F]{64}$") -Message "FSR4 official SHA-256 must be recorded."
+Assert-Condition -Condition ($fsr4.official_signature_status -eq "valid") -Message "FSR4 official signature verification must be recorded."
+Assert-Condition -Condition ($fsr4.release_eligibility -eq "approved") -Message "FSR4 release input is blocked: $($fsr4.release_eligibility)"
+
 $dlssg = $releaseInputs["nukem-dlssg-to-fsr3"]
 Assert-Condition -Condition ($dlssg.source_commit -match "^[0-9a-f]{40}$") -Message "DLSSG source commit must be pinned."
 foreach ($asset in $dlssg.source_assets) {
@@ -62,7 +68,7 @@ foreach ($asset in $dlssg.source_assets) {
 $fsr4Path = Join-Path $RepositoryRoot "installer\assets\fsr4\amd_fidelityfx_upscaler_dx12.dll"
 Assert-Condition -Condition (Test-Path $fsr4Path) -Message "Pinned FSR4 release asset is missing."
 $fsr4Hash = (Get-FileHash $fsr4Path -Algorithm SHA256).Hash
-Assert-Condition -Condition ($fsr4Hash -eq $releaseInputs["amd-fsr4-upscaler"].sha256) -Message "FSR4 release asset hash differs from the manifest."
+Assert-Condition -Condition ($fsr4Hash -eq $fsr4.sha256) -Message "FSR4 release asset hash differs from the manifest."
 
 $project = Get-Content $projectPath -Raw
 foreach ($entry in @(
