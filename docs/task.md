@@ -74,8 +74,8 @@
 ## Etapa 5B - Event-Driven Runtime Updates
 - `[x]` Define configuration change categories
 - `[x]` Define hot parameter updates
-- `[ ]` Define pipeline reconfiguration events
-- `[ ]` Define resource recreation events
+- `[x]` Define pipeline reconfiguration events
+- `[x]` Define resource recreation events
 - `[x]` Connect UI/config changes to runtime updates
 - `[x]` Remove unnecessary per-frame configuration resolution
 - `[ ]` Build

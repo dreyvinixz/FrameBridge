@@ -70,6 +70,19 @@ The three automatic in-frame decisions that write volatile configuration values 
 
 Normal `CustomOptional` assignments and resets now publish a refreshed snapshot immediately, while `set_volatile_value()` intentionally does not. This lets UI/config changes reach the runtime without re-reading `Config` in `EvaluateInternal()` or turning automatic hot-path decisions into refresh events. `Config::LoadFromPath()` publishes once after the INI reload completes. Pipeline reconfiguration and resource-recreation event categories remain separate stage 5B work. Static validation confirms that the FFX evaluation path contains no direct configuration reads and that the snapshot covers each upstream hot-path field. A Release x64 build, benchmark, and game regression run remain mandatory.
 
+### Deferred reconfiguration contract
+
+The snapshot publisher is deliberately limited to hot parameters. A configuration write must not destroy a graphics context, recreate resources, or alter an active command list from a menu/UI callback. FrameBridge classifies the remaining FFX changes as follows:
+
+| Category | Current fields | Required action | Safe boundary | Current status |
+| --- | --- | --- | --- | --- |
+| Hot parameter | barriers, reactive-mask controls, camera/velocity/scales, debug view | Publish a new runtime snapshot; the next evaluation consumes it. | Before the next `EvaluateInternal()` call. | Implemented for the FFX DX12 snapshot. |
+| Pipeline/context | `FfxUpscalerIndex`, `FfxFGIndex`, non-linear colour-space mode, FSR runtime/library selection | Coalesce writes into one pending backend change and recreate the affected FFX context using the selected version. | Existing `State::changeBackend` lifecycle, after the current evaluation has returned. | Defined; not yet wired to a FrameBridge event publisher. |
+| Resource/size | `OutputScalingEnabled`, `OutputScalingMultiplier`, and a game-reported output-size change | Recompute target/display dimensions, then recreate only resources tied to those dimensions. | The existing `IFeature::UpdateOutputResolution()`/backend-change path, never inside an active command list. | Upstream path exists; its interaction with the local snapshot still requires a game regression test. |
+| Process/bootstrap | DLL paths, Agility SDK, hook choice, backend selection | Do not hot apply. Persist the value and require a process restart. | Next process launch. | Intentionally out of the runtime event system. |
+
+The implementation phase must carry a typed pending-change mask (rather than a generic notification) from configuration/UI writes to the render-side owner. It may set the already-established `State::changeBackend` flag only at the safe boundary, and must coalesce multiple writes issued by one UI action or INI reload. A reconfiguration test must assert that no context/resource is recreated while `EvaluateInternal()` is executing and that one coalesced action yields at most one backend recreation. Until that implementation and test exist, changing an index or output-scaling option is not advertised as a live FrameBridge feature.
+
 ### Runtime capability model
 
 `runtime/RuntimeCapabilities.*` and `RuntimeCapabilityTypes.h` are retained as a FrameBridge-owned, mutex-protected diagnostics model and are explicitly registered in the target project. The prior FSR4 scanner hook and old menu integration were not copied: both depend on upstream interfaces that changed materially. Reconnecting live capability collection and UI presentation requires a separate, target-aware design and validation step; the retained model must not be presented as live telemetry yet.
