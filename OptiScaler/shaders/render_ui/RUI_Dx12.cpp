@@ -63,57 +63,14 @@ RUI_Dx12::RUI_Dx12(std::string InName, ID3D12Device* InDevice, bool preMultiplie
         return;
     }
 
-    CD3DX12_DESCRIPTOR_RANGE1 descriptorRanges[] = {
-        CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 0, 0),
-    };
-
-    CD3DX12_ROOT_PARAMETER1 rootParameter {};
-    rootParameter.InitAsDescriptorTable(std::size(descriptorRanges), descriptorRanges);
-
-    D3D12_STATIC_SAMPLER_DESC sampler {};
+    CD3DX12_STATIC_SAMPLER_DESC sampler(0);
     sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
-    sampler.AddressU = sampler.AddressV = sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-    sampler.MaxLOD = D3D12_FLOAT32_MAX;
-    sampler.ShaderRegister = 0;
-    sampler.RegisterSpace = 0;
     sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    sampler.AddressU = sampler.AddressV = sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
 
-    CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSigDesc;
-    rootSigDesc.Init_1_1(1, &rootParameter, 1, &sampler, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-
-    ID3DBlob* signatureBlob;
-    ID3DBlob* errorBlob;
-
-    auto result = D3D12SerializeVersionedRootSignature(&rootSigDesc, &signatureBlob, &errorBlob);
-    if (result != S_OK)
+    if (!SetupRootSignature(InDevice, 2, 0, 0, 1, 0, 1, &sampler))
     {
-        LOG_ERROR("D3D12SerializeVersionedRootSignature error: {:X}", (unsigned long) result);
-        return;
-    }
-
-    result = InDevice->CreateRootSignature(0, signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(),
-                                           IID_PPV_ARGS(&_rootSignature));
-    if (result != S_OK)
-    {
-        LOG_ERROR("CreateRootSignature error: {:X}", (unsigned long) result);
-        return;
-    }
-
-    if (errorBlob != nullptr)
-    {
-        errorBlob->Release();
-        errorBlob = nullptr;
-    }
-
-    if (signatureBlob != nullptr)
-    {
-        signatureBlob->Release();
-        signatureBlob = nullptr;
-    }
-
-    if (_rootSignature == nullptr)
-    {
-        LOG_ERROR("[{0}] _rootSignature is null!", _name);
+        LOG_ERROR("Failed to setup root signature");
         return;
     }
 
@@ -145,14 +102,14 @@ RUI_Dx12::RUI_Dx12(std::string InName, ID3D12Device* InDevice, bool preMultiplie
     {
         if (!preMultipliedAlpha)
         {
-            vs = RUI_CompileShader(ruiCode.c_str(), "VSMain", "vs_5_1");
+            vs = CompileShader(ruiCode.c_str(), "VSMain", "vs_5_1");
             if (vs != nullptr)
                 graphicsPsoDesc.VS = { vs->GetBufferPointer(), vs->GetBufferSize() };
             else
                 graphicsPsoDesc.VS =
                     CD3DX12_SHADER_BYTECODE(reinterpret_cast<const void*>(render_ui_VS_cso), sizeof(render_ui_VS_cso));
 
-            ps = RUI_CompileShader(ruiCode.c_str(), "PSMain", "ps_5_1");
+            ps = CompileShader(ruiCode.c_str(), "PSMain", "ps_5_1");
             if (ps != nullptr)
                 graphicsPsoDesc.PS = { ps->GetBufferPointer(), ps->GetBufferSize() };
             else
@@ -161,14 +118,14 @@ RUI_Dx12::RUI_Dx12(std::string InName, ID3D12Device* InDevice, bool preMultiplie
         }
         else
         {
-            vs = RUI_CompileShader(ruipmCode.c_str(), "VSMain", "vs_5_1");
+            vs = CompileShader(ruipmCode.c_str(), "VSMain", "vs_5_1");
             if (vs != nullptr)
                 graphicsPsoDesc.VS = { vs->GetBufferPointer(), vs->GetBufferSize() };
             else
                 graphicsPsoDesc.VS = CD3DX12_SHADER_BYTECODE(reinterpret_cast<const void*>(render_ui_pm_VS_cso),
                                                              sizeof(render_ui_pm_VS_cso));
 
-            ps = RUI_CompileShader(ruipmCode.c_str(), "PSMain", "ps_5_1");
+            ps = CompileShader(ruipmCode.c_str(), "PSMain", "ps_5_1");
             if (ps != nullptr)
                 graphicsPsoDesc.PS = { ps->GetBufferPointer(), ps->GetBufferSize() };
             else
@@ -188,26 +145,14 @@ RUI_Dx12::RUI_Dx12(std::string InName, ID3D12Device* InDevice, bool preMultiplie
         Shader_Dx12::TranslateTypelessFormats(scDesc.BufferDesc.Format); // match swapchain RTV format (can be *_SRGB)
     graphicsPsoDesc.SampleDesc = { 1, 0 };
 
-    result = InDevice->CreateGraphicsPipelineState(&graphicsPsoDesc, IID_PPV_ARGS(&_pipelineState));
+    auto result = InDevice->CreateGraphicsPipelineState(&graphicsPsoDesc, IID_PPV_ARGS(&_pipelineState));
     if (result != S_OK)
     {
         LOG_ERROR("CreateGraphicsPipelineState error: {:X}", (unsigned long) result);
         return;
     }
 
-    ScopedSkipHeapCapture skipHeapCapture {};
-
-    for (int i = 0; i < HC_NUM_OF_HEAPS; i++)
-    {
-        if (!_frameHeaps[i].Initialize(InDevice, 2, 0, 0, 1))
-        {
-            LOG_ERROR("[{0}] Failed to init heap", _name);
-            _init = false;
-            return;
-        }
-    }
-
-    _init = true;
+    _init = InitHeaps(InDevice, _frameHeaps, HC_NUM_OF_HEAPS);
 }
 
 bool RUI_Dx12::Dispatch(IDXGISwapChain3* sc, ID3D12GraphicsCommandList* cmdList, ID3D12Resource* hudless,
@@ -248,11 +193,6 @@ bool RUI_Dx12::Dispatch(IDXGISwapChain3* sc, ID3D12GraphicsCommandList* cmdList,
     _counter++;
     _counter = _counter % HC_NUM_OF_HEAPS;
 
-    // Check existing buffer
-    D3D12_RESOURCE_DESC bufferDesc {};
-    if (_buffer[_counter] != nullptr)
-        bufferDesc = _buffer[_counter]->GetDesc();
-
     if (!CreateBufferResource(_counter, _device, scBuffer, D3D12_RESOURCE_STATE_COPY_DEST))
     {
         LOG_ERROR("CreateBufferResource error!");
@@ -279,30 +219,9 @@ bool RUI_Dx12::Dispatch(IDXGISwapChain3* sc, ID3D12GraphicsCommandList* cmdList,
     FrameDescriptorHeap& currentHeap = _frameHeaps[_counter];
 
     // Create views
-    {
-        D3D12_SHADER_RESOURCE_VIEW_DESC srv {};
-        srv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-        srv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        srv.Texture2D.MipLevels = 1;
-        srv.Format = Shader_Dx12::TranslateTypelessFormats(hudlessDesc.Format);
-        _device->CreateShaderResourceView(hudless, &srv, currentHeap.GetSrvCPU(0));
-    }
-
-    {
-        D3D12_SHADER_RESOURCE_VIEW_DESC srv {};
-        srv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-        srv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        srv.Texture2D.MipLevels = 1;
-        srv.Format = Shader_Dx12::TranslateTypelessFormats(scDesc.BufferDesc.Format);
-        _device->CreateShaderResourceView(_buffer[_counter], &srv, currentHeap.GetSrvCPU(1));
-    }
-
-    {
-        D3D12_RENDER_TARGET_VIEW_DESC rtv {};
-        rtv.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-        rtv.Format = Shader_Dx12::TranslateTypelessFormats(scDesc.BufferDesc.Format);
-        _device->CreateRenderTargetView(scBuffer, &rtv, currentHeap.GetRtvCPU(0));
-    }
+    CreateShaderResourceView(_device, hudless, currentHeap.GetSrvCPU(0));
+    CreateShaderResourceView(_device, _buffer[_counter], currentHeap.GetSrvCPU(1));
+    CreateRenderTargetView(_device, scBuffer, currentHeap.GetRtvCPU(0), 0);
 
     ID3D12DescriptorHeap* heaps[] = { currentHeap.GetHeapCSU() };
     cmdList->SetDescriptorHeaps(_countof(heaps), heaps);
@@ -345,20 +264,11 @@ RUI_Dx12::~RUI_Dx12()
     if (!_init || State::Instance().isShuttingDown)
         return;
 
-    if (_rootSignature != nullptr)
-    {
-        _rootSignature->Release();
-        _rootSignature = nullptr;
-    }
+    SAFE_RELEASE(_rootSignature);
+    SAFE_RELEASE(_constantBuffer);
 
     for (int i = 0; i < HC_NUM_OF_HEAPS; i++)
     {
         _frameHeaps[i].ReleaseHeaps();
-    }
-
-    if (_constantBuffer != nullptr)
-    {
-        _constantBuffer->Release();
-        _constantBuffer = nullptr;
     }
 }

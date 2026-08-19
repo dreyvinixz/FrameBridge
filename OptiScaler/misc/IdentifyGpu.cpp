@@ -161,6 +161,12 @@ std::vector<GpuInformation> IdentifyGpu::checkGpuInfo()
                 gpuInfo.driverStore = storePaths[luid];
 
             localCachedInfo.push_back(std::move(gpuInfo));
+
+            // HACK for 007, only keep the first reported device
+            // Avoids AMD iGPUs from being queried when the first one is a different vendor
+            // This in turn avoids amdxc64 being loaded for that iGPU which is known to causes issues in 007
+            if (Config::Instance()->Fsr4DoNotLoadAmdxc64.value_or_default())
+                break;
         }
         else
         {
@@ -565,6 +571,22 @@ void IdentifyGpu::updateD3d12Capabilities(D3d12Proxy::PFN_D3D12CreateDevice o_D3
                     gpuInfo.fsr4ForcedSupport = res.fsr4ForcedSupport;
                     break;
                 }
+            }
+        }
+
+        // Convert old config
+        // Apply force int8 if current GPU doesn't support int8 but old config was set
+        if (!cache.empty() && Config::Instance()->_DONTUSE_Fsr4ForceEnableInt8.has_value() &&
+            Config::Instance()->_DONTUSE_Fsr4ForceEnableInt8.value())
+        {
+            auto& primaryGpu = cache.front();
+
+            if (primaryGpu.fsr4Support == FSR4Support::None)
+            {
+                primaryGpu.fsr4Support = FSR4Support::INT8;
+                primaryGpu.fsr4ForcedSupport = true;
+
+                Config::Instance()->Fsr4ForceModel = FSR4Support::INT8;
             }
         }
     }

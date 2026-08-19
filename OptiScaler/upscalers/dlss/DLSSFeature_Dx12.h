@@ -8,15 +8,16 @@ class DLSSFeatureDx12 : public DLSSFeature, public IFeature_Dx12
 {
   private:
   protected:
+    bool InitDLSS(ID3D12GraphicsCommandList* InCommandList, NVSDK_NGX_Parameter* InParameters);
+
   public:
-    bool Init(ID3D12Device* InDevice, ID3D12GraphicsCommandList* InCommandList,
-              NVSDK_NGX_Parameter* InParameters) override;
-    bool Evaluate(ID3D12GraphicsCommandList* InCommandList, NVSDK_NGX_Parameter* InParameters) override;
+    bool InitInternal(ID3D12GraphicsCommandList* InCommandList, NVSDK_NGX_Parameter* InParameters) override;
+    bool EvaluateInternal(ID3D12GraphicsCommandList* InCommandList, NVSDK_NGX_Parameter* InParameters) override;
 
     static void Shutdown(ID3D12Device* InDevice);
 
     feature_version Version() override { return DLSSFeature::Version(); }
-    std::string Name() const override { return DLSSFeature::Name(); }
+    Upscaler GetUpscalerType() const final { return DLSSFeature::GetUpscalerType(); }
 
     bool IsWithDx12() override { return false; }
 

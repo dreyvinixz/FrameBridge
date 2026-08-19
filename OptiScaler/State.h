@@ -1,34 +1,17 @@
 #pragma once
 #include "upscalers/IFeature.h"
+
+#include "misc/Quirks.h"
 #include "framegen/IFGFeature_Dx12.h"
 #include <inputs/FG/Streamline_Inputs_Dx12.h>
-#include "misc/Quirks.h"
+#include <inputs/FG/Streamline_Inputs_Sl1_Dx12.h>
 
 #include <set>
 #include <deque>
+#include <mutex>
+#include <sl_dlss_g.h>
 #include <vulkan/vulkan.h>
 #include <ankerl/unordered_dense.h>
-#include <mutex>
-
-typedef enum WindowsVersion
-{
-    Unknown = 0,
-    WindowsXP,
-    WindowsVista,
-    Windows7,
-    Windows8,
-    Windows8_1,
-    Windows10,
-    Windows11,
-} WindowsVersion;
-
-typedef enum API
-{
-    NotSelected = 0,
-    DX11,
-    DX12,
-    Vulkan,
-} API;
 
 enum class FGPreset : uint32_t
 {
@@ -47,29 +30,45 @@ enum class FrameTimeSource : uint32_t
 enum class FGInput : uint32_t
 {
     NoFG,
-    Nukems,
-    FSRFG,
-    DLSSG, // technically Streamline inputs
-    XeFG,
     Upscaler, // OptiFG
+    DLSSG,    // technically Streamline inputs
+    NvngxFG,
+    FSRFG,
     FSRFG30,
+    XeFG,
+
+    ForceXeLL, // Do not expose this option
 };
 
 enum class FGOutput : uint32_t
 {
     NoFG,
-    Nukems,
     FSRFG,
     DLSSG,
-    XeFG
+    XeFG,
+};
+
+enum class FGNvngxReplacement : uint32_t
+{
+    None,
+    Nukems,
+    Arturs,
+    FFX,
+    Combo,
 };
 
 enum class WorkingMode : uint32_t
 {
     Dxgi,
     D3d12,
-    Nvngx,
     Other,
+};
+
+enum class PostCode : uint32_t
+{
+    SlPluginsAlreadyInMemory,
+    TryingFsr4Fp8OnUnsupported,
+    _
 };
 
 enum class GameEngineType : uint32_t
@@ -78,6 +77,12 @@ enum class GameEngineType : uint32_t
     Unreal,
     Katana,
     Other,
+};
+
+enum class SwapchainInteropApi : uint32_t
+{
+    None,
+    Dx11wDx12,
 };
 
 typedef struct CapturedHudlessInfo
@@ -96,32 +101,31 @@ class State
         return instance;
     }
 
-    std::string GameExe;
-    std::string GameName;
-    std::string GameVersion;
-    GameEngineType GameEngine = GameEngineType::Other;
-    ankerl::unordered_dense::map<void*, std::string> DeviceAdapterNames;
-    WindowsVersion WindowsVer = WindowsVersion::Unknown;
+    std::string gameExe;
+    std::string gameName;
+    std::string gameVersion;
+    GameEngineType gameEngine = GameEngineType::Other;
 
-    bool NvngxDx11Inited = false;
-    bool NvngxDx12Inited = false;
-    bool NvngxVkInited = false;
+    bool nvngxDx11Inited = false;
+    bool nvngxDx12Inited = false;
+    bool nvngxVkInited = false;
 
     flag_set<GameQuirk> gameQuirks;
     bool isOptiPatcherSucceed = false;
 
     // Reseting on creation of new feature
-    std::optional<bool> AutoExposure;
+    std::optional<bool> autoExposure;
 
     // FG
-    UINT64 FGLastFrame = 0;
+    uint64_t fgLastFrame = 0;
 
-    // DLSSG
-    bool NukemsFilesAvailable = false;
-    bool DLSSGDebugView = false;
-    bool DLSSGInterpolatedOnly = false;
+    // Nvngx FG, uses streamline swapchain
+    bool nukemsFgFileAvailable = false;
+    bool artursFgFileAvailable = false;
+    bool dlssgDebugView = false;
+    bool dlssgInterpolatedOnly = false;
+    uint64_t dlssgLastFrame = 0;
     uint32_t delayMenuRenderBy = 0;
-    UINT64 DLSSGLastFrame = 0;
 
     // FSR Common
     float lastFsrCameraNear = 0.0f;
@@ -130,30 +134,31 @@ class State
     // Frame Generation
     FGInput activeFgInput = FGInput::NoFG;
     FGOutput activeFgOutput = FGOutput::NoFG;
+    // This should be set to a non-None value only if all other requirements are met and nvngx can be used
+    FGNvngxReplacement activeFgNvngx = FGNvngxReplacement::None;
 
     // Streamline FG inputs
     Sl_Inputs_Dx12 slFGInputs = {};
+    Sl1_Inputs_Dx12 s_sl1FGInputs {};
 
     // OptiFG
-    bool FGPresentIsCalled = false;
-    bool FGonlyGenerated = false;
-    bool FGHudlessCompare = false;
-    bool FGchanged = false;
-    bool SCchanged = false;
+    bool fgPresentIsCalled = false;
+    bool fgOnlyGenerated = false;
+    bool fgHudlessCompare = false;
+    bool fgChanged = false;
+    bool scChanged = false;
     bool skipHeapCapture = false;
 
-    bool FGcaptureResources = false;
-    size_t FGcapturedResourceCount = false;
-    bool FGresetCapturedResources = false;
-    bool FGonlyUseCapturedResources = false;
+    bool fgCaptureResources = false;
+    size_t fgCapturedResourceCount = 0;
+    bool fgResetCapturedResources = false;
+    bool fgOnlyUseCapturedResources = false;
 
-    bool FSRFGFTPchanged = false;
-    bool FSRFGInputActive = false;
+    bool fsrfgFramePaceTuningChanged = false;
+    bool fsrfgInputActive = false;
 
-    bool FGResizing = false;
-
-    ankerl::unordered_dense::map<void*, CapturedHudlessInfo> CapturedHudlesses;
-    bool ClearCapturedHudlesses = false;
+    ankerl::unordered_dense::map<void*, CapturedHudlessInfo> capturedHudlesses;
+    bool clearCapturedHudlesses = false;
 
     // NVNGX init parameters
     uint64_t NVNGX_ApplicationId = 1337;
@@ -169,25 +174,39 @@ class State
     std::optional<std::wstring> NVNGX_DLSSD_Path;
     std::optional<std::wstring> NVNGX_DLSSG_Path;
 
+    // optis dlls
+    HMODULE optiSlInterposer = nullptr;
+    HMODULE optiSlCommon = nullptr;
+    HMODULE optiSlDLSSG = nullptr;
+    HMODULE optiSlReflex = nullptr;
+    HMODULE optiSlPCL = nullptr;
+    HMODULE optiDLSSG = nullptr;
+
     // NGX OTA
     std::string NGX_OTA_Dlss;
     std::string NGX_OTA_Dlssd;
 
     feature_version streamlineVersion = { 0, 0, 0 };
 
+    // Has value when Opti was able to hook sl and the game set DLSSG options
+    std::optional<int> dlssgMfgMax = std::nullopt;
+
     API api = API::NotSelected;
     API swapchainApi = API::NotSelected;
+    SwapchainInteropApi swapchainInteropApi = SwapchainInteropApi::None;
 
     // Framerate
     bool reflexLimitsFps = false;
     bool reflexShowWarning = false;
     bool rtssReflexInjection = false;
+    bool fakenvapiReloadLowLatency = false;
     UINT64 reflexFrameId = 0;
     UINT64 frameCount = 0;
+    bool vkAntiLagSupported = false;
 
     // for realtime changes
     ankerl::unordered_dense::map<unsigned int, bool> changeBackend;
-    std::string newBackend = "";
+    Upscaler newBackend = Upscaler::Reset;
 
     // XeSS debug stuff
     bool xessDebug = false;
@@ -197,6 +216,12 @@ class State
 
     int xefgMaxInterpolationCount = 1;
     bool WAR_xefgRequestFGToggle = false;
+
+    int dlssgMaxInterpolationCount = 1;
+    bool dlssgGameDMFGSupported = false;
+    bool dlssgOptiDMFGSupported = false;
+    sl::DLSSGMode dlssgLastSetMode = sl::DLSSGMode::eOff;
+    int dlssgDetectedInterpolationCount = 0;
 
     // DLSS
     bool dlssPresetsOverriddenExternally = false;
@@ -238,13 +263,8 @@ class State
 
     // Linux checks
     bool isRunningOnLinux = false;
-    bool isRunningOnDXVK = false;
 
     // Other checks
-    bool isRunningOnNvidia = false;
-    std::optional<bool> isRunningOnRDNA4;
-    std::optional<bool> isRunningOnRDNA3;
-    bool isPascalOrOlder = false;
     WorkingMode workingMode = WorkingMode::Other;
 
     // Vulkan stuff
@@ -259,6 +279,12 @@ class State
     double lastFGFrameTime = 0.0;
     double presentFrameTime = 0.0;
     std::mutex frameTimeMutex;
+
+    // Opti checking if everything is setup correctly on game launch
+    // Takes effect up to the first time Opti can show anything on the screen
+    // Beyond that use notifications
+    bool postDone = false;
+    flag_set<PostCode> postCodes;
 
     // Version check
     std::mutex versionCheckMutex;
@@ -278,11 +304,11 @@ class State
     UINT SCLastFlags = 0;
 
     // HDR
-    std::vector<IUnknown*> SCbuffers;
+    std::vector<IUnknown*> scBuffers;
     bool isHdrActive = false;
 
-    std::string setInputApiName;
-    std::string currentInputApiName;
+    std::optional<ApiUpscalerInput> setInputApiName;
+    ApiUpscalerInput currentInputApiName;
 
     bool isShuttingDown = false;
     std::set<PVOID> modulesToFree;
@@ -303,16 +329,19 @@ class State
     IDXGISwapChain* currentRealSwapchain = nullptr;
     IDXGISwapChain* currentFGSwapchain = nullptr;
     ID3D12Device* currentD3D12Device = nullptr;
-    DXGI_ADAPTER_DESC currentD3D12AdepterDesc = {};
     ID3D11Device* currentD3D11Device = nullptr;
-    DXGI_ADAPTER_DESC currentD3D11AdepterDesc = {};
     ID3D12CommandQueue* currentCommandQueue = nullptr;
     VkDevice currentVkDevice = nullptr;
     DXGI_SWAP_CHAIN_DESC currentSwapchainDesc {};
 
     std::vector<ID3D12Device*> d3d12Devices;
     std::vector<ID3D11Device*> d3d11Devices;
-    std::unordered_map<UINT64, std::string> adapterDescs;
+
+    static UINT GetOwner()
+    {
+        _lastOwner++;
+        return _lastOwner;
+    }
 
     // Moved checks here to prevent circular includes
     /// <summary>
@@ -321,26 +350,32 @@ class State
     /// <param name="dllName">Lower case dll name without `.dll` at the end. Leave blank for skipping all dll's</param>
     static void DisableChecks(UINT owner, std::string dllName = "")
     {
-        if (_skipOwner == 0)
-        {
-            _skipOwner = owner;
-            _skipChecks = true;
-            _skipDllName = dllName;
-        }
-        else
-        {
-            _skipDllName = ""; // Hack for multiple skip calls
-        }
+        // if (_skipOwner == 0 || _skipOwner < owner)
+        //{
+        _skipOwner = owner;
+        _skipChecks = true;
+        _skipDllName[_skipOwner] = dllName;
+        //}
     };
 
     static void EnableChecks(UINT owner)
     {
-        if (_skipOwner == 0 || _skipOwner == owner)
+        _skipDllName.erase(_skipOwner);
+
+        // if (_skipOwner == owner)
+        //{
+        if (_skipDllName.size() > 0)
         {
-            _skipChecks = false;
-            _skipDllName = "";
+            // loop in reverse to get the last added owner
+            _skipOwner = _skipDllName.rbegin()->first;
+        }
+        else
+        {
             _skipOwner = 0;
         }
+
+        _skipChecks = (_skipOwner != 0);
+        //}
     };
 
     static void DisableServeOriginal(UINT owner)
@@ -362,13 +397,17 @@ class State
     };
 
     static bool SkipDllChecks() { return _skipChecks; }
-    static std::string SkipDllName() { return _skipDllName; }
+    static std::string SkipDllName()
+    {
+        return _skipOwner == 0 ? "" : (_skipDllName.contains(_skipOwner) ? _skipDllName[_skipOwner] : "");
+    }
     static bool ServeOriginal() { return _serveOriginal; }
 
   private:
     inline static bool _skipChecks = false;
-    inline static std::string _skipDllName = "";
+    inline static std::map<UINT, std::string> _skipDllName;
     inline static UINT _skipOwner = 0;
+    inline static UINT _lastOwner = 0;
 
     inline static bool _serveOriginal = false;
     inline static UINT _serveOwner = 0;

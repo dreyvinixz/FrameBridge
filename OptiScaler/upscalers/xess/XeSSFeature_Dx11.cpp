@@ -1,5 +1,6 @@
 #include <pch.h>
 #include "XeSSFeature_Dx11.h"
+#include <imgui/ImGuiNotify.hpp>
 
 static std::string ResultToString(xess_result_t result)
 {
@@ -51,7 +52,9 @@ bool XeSSFeature_Dx11::Init(ID3D11Device* InDevice, ID3D11DeviceContext* InConte
 
     if (!_moduleLoaded)
     {
-        LOG_ERROR("libxess.dll not loaded!");
+        ImGui::InsertNotification(
+            { ImGuiToastType::Warning, 10000, "Couldn't load libxess_dx11.dll\nCheck if the dll is present" });
+        LOG_ERROR("libxess_dx11.dll not loaded!");
         return false;
     }
 
@@ -82,7 +85,10 @@ bool XeSSFeature_Dx11::Init(ID3D11Device* InDevice, ID3D11DeviceContext* InConte
 
         if (ret != XESS_RESULT_SUCCESS)
         {
-            LOG_ERROR("xessD3D12CreateContext error: {0}", ResultToString(ret));
+            auto str = ResultToString(ret);
+            ImGui::InsertNotification(
+                { ImGuiToastType::Error, 10000, std::format("Couldn't create XeSS context\n{}", str).c_str() });
+            LOG_ERROR("xessD3D11CreateContext error: {0}", str);
             return false;
         }
 
@@ -240,7 +246,7 @@ bool XeSSFeature_Dx11::Init(ID3D11Device* InDevice, ID3D11DeviceContext* InConte
         }
     }
 
-    if (!Config::Instance()->OverlayMenu.value_or(true) && (Imgui == nullptr || Imgui.get() == nullptr))
+    if (!Config::Instance()->OverlayMenu.value_or_default() && (Imgui == nullptr || Imgui.get() == nullptr))
         Imgui = std::make_unique<Menu_Dx11>(GetForegroundWindow(), InDevice);
 
     OutputScaler = std::make_unique<OS_Dx11>("Output Scaling", InDevice, (TargetWidth() < DisplayWidth()));
@@ -267,9 +273,6 @@ bool XeSSFeature_Dx11::Evaluate(ID3D11DeviceContext* DeviceContext, NVSDK_NGX_Pa
 
     if (!OutputScaler->IsInit())
         Config::Instance()->OutputScalingEnabled = false;
-
-    if (Config::Instance()->DADepthIsLinear.value_for_config_ignore_default() == std::nullopt)
-        Config::Instance()->DADepthIsLinear.set_volatile_value(false);
 
     ID3D11ShaderResourceView* restoreSRVs[D3D11_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT] = {};
     ID3D11SamplerState* restoreSamplerStates[D3D11_COMMONSHADER_SAMPLER_SLOT_COUNT] = {};
@@ -525,7 +528,9 @@ bool XeSSFeature_Dx11::Evaluate(ID3D11DeviceContext* DeviceContext, NVSDK_NGX_Pa
         RCAS != nullptr && RCAS.get() != nullptr && RCAS->CanRender())
     {
         RcasConstants rcasConstants {};
-
+        rcasConstants.DepthIsLinear = DepthLinear();
+        rcasConstants.DepthIsReversed = DepthInverted();
+        rcasConstants.IsHdr = IsHdr();
         rcasConstants.Sharpness = _sharpness;
         InParameters->Get(NVSDK_NGX_Parameter_MV_Scale_X, &rcasConstants.MvScaleX);
         InParameters->Get(NVSDK_NGX_Parameter_MV_Scale_Y, &rcasConstants.MvScaleY);
@@ -566,7 +571,7 @@ bool XeSSFeature_Dx11::Evaluate(ID3D11DeviceContext* DeviceContext, NVSDK_NGX_Pa
     }
 
     // imgui
-    if (!Config::Instance()->OverlayMenu.value_or(true) && _frameCount > 30)
+    if (!Config::Instance()->OverlayMenu.value_or_default() && _frameCount > 30)
     {
         if (Imgui != nullptr && Imgui.get() != nullptr)
         {

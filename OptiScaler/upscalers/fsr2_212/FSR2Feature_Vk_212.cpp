@@ -1,9 +1,10 @@
 #include <pch.h>
 #include <Config.h>
-
 #include "FSR2Feature_Vk_212.h"
-
 #include "nvsdk_ngx_vk.h"
+#include "MathUtils.h"
+
+using namespace OptiMath;
 
 bool FSR2FeatureVk212::InitFSR2(const NVSDK_NGX_Parameter* InParameters)
 {
@@ -187,14 +188,14 @@ bool FSR2FeatureVk212::Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Parameter
     if (!IsInited())
         return false;
 
+    auto& cfg = *Config::Instance();
+    const auto& ngxParams = *InParameters;
+
     if (!RCAS->IsInit())
         Config::Instance()->RcasEnabled.set_volatile_value(false);
 
     if (!OS->IsInit())
         Config::Instance()->OutputScalingEnabled.set_volatile_value(false);
-
-    if (Config::Instance()->DADepthIsLinear.value_for_config_ignore_default() == std::nullopt)
-        Config::Instance()->DADepthIsLinear.set_volatile_value(false);
 
     Fsr212::FfxFsr2DispatchDescription params {};
 
@@ -211,19 +212,17 @@ bool FSR2FeatureVk212::Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Parameter
 
     params.commandList = Fsr212::ffxGetCommandListVK212(InCmdBuffer);
 
-    void* paramColor;
-    InParameters->Get(NVSDK_NGX_Parameter_Color, &paramColor);
+    NVSDK_NGX_Resource_VK* paramColor;
+    InParameters->Get(NVSDK_NGX_Parameter_Color, (void**) &paramColor);
 
     if (paramColor)
     {
         LOG_DEBUG("Color exist..");
 
         params.color = Fsr212::ffxGetTextureResourceVK212(
-            &_context, ((NVSDK_NGX_Resource_VK*) paramColor)->Resource.ImageViewInfo.Image,
-            ((NVSDK_NGX_Resource_VK*) paramColor)->Resource.ImageViewInfo.ImageView,
-            ((NVSDK_NGX_Resource_VK*) paramColor)->Resource.ImageViewInfo.Width,
-            ((NVSDK_NGX_Resource_VK*) paramColor)->Resource.ImageViewInfo.Height,
-            ((NVSDK_NGX_Resource_VK*) paramColor)->Resource.ImageViewInfo.Format, (wchar_t*) L"FSR2_Color",
+            &_context, paramColor->Resource.ImageViewInfo.Image, paramColor->Resource.ImageViewInfo.ImageView,
+            paramColor->Resource.ImageViewInfo.Width, paramColor->Resource.ImageViewInfo.Height,
+            paramColor->Resource.ImageViewInfo.Format, (wchar_t*) L"FSR2_Color",
             Fsr212::FFX_RESOURCE_STATE_COMPUTE_READ);
     }
     else
@@ -232,19 +231,17 @@ bool FSR2FeatureVk212::Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Parameter
         return false;
     }
 
-    void* paramVelocity;
-    InParameters->Get(NVSDK_NGX_Parameter_MotionVectors, &paramVelocity);
+    NVSDK_NGX_Resource_VK* paramVelocity;
+    InParameters->Get(NVSDK_NGX_Parameter_MotionVectors, (void**) &paramVelocity);
 
     if (paramVelocity)
     {
         LOG_DEBUG("MotionVectors exist..");
 
         params.motionVectors = Fsr212::ffxGetTextureResourceVK212(
-            &_context, ((NVSDK_NGX_Resource_VK*) paramVelocity)->Resource.ImageViewInfo.Image,
-            ((NVSDK_NGX_Resource_VK*) paramVelocity)->Resource.ImageViewInfo.ImageView,
-            ((NVSDK_NGX_Resource_VK*) paramVelocity)->Resource.ImageViewInfo.Width,
-            ((NVSDK_NGX_Resource_VK*) paramVelocity)->Resource.ImageViewInfo.Height,
-            ((NVSDK_NGX_Resource_VK*) paramVelocity)->Resource.ImageViewInfo.Format, (wchar_t*) L"FSR2_MotionVectors",
+            &_context, paramVelocity->Resource.ImageViewInfo.Image, paramVelocity->Resource.ImageViewInfo.ImageView,
+            paramVelocity->Resource.ImageViewInfo.Width, paramVelocity->Resource.ImageViewInfo.Height,
+            paramVelocity->Resource.ImageViewInfo.Format, (wchar_t*) L"FSR2_MotionVectors",
             Fsr212::FFX_RESOURCE_STATE_COMPUTE_READ);
     }
     else
@@ -253,19 +250,17 @@ bool FSR2FeatureVk212::Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Parameter
         return false;
     }
 
-    void* paramOutput;
-    InParameters->Get(NVSDK_NGX_Parameter_Output, &paramOutput);
+    NVSDK_NGX_Resource_VK* paramOutput;
+    InParameters->Get(NVSDK_NGX_Parameter_Output, (void**) &paramOutput);
 
     if (paramOutput)
     {
         LOG_DEBUG("Output exist..");
 
         params.output = Fsr212::ffxGetTextureResourceVK212(
-            &_context, ((NVSDK_NGX_Resource_VK*) paramOutput)->Resource.ImageViewInfo.Image,
-            ((NVSDK_NGX_Resource_VK*) paramOutput)->Resource.ImageViewInfo.ImageView,
-            ((NVSDK_NGX_Resource_VK*) paramOutput)->Resource.ImageViewInfo.Width,
-            ((NVSDK_NGX_Resource_VK*) paramOutput)->Resource.ImageViewInfo.Height,
-            ((NVSDK_NGX_Resource_VK*) paramOutput)->Resource.ImageViewInfo.Format, (wchar_t*) L"FSR2_Output",
+            &_context, paramOutput->Resource.ImageViewInfo.Image, paramOutput->Resource.ImageViewInfo.ImageView,
+            paramOutput->Resource.ImageViewInfo.Width, paramOutput->Resource.ImageViewInfo.Height,
+            paramOutput->Resource.ImageViewInfo.Format, (wchar_t*) L"FSR2_Output",
             Fsr212::FFX_RESOURCE_STATE_UNORDERED_ACCESS);
     }
     else
@@ -274,19 +269,17 @@ bool FSR2FeatureVk212::Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Parameter
         return false;
     }
 
-    void* paramDepth;
-    InParameters->Get(NVSDK_NGX_Parameter_Depth, &paramDepth);
+    NVSDK_NGX_Resource_VK* paramDepth;
+    InParameters->Get(NVSDK_NGX_Parameter_Depth, (void**) &paramDepth);
 
     if (paramDepth)
     {
         LOG_DEBUG("Depth exist..");
 
         params.depth = Fsr212::ffxGetTextureResourceVK212(
-            &_context, ((NVSDK_NGX_Resource_VK*) paramDepth)->Resource.ImageViewInfo.Image,
-            ((NVSDK_NGX_Resource_VK*) paramDepth)->Resource.ImageViewInfo.ImageView,
-            ((NVSDK_NGX_Resource_VK*) paramDepth)->Resource.ImageViewInfo.Width,
-            ((NVSDK_NGX_Resource_VK*) paramDepth)->Resource.ImageViewInfo.Height,
-            ((NVSDK_NGX_Resource_VK*) paramDepth)->Resource.ImageViewInfo.Format, (wchar_t*) L"FSR2_Depth",
+            &_context, paramDepth->Resource.ImageViewInfo.Image, paramDepth->Resource.ImageViewInfo.ImageView,
+            paramDepth->Resource.ImageViewInfo.Width, paramDepth->Resource.ImageViewInfo.Height,
+            paramDepth->Resource.ImageViewInfo.Format, (wchar_t*) L"FSR2_Depth",
             Fsr212::FFX_RESOURCE_STATE_COMPUTE_READ);
     }
     else
@@ -295,44 +288,42 @@ bool FSR2FeatureVk212::Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Parameter
         return false;
     }
 
-    void* paramExp = nullptr;
+    NVSDK_NGX_Resource_VK* paramExp = nullptr;
     if (AutoExposure())
     {
         LOG_DEBUG("AutoExposure enabled!");
     }
     else
     {
-        InParameters->Get(NVSDK_NGX_Parameter_ExposureTexture, &paramExp);
+        InParameters->Get(NVSDK_NGX_Parameter_ExposureTexture, (void**) &paramExp);
 
         if (paramExp)
         {
             LOG_DEBUG("ExposureTexture exist..");
 
             params.exposure = Fsr212::ffxGetTextureResourceVK212(
-                &_context, ((NVSDK_NGX_Resource_VK*) paramExp)->Resource.ImageViewInfo.Image,
-                ((NVSDK_NGX_Resource_VK*) paramExp)->Resource.ImageViewInfo.ImageView,
-                ((NVSDK_NGX_Resource_VK*) paramExp)->Resource.ImageViewInfo.Width,
-                ((NVSDK_NGX_Resource_VK*) paramExp)->Resource.ImageViewInfo.Height,
-                ((NVSDK_NGX_Resource_VK*) paramExp)->Resource.ImageViewInfo.Format, (wchar_t*) L"FSR2_Exposure",
+                &_context, paramExp->Resource.ImageViewInfo.Image, paramExp->Resource.ImageViewInfo.ImageView,
+                paramExp->Resource.ImageViewInfo.Width, paramExp->Resource.ImageViewInfo.Height,
+                paramExp->Resource.ImageViewInfo.Format, (wchar_t*) L"FSR2_Exposure",
                 Fsr212::FFX_RESOURCE_STATE_COMPUTE_READ);
         }
         else
         {
             LOG_DEBUG("AutoExposure disabled but ExposureTexture is not exist, it may cause problems!!");
-            State::Instance().AutoExposure = true;
+            State::Instance().autoExposure = true;
             State::Instance().changeBackend[Handle()->Id] = true;
             return true;
         }
     }
 
-    void* paramTransparency = nullptr;
-    InParameters->Get("FSR.transparencyAndComposition", &paramTransparency);
+    NVSDK_NGX_Resource_VK* paramTransparency = nullptr;
+    InParameters->Get("FSR.transparencyAndComposition", (void**) &paramTransparency);
 
-    void* paramReactiveMask = nullptr;
-    InParameters->Get("FSR.reactive", &paramReactiveMask);
+    NVSDK_NGX_Resource_VK* paramReactiveMask = nullptr;
+    InParameters->Get("FSR.reactive", (void**) &paramReactiveMask);
 
-    void* paramReactiveMask2 = nullptr;
-    InParameters->Get(NVSDK_NGX_Parameter_DLSS_Input_Bias_Current_Color_Mask, &paramReactiveMask2);
+    NVSDK_NGX_Resource_VK* paramReactiveMask2 = nullptr;
+    InParameters->Get(NVSDK_NGX_Parameter_DLSS_Input_Bias_Current_Color_Mask, (void**) &paramReactiveMask2);
 
     if (!Config::Instance()->DisableReactiveMask.value_or(paramReactiveMask == nullptr &&
                                                           paramReactiveMask2 == nullptr))
@@ -341,11 +332,9 @@ bool FSR2FeatureVk212::Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Parameter
         {
             LOG_DEBUG("Using FSR transparency mask..");
             params.transparencyAndComposition = Fsr212::ffxGetTextureResourceVK212(
-                &_context, ((NVSDK_NGX_Resource_VK*) paramTransparency)->Resource.ImageViewInfo.Image,
-                ((NVSDK_NGX_Resource_VK*) paramTransparency)->Resource.ImageViewInfo.ImageView,
-                ((NVSDK_NGX_Resource_VK*) paramTransparency)->Resource.ImageViewInfo.Width,
-                ((NVSDK_NGX_Resource_VK*) paramTransparency)->Resource.ImageViewInfo.Height,
-                ((NVSDK_NGX_Resource_VK*) paramTransparency)->Resource.ImageViewInfo.Format,
+                &_context, paramTransparency->Resource.ImageViewInfo.Image,
+                paramTransparency->Resource.ImageViewInfo.ImageView, paramTransparency->Resource.ImageViewInfo.Width,
+                paramTransparency->Resource.ImageViewInfo.Height, paramTransparency->Resource.ImageViewInfo.Format,
                 (wchar_t*) L"FSR2_Reactive", Fsr212::FFX_RESOURCE_STATE_COMPUTE_READ);
         }
 
@@ -353,11 +342,9 @@ bool FSR2FeatureVk212::Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Parameter
         {
             LOG_DEBUG("Using FSR reactive mask..");
             params.reactive = Fsr212::ffxGetTextureResourceVK212(
-                &_context, ((NVSDK_NGX_Resource_VK*) paramReactiveMask)->Resource.ImageViewInfo.Image,
-                ((NVSDK_NGX_Resource_VK*) paramReactiveMask)->Resource.ImageViewInfo.ImageView,
-                ((NVSDK_NGX_Resource_VK*) paramReactiveMask)->Resource.ImageViewInfo.Width,
-                ((NVSDK_NGX_Resource_VK*) paramReactiveMask)->Resource.ImageViewInfo.Height,
-                ((NVSDK_NGX_Resource_VK*) paramReactiveMask)->Resource.ImageViewInfo.Format,
+                &_context, paramReactiveMask->Resource.ImageViewInfo.Image,
+                paramReactiveMask->Resource.ImageViewInfo.ImageView, paramReactiveMask->Resource.ImageViewInfo.Width,
+                paramReactiveMask->Resource.ImageViewInfo.Height, paramReactiveMask->Resource.ImageViewInfo.Format,
                 (wchar_t*) L"FSR2_Reactive", Fsr212::FFX_RESOURCE_STATE_COMPUTE_READ);
         }
         else
@@ -368,23 +355,23 @@ bool FSR2FeatureVk212::Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Parameter
                 if (Config::Instance()->FsrUseMaskForTransparency.value_or_default())
                 {
                     params.transparencyAndComposition = Fsr212::ffxGetTextureResourceVK212(
-                        &_context, ((NVSDK_NGX_Resource_VK*) paramReactiveMask2)->Resource.ImageViewInfo.Image,
-                        ((NVSDK_NGX_Resource_VK*) paramReactiveMask2)->Resource.ImageViewInfo.ImageView,
-                        ((NVSDK_NGX_Resource_VK*) paramReactiveMask2)->Resource.ImageViewInfo.Width,
-                        ((NVSDK_NGX_Resource_VK*) paramReactiveMask2)->Resource.ImageViewInfo.Height,
-                        ((NVSDK_NGX_Resource_VK*) paramReactiveMask2)->Resource.ImageViewInfo.Format,
-                        (wchar_t*) L"FSR2_Transparency", Fsr212::FFX_RESOURCE_STATE_COMPUTE_READ);
+                        &_context, paramReactiveMask2->Resource.ImageViewInfo.Image,
+                        paramReactiveMask2->Resource.ImageViewInfo.ImageView,
+                        paramReactiveMask2->Resource.ImageViewInfo.Width,
+                        paramReactiveMask2->Resource.ImageViewInfo.Height,
+                        paramReactiveMask2->Resource.ImageViewInfo.Format, (wchar_t*) L"FSR2_Transparency",
+                        Fsr212::FFX_RESOURCE_STATE_COMPUTE_READ);
                 }
 
                 if (Config::Instance()->DlssReactiveMaskBias.value_or_default() > 0.0f)
                 {
                     params.reactive = Fsr212::ffxGetTextureResourceVK212(
-                        &_context, ((NVSDK_NGX_Resource_VK*) paramReactiveMask2)->Resource.ImageViewInfo.Image,
-                        ((NVSDK_NGX_Resource_VK*) paramReactiveMask2)->Resource.ImageViewInfo.ImageView,
-                        ((NVSDK_NGX_Resource_VK*) paramReactiveMask2)->Resource.ImageViewInfo.Width,
-                        ((NVSDK_NGX_Resource_VK*) paramReactiveMask2)->Resource.ImageViewInfo.Height,
-                        ((NVSDK_NGX_Resource_VK*) paramReactiveMask2)->Resource.ImageViewInfo.Format,
-                        (wchar_t*) L"FSR2_Reactive", Fsr212::FFX_RESOURCE_STATE_COMPUTE_READ);
+                        &_context, paramReactiveMask2->Resource.ImageViewInfo.Image,
+                        paramReactiveMask2->Resource.ImageViewInfo.ImageView,
+                        paramReactiveMask2->Resource.ImageViewInfo.Width,
+                        paramReactiveMask2->Resource.ImageViewInfo.Height,
+                        paramReactiveMask2->Resource.ImageViewInfo.Format, (wchar_t*) L"FSR2_Reactive",
+                        Fsr212::FFX_RESOURCE_STATE_COMPUTE_READ);
                 }
             }
             else
@@ -396,8 +383,8 @@ bool FSR2FeatureVk212::Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Parameter
         }
     }
 
-    VkImageView finalOutputView = ((NVSDK_NGX_Resource_VK*) paramOutput)->Resource.ImageViewInfo.ImageView;
-    VkImage finalOutputImage = ((NVSDK_NGX_Resource_VK*) paramOutput)->Resource.ImageViewInfo.Image;
+    VkImageView finalOutputView = paramOutput->Resource.ImageViewInfo.ImageView;
+    VkImage finalOutputImage = paramOutput->Resource.ImageViewInfo.Image;
 
     _sharpness = GetSharpness(InParameters);
     float ssMulti = Config::Instance()->OutputScalingMultiplier.value_or(1.5f);
@@ -414,9 +401,8 @@ bool FSR2FeatureVk212::Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Parameter
         VkImage oldImage = RCAS->GetImage();
 
         if (RCAS->CreateImageResource(
-                Device, PhysicalDevice, ((NVSDK_NGX_Resource_VK*) paramOutput)->Resource.ImageViewInfo.Width,
-                ((NVSDK_NGX_Resource_VK*) paramOutput)->Resource.ImageViewInfo.Height,
-                ((NVSDK_NGX_Resource_VK*) paramOutput)->Resource.ImageViewInfo.Format,
+                Device, PhysicalDevice, paramOutput->Resource.ImageViewInfo.Width,
+                paramOutput->Resource.ImageViewInfo.Height, paramOutput->Resource.ImageViewInfo.Format,
                 VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT))
         {
             VkImageLayout oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -424,11 +410,9 @@ bool FSR2FeatureVk212::Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Parameter
                 oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
             params.output = Fsr212::ffxGetTextureResourceVK212(
-                &_context, RCAS->GetImage(), RCAS->GetImageView(),
-                ((NVSDK_NGX_Resource_VK*) paramOutput)->Resource.ImageViewInfo.Width,
-                ((NVSDK_NGX_Resource_VK*) paramOutput)->Resource.ImageViewInfo.Height,
-                ((NVSDK_NGX_Resource_VK*) paramOutput)->Resource.ImageViewInfo.Format, (wchar_t*) L"FSR2_Output",
-                Fsr212::FFX_RESOURCE_STATE_UNORDERED_ACCESS);
+                &_context, RCAS->GetImage(), RCAS->GetImageView(), paramOutput->Resource.ImageViewInfo.Width,
+                paramOutput->Resource.ImageViewInfo.Height, paramOutput->Resource.ImageViewInfo.Format,
+                (wchar_t*) L"FSR2_Output", Fsr212::FFX_RESOURCE_STATE_UNORDERED_ACCESS);
 
             VkImageSubresourceRange range {};
             range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -449,21 +433,18 @@ bool FSR2FeatureVk212::Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Parameter
     {
         VkImage oldImage = OS->GetImage();
 
-        if (OS->CreateImageResource(Device, PhysicalDevice, TargetWidth(), TargetHeight(),
-                                    ((NVSDK_NGX_Resource_VK*) paramOutput)->Resource.ImageViewInfo.Format,
-                                    VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
-                                        VK_IMAGE_USAGE_TRANSFER_DST_BIT))
+        if (OS->CreateImageResource(
+                Device, PhysicalDevice, TargetWidth(), TargetHeight(), paramOutput->Resource.ImageViewInfo.Format,
+                VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT))
         {
             VkImageLayout oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             if (oldImage != VK_NULL_HANDLE && oldImage == OS->GetImage())
                 oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
             params.output = Fsr212::ffxGetTextureResourceVK212(
-                &_context, OS->GetImage(), OS->GetImageView(),
-                ((NVSDK_NGX_Resource_VK*) paramOutput)->Resource.ImageViewInfo.Width,
-                ((NVSDK_NGX_Resource_VK*) paramOutput)->Resource.ImageViewInfo.Height,
-                ((NVSDK_NGX_Resource_VK*) paramOutput)->Resource.ImageViewInfo.Format, (wchar_t*) L"FSR2_Output",
-                Fsr212::FFX_RESOURCE_STATE_UNORDERED_ACCESS);
+                &_context, OS->GetImage(), OS->GetImageView(), paramOutput->Resource.ImageViewInfo.Width,
+                paramOutput->Resource.ImageViewInfo.Height, paramOutput->Resource.ImageViewInfo.Format,
+                (wchar_t*) L"FSR2_Output", Fsr212::FFX_RESOURCE_STATE_UNORDERED_ACCESS);
 
             VkImageSubresourceRange range {};
             range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -531,23 +512,25 @@ bool FSR2FeatureVk212::Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Parameter
 
     if (DepthInverted())
     {
-        params.cameraFar = Config::Instance()->FsrCameraNear.value_or_default();
-        params.cameraNear = Config::Instance()->FsrCameraFar.value_or_default();
+        params.cameraFar = cfg.FsrCameraNear.value_or_default();
+        params.cameraNear = cfg.FsrCameraFar.value_or_default();
     }
     else
     {
-        params.cameraFar = Config::Instance()->FsrCameraFar.value_or_default();
-        params.cameraNear = Config::Instance()->FsrCameraNear.value_or_default();
+        params.cameraFar = cfg.FsrCameraFar.value_or_default();
+        params.cameraNear = cfg.FsrCameraNear.value_or_default();
     }
 
-    if (Config::Instance()->FsrVerticalFov.has_value())
-        params.cameraFovAngleVertical = Config::Instance()->FsrVerticalFov.value() * 0.0174532925199433f;
-    else if (Config::Instance()->FsrHorizontalFov.value_or_default() > 0.0f)
+    if (cfg.FsrVerticalFov.has_value())
+        params.cameraFovAngleVertical = GetRadiansFromDeg(cfg.FsrVerticalFov.value());
+    else if (cfg.FsrHorizontalFov.value_or_default() > 0.0f)
+    {
+        const float hFovRad = GetRadiansFromDeg(cfg.FsrHorizontalFov.value());
         params.cameraFovAngleVertical =
-            2.0f * atan((tan(Config::Instance()->FsrHorizontalFov.value() * 0.0174532925199433f) * 0.5f) /
-                        (float) DisplayHeight() * (float) DisplayWidth());
+            GetVerticalFovFromHorizontal(hFovRad, (float) TargetWidth(), (float) TargetHeight());
+    }
     else
-        params.cameraFovAngleVertical = 1.0471975511966f;
+        params.cameraFovAngleVertical = GetRadiansFromDeg(60);
 
     if (InParameters->Get(NVSDK_NGX_Parameter_FrameTimeDeltaInMsec, &params.frameTimeDelta) !=
             NVSDK_NGX_Result_Success ||
@@ -599,6 +582,9 @@ bool FSR2FeatureVk212::Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Parameter
                              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, range);
 
         RcasConstants rcasConstants {};
+        rcasConstants.DepthIsLinear = DepthLinear();
+        rcasConstants.DepthIsReversed = DepthInverted();
+        rcasConstants.IsHdr = IsHdr();
         rcasConstants.Sharpness = _sharpness;
         InParameters->Get(NVSDK_NGX_Parameter_MV_Scale_X, &rcasConstants.MvScaleX);
         InParameters->Get(NVSDK_NGX_Parameter_MV_Scale_Y, &rcasConstants.MvScaleY);
@@ -614,11 +600,21 @@ bool FSR2FeatureVk212::Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Parameter
             rcasConstants.CameraFar = params.cameraFar;
         }
 
-        VkExtent2D outExtent = { DisplayWidth(), DisplayHeight() };
+        VkImageInfo InResourceInfo {};
+        InResourceInfo.ImageView = RCAS->GetImageView();
+        InResourceInfo.Image = RCAS->GetImage();
+        // Missing the rest of the info
 
-        RCAS->Dispatch(Device, InCmdBuffer, rcasConstants, RCAS->GetImageView(),
-                       ((NVSDK_NGX_Resource_VK*) paramVelocity)->Resource.ImageViewInfo.ImageView, finalOutputView,
-                       outExtent, ((NVSDK_NGX_Resource_VK*) paramDepth)->Resource.ImageViewInfo.ImageView);
+        VkImageInfo OutResourceInfo {};
+        OutResourceInfo.ImageView = finalOutputView;
+        OutResourceInfo.Image = finalOutputImage;
+        OutResourceInfo.Width = DisplayWidth();
+        OutResourceInfo.Height = DisplayHeight();
+        // Missing the rest of the info
+
+        RCAS->Dispatch(Device, InCmdBuffer, rcasConstants, &InResourceInfo,
+                       (VkImageInfo*) &paramVelocity->Resource.ImageViewInfo, &OutResourceInfo,
+                       (VkImageInfo*) &paramDepth->Resource.ImageViewInfo);
     }
 
     _frameCount++;

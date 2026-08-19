@@ -2,6 +2,7 @@
 #include "OS_Dx11.h"
 
 #include "OS_Common.h"
+#include "../Shader_Common.h"
 
 #define A_CPU
 // FSR compute shader is from : https://github.com/fholger/vrperfkit/
@@ -324,7 +325,7 @@ OS_Dx11::OS_Dx11(std::string InName, ID3D11Device* InDevice, bool InUpsample)
         // Compile shader blobs
         if (_upsample)
         {
-            shaderBlob = OS_CompileShader(upsampleCode.c_str(), "CSMain", "cs_5_0");
+            shaderBlob = CompileShader(upsampleCode.c_str(), "CSMain", "cs_5_0");
         }
         else
         {
@@ -334,35 +335,35 @@ OS_Dx11::OS_Dx11(std::string InName, ID3D11Device* InDevice, bool InUpsample)
             switch (Config::Instance()->OutputScalingDownscaler.value_or_default())
             {
             case Scaler::Bicubic:
-                shaderBlob = OS_CompileShader(downsampleCodeBC.c_str(), "CSMain", "cs_5_0");
+                shaderBlob = CompileShader(downsampleCodeBC.c_str(), "CSMain", "cs_5_0");
                 break;
 
             case Scaler::CatmullRom:
-                shaderBlob = OS_CompileShader(downsampleCodeCatmull.c_str(), "CSMain", "cs_5_0");
+                shaderBlob = CompileShader(downsampleCodeCatmull.c_str(), "CSMain", "cs_5_0");
                 break;
 
             case Scaler::Lanczos2:
-                shaderBlob = OS_CompileShader(downsampleCodeLanczos2.c_str(), "CSMain", "cs_5_0");
+                shaderBlob = CompileShader(downsampleCodeLanczos2.c_str(), "CSMain", "cs_5_0");
                 break;
 
             case Scaler::Lanczos3:
-                shaderBlob = OS_CompileShader(downsampleCodeLanczos3.c_str(), "CSMain", "cs_5_0");
+                shaderBlob = CompileShader(downsampleCodeLanczos3.c_str(), "CSMain", "cs_5_0");
                 break;
 
             case Scaler::Kaiser2:
-                shaderBlob = OS_CompileShader(downsampleCodeKaiser2.c_str(), "CSMain", "cs_5_0");
+                shaderBlob = CompileShader(downsampleCodeKaiser2.c_str(), "CSMain", "cs_5_0");
                 break;
 
             case Scaler::Kaiser3:
-                shaderBlob = OS_CompileShader(downsampleCodeKaiser3.c_str(), "CSMain", "cs_5_0");
+                shaderBlob = CompileShader(downsampleCodeKaiser3.c_str(), "CSMain", "cs_5_0");
                 break;
 
             case Scaler::Magic:
-                shaderBlob = OS_CompileShader(downsampleCodeMAGIC.c_str(), "CSMain", "cs_5_0");
+                shaderBlob = CompileShader(downsampleCodeMAGIC.c_str(), "CSMain", "cs_5_0");
                 break;
 
             default:
-                shaderBlob = OS_CompileShader(downsampleCodeBC.c_str(), "CSMain", "cs_5_0");
+                shaderBlob = CompileShader(downsampleCodeBC.c_str(), "CSMain", "cs_5_0");
                 break;
             }
         }
@@ -423,11 +424,7 @@ OS_Dx11::OS_Dx11(std::string InName, ID3D11Device* InDevice, bool InUpsample)
             }
         }
 
-        if (shaderBlob != nullptr)
-        {
-            shaderBlob->Release();
-            shaderBlob = nullptr;
-        }
+        SAFE_RELEASE(shaderBlob);
 
         if (FAILED(hr))
         {
@@ -463,18 +460,9 @@ OS_Dx11::~OS_Dx11()
     if (!_init || State::Instance().isShuttingDown)
         return;
 
-    if (_computeShader != nullptr)
-        _computeShader->Release();
-
-    if (_constantBuffer != nullptr)
-        _constantBuffer->Release();
-
-    if (_srvInput != nullptr)
-        _srvInput->Release();
-
-    if (_uavOutput != nullptr)
-        _uavOutput->Release();
-
-    if (_buffer != nullptr)
-        _buffer->Release();
+    SAFE_RELEASE(_computeShader);
+    SAFE_RELEASE(_constantBuffer);
+    SAFE_RELEASE(_srvInput);
+    SAFE_RELEASE(_uavOutput);
+    SAFE_RELEASE(_buffer);
 }

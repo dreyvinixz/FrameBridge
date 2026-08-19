@@ -98,6 +98,8 @@ bool DLSSG_Dx12::CreateSwapchain(IDXGIFactory* factory, ID3D12CommandQueue* cmdQ
         slFactory->Release();
     }
 
+    StreamlineProxy::SetFeatureLoaded()(sl::kFeatureDLSS_G, true);
+
     desc->Flags |= DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
 
     ScopedSkipSpoofing skipSpoofing {};
@@ -432,17 +434,13 @@ bool DLSSG_Dx12::Dispatch()
         constData.cameraRight.x = _cameraRight[fIndex][0];
         constData.cameraRight.y = _cameraRight[fIndex][1];
         constData.cameraRight.z = _cameraRight[fIndex][2];
-
-        constData.cameraRight.x = _cameraRight[fIndex][0];
-        constData.cameraRight.y = _cameraRight[fIndex][1];
-        constData.cameraRight.z = _cameraRight[fIndex][2];
     }
     else
     {
         constData.cameraPos = { 0.0f, 0.0f, 0.0f };
-        constData.cameraRight = { 1.0f, 0.0f, 0.0f };
-        constData.cameraUp = { 0.0f, 1.0f, 0.0f };
-        constData.cameraFwd = { 0.0f, 0.0f, 1.0f };
+        constData.cameraUp = { 0.0f, 0.0f, 1.0f };
+        constData.cameraRight = { 0.0f, 1.0f, 0.0f };
+        constData.cameraFwd = { 1.0f, 0.0f, 0.0f };
         constData.cameraPinholeOffset = { 0.0f, 0.0f };
 
         XMMATRIX cameraViewToClip {};
@@ -475,6 +473,7 @@ bool DLSSG_Dx12::Dispatch()
         memcpy(&constData.clipToCameraView, &temp, sizeof(sl::float4x4));
 
         XMStoreFloat4x4(&temp, prev);
+        memcpy(&constData.clipToLensClip, &temp, sizeof(sl::float4x4));
         memcpy(&constData.clipToPrevClip, &temp, sizeof(sl::float4x4));
         memcpy(&constData.prevClipToClip, &temp, sizeof(sl::float4x4));
     }
@@ -522,7 +521,7 @@ bool DLSSG_Dx12::Dispatch()
     constData.depthInverted = IsInvertedDepth() ? sl::Boolean::eTrue : sl::Boolean::eFalse;
     constData.cameraMotionIncluded = sl::Boolean::eTrue;
     constData.motionVectors3D = sl::Boolean::eFalse;
-    constData.motionVectorsInvalidValue = 0.0f;
+    // constData.motionVectorsInvalidValue = 0.0f;
     constData.orthographicProjection = sl::Boolean::eFalse;
     constData.motionVectorsDilated = IsLowResMV() ? sl::Boolean::eFalse : sl::Boolean::eTrue;
     constData.motionVectorsJittered = IsJitteredMVs() ? sl::Boolean::eTrue : sl::Boolean::eFalse;
@@ -642,6 +641,13 @@ void DLSSG_Dx12::ReleaseObjects()
         SAFE_RELEASE(_scCommandAllocator[i]);
         SAFE_RELEASE(_scCommandList[i]);
         SAFE_RELEASE(dlssgFence[i]);
+
+        // Reset command list state
+        _scCommandListResetted[i] = false;
+        _scAllocatorFenceValues[i] = 0;
+
+        _uiCommandListResetted[i] = false;
+        _uiAllocatorFenceValues[i] = 0;
     }
 
     _renderUI.reset();
@@ -669,6 +675,13 @@ void DLSSG_Dx12::CreateObjects(ID3D12Device* InDevice)
         // FG
         for (size_t i = 0; i < BUFFER_COUNT; i++)
         {
+            // Reset command list state
+            _scCommandListResetted[i] = false;
+            _scAllocatorFenceValues[i] = 0;
+
+            _uiCommandListResetted[i] = false;
+            _uiAllocatorFenceValues[i] = 0;
+
             result =
                 InDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&_uiCommandAllocator[i]));
             if (result != S_OK)

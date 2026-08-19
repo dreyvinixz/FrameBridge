@@ -2,6 +2,7 @@
 #include "DT_Dx11.h"
 
 #include "DT_Common.h"
+#include "../Shader_Common.h"
 #include "precompile/dt_dx11_Shader_Dx11.h"
 
 #include <Config.h>
@@ -42,8 +43,7 @@ bool DepthTransfer_Dx11::InitializeViews(ID3D11Texture2D* InResource, ID3D11Text
 
     if (InResource != _currentInResource || _srvInput == nullptr)
     {
-        if (_srvInput != nullptr)
-            _srvInput->Release();
+        SAFE_RELEASE(_srvInput);
 
         InResource->GetDesc(&desc);
 
@@ -72,8 +72,7 @@ bool DepthTransfer_Dx11::InitializeViews(ID3D11Texture2D* InResource, ID3D11Text
 
     if (OutResource != _currentOutResource || _uavOutput == nullptr)
     {
-        if (_uavOutput != nullptr)
-            _uavOutput->Release();
+        SAFE_RELEASE(_uavOutput);
 
         OutResource->GetDesc(&desc);
 
@@ -158,7 +157,7 @@ DepthTransfer_Dx11::DepthTransfer_Dx11(std::string InName, ID3D11Device* InDevic
     else
     {
         // Compile shader blobs
-        ID3DBlob* shaderBlob = DT_CompileShader(shaderCode.c_str(), "CSMain", "cs_5_0");
+        ID3DBlob* shaderBlob = CompileShader(shaderCode.c_str(), "CSMain", "cs_5_0");
 
         if (shaderBlob == nullptr)
             LOG_ERROR("[{0}] CompileShader error!", _name);
@@ -173,11 +172,7 @@ DepthTransfer_Dx11::DepthTransfer_Dx11(std::string InName, ID3D11Device* InDevic
             hr = _device->CreateComputeShader(reinterpret_cast<const void*>(dt_dx11_cso), sizeof(dt_dx11_cso), nullptr,
                                               &_computeShader);
 
-        if (shaderBlob != nullptr)
-        {
-            shaderBlob->Release();
-            shaderBlob = nullptr;
-        }
+        SAFE_RELEASE(shaderBlob);
 
         if (FAILED(hr))
         {
@@ -194,18 +189,9 @@ DepthTransfer_Dx11::~DepthTransfer_Dx11()
     if (!_init || State::Instance().isShuttingDown)
         return;
 
-    if (_computeShader != nullptr)
-        _computeShader->Release();
-
-    if (_constantBuffer != nullptr)
-        _constantBuffer->Release();
-
-    if (_srvInput != nullptr)
-        _srvInput->Release();
-
-    if (_uavOutput != nullptr)
-        _uavOutput->Release();
-
-    if (_buffer != nullptr)
-        _buffer->Release();
+    SAFE_RELEASE(_computeShader);
+    SAFE_RELEASE(_constantBuffer);
+    SAFE_RELEASE(_srvInput);
+    SAFE_RELEASE(_uavOutput);
+    SAFE_RELEASE(_buffer);
 }

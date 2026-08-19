@@ -61,6 +61,13 @@
 #include <d3d12sdklayers.h>
 #endif
 
+// Enables Low Latency inputs
+// #define LOW_LATENCY_INPUTS
+
+#ifdef LOW_LATENCY_INPUTS
+#define XELL_EXPORT_API
+#endif
+
 // Use vkQueueSubmit2KHR instead of vkQueueSubmit for testing Linux issue
 // #define USE_QUEUE_SUBMIT_2_KHR
 
@@ -79,76 +86,31 @@ inline HMODULE d3d12AgilityModule = nullptr;
 inline HMODULE slInterposerModule = nullptr;
 inline DWORD processId;
 
-#define LOG_TRACE(msg, ...)                                                                                            \
-    do                                                                                                                 \
-    {                                                                                                                  \
-        if (spdlog::default_logger_raw() && spdlog::default_logger_raw()->should_log(spdlog::level::trace))            \
-            spdlog::trace(__FUNCTION__ " " msg, ##__VA_ARGS__);                                                        \
-    } while (0)
+#define LOG_TRACE(msg, ...) spdlog::trace(__FUNCTION__ " " msg, ##__VA_ARGS__)
 
-#define LOG_DEBUG(msg, ...)                                                                                            \
-    do                                                                                                                 \
-    {                                                                                                                  \
-        if (spdlog::default_logger_raw() && spdlog::default_logger_raw()->should_log(spdlog::level::debug))            \
-            spdlog::debug(__FUNCTION__ " " msg, ##__VA_ARGS__);                                                        \
-    } while (0)
+#define LOG_DEBUG(msg, ...) spdlog::debug(__FUNCTION__ " " msg, ##__VA_ARGS__)
 
 #ifdef DETAILED_DEBUG_LOGS
-#define LOG_DEBUG_ONLY(msg, ...)                                                                                       \
-    do                                                                                                                 \
-    {                                                                                                                  \
-        if (spdlog::default_logger_raw() && spdlog::default_logger_raw()->should_log(spdlog::level::debug))            \
-            spdlog::debug(__FUNCTION__ " " msg, ##__VA_ARGS__);                                                        \
-    } while (0)
+#define LOG_DEBUG_ONLY(msg, ...) spdlog::debug(__FUNCTION__ " " msg, ##__VA_ARGS__)
 #else
 #define LOG_DEBUG_ONLY(msg, ...)
 #endif
 
 #ifdef LOG_ASYNC
-#define LOG_DEBUG_ASYNC(msg, ...)                                                                                      \
-    do                                                                                                                 \
-    {                                                                                                                  \
-        if (spdlog::default_logger_raw() && spdlog::default_logger_raw()->should_log(spdlog::level::debug))            \
-            spdlog::debug(__FUNCTION__ " " msg, ##__VA_ARGS__);                                                        \
-    } while (0)
+#define LOG_DEBUG_ASYNC(msg, ...) spdlog::debug(__FUNCTION__ " " msg, ##__VA_ARGS__)
 #else
 #define LOG_DEBUG_ASYNC(msg, ...)
 #endif
 
-#define LOG_INFO(msg, ...)                                                                                             \
-    do                                                                                                                 \
-    {                                                                                                                  \
-        if (spdlog::default_logger_raw() && spdlog::default_logger_raw()->should_log(spdlog::level::info))             \
-            spdlog::info(__FUNCTION__ " " msg, ##__VA_ARGS__);                                                         \
-    } while (0)
+#define LOG_INFO(msg, ...) spdlog::info(__FUNCTION__ " " msg, ##__VA_ARGS__)
 
-#define LOG_WARN(msg, ...)                                                                                             \
-    do                                                                                                                 \
-    {                                                                                                                  \
-        if (spdlog::default_logger_raw() && spdlog::default_logger_raw()->should_log(spdlog::level::warn))             \
-            spdlog::warn(__FUNCTION__ " " msg, ##__VA_ARGS__);                                                         \
-    } while (0)
+#define LOG_WARN(msg, ...) spdlog::warn(__FUNCTION__ " " msg, ##__VA_ARGS__)
 
-#define LOG_ERROR(msg, ...)                                                                                            \
-    do                                                                                                                 \
-    {                                                                                                                  \
-        if (spdlog::default_logger_raw() && spdlog::default_logger_raw()->should_log(spdlog::level::err))              \
-            spdlog::error(__FUNCTION__ " " msg, ##__VA_ARGS__);                                                        \
-    } while (0)
+#define LOG_ERROR(msg, ...) spdlog::error(__FUNCTION__ " " msg, ##__VA_ARGS__)
 
-#define LOG_FUNC()                                                                                                     \
-    do                                                                                                                 \
-    {                                                                                                                  \
-        if (spdlog::default_logger_raw() && spdlog::default_logger_raw()->should_log(spdlog::level::trace))            \
-            spdlog::trace(__FUNCTION__);                                                                               \
-    } while (0)
+#define LOG_FUNC() spdlog::trace(__FUNCTION__)
 
-#define LOG_FUNC_RESULT(result)                                                                                        \
-    do                                                                                                                 \
-    {                                                                                                                  \
-        if (spdlog::default_logger_raw() && spdlog::default_logger_raw()->should_log(spdlog::level::trace))            \
-            spdlog::trace(__FUNCTION__ " result: {0:X}", (UINT64) result);                                             \
-    } while (0)
+#define LOG_FUNC_RESULT(result) spdlog::trace(__FUNCTION__ " result: {0:X}", (UINT64) result)
 
 // #define TRACKING_LOGS
 
@@ -158,46 +120,25 @@ inline DWORD processId;
 #define LOG_TRACK(msg, ...)
 #endif
 
-struct feature_version
-{
-    unsigned int major;
-    unsigned int minor;
-    unsigned int patch;
+#define SAFE_RELEASE(p)                                                                                                \
+    do                                                                                                                 \
+    {                                                                                                                  \
+        if (p && p != nullptr)                                                                                         \
+        {                                                                                                              \
+            (p)->Release();                                                                                            \
+            (p) = nullptr;                                                                                             \
+        }                                                                                                              \
+    } while ((void) 0, 0);
 
-    bool operator==(const feature_version& other) const
-    {
-        return major == other.major && minor == other.minor && patch == other.patch;
-    }
-
-    bool operator!=(const feature_version& other) const { return !(*this == other); }
-
-    bool operator<(const feature_version& other) const
-    {
-        if (major != other.major)
-            return major < other.major;
-        if (minor != other.minor)
-            return minor < other.minor;
-        return patch < other.patch;
-    }
-
-    bool operator>(const feature_version& other) const { return other < *this; }
-
-    bool operator<=(const feature_version& other) const { return !(other < *this); }
-
-    bool operator>=(const feature_version& other) const { return !(*this < other); }
-};
-
-namespace VendorId
-{
-enum Value : uint32_t
-{
-    Invalid = 0,
-    Microsoft = 0x1414, // Software Render Adapter
-    Nvidia = 0x10DE,
-    AMD = 0x1002,
-    Intel = 0x8086,
-};
-};
+#define SAFE_CLOSE_HANDLE(p)                                                                                           \
+    do                                                                                                                 \
+    {                                                                                                                  \
+        if (p)                                                                                                         \
+        {                                                                                                              \
+            CloseHandle(p);                                                                                            \
+            (p) = nullptr;                                                                                             \
+        }                                                                                                              \
+    } while ((void) 0, 0)
 
 inline static std::string wstring_to_string(const std::wstring& wide_str)
 {
@@ -236,7 +177,9 @@ inline static void to_lower_in_place(std::string& string)
     std::transform(string.begin(), string.end(), string.begin(), ::tolower);
 }
 
-inline static void to_lower_in_place(std::wstring& string)
+inline static void to_lower_in_place(std::wstring& wstring)
 {
-    std::transform(string.begin(), string.end(), string.begin(), ::towlower);
+    std::transform(wstring.begin(), wstring.end(), wstring.begin(), ::towlower);
 }
+
+#include "OptiTypes.h"

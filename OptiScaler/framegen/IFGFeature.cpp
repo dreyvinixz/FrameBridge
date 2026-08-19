@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "IFGFeature.h"
 #include <Config.h>
+#include <low_latency/input/input_common.h>
 
 int IFGFeature::GetIndex() { return (_frameCount % BUFFER_COUNT); }
 
@@ -154,7 +155,7 @@ int IFGFeature::GetDispatchIndex(UINT64& willDispatchFrame)
     }
 
     _lastDispatchedFrame = willDispatchFrame;
-    _lastFGFrame = State::Instance().FGLastFrame;
+    _lastFGFrame = State::Instance().fgLastFrame;
 
     return (willDispatchFrame % BUFFER_COUNT);
 }
@@ -181,15 +182,18 @@ void IFGFeature::SetFrameCount(UINT64 frameId)
 {
     // Only change frame count, if it's lower than current one
     // Or higher than allowed frame ahead
-    if (frameId < _frameCount || (frameId - _frameCount) > Config::Instance()->FGAllowedFrameAhead.value_or_default())
-    {
-        LOG_DEBUG("Old: {}, New: {}", _frameCount, frameId);
-        _frameCount = frameId;
-    }
-    else if (frameId != _frameCount)
-    {
-        LOG_TRACE("Prevented setting frame count! Old: {}, New: {}", _frameCount, frameId);
-    }
+    // if (frameId < _frameCount || (frameId - _frameCount) >
+    // Config::Instance()->FGAllowedFrameAhead.value_or_default())
+    //{
+    //    LOG_DEBUG("Old: {}, New: {}", _frameCount, frameId);
+    //    _frameCount = frameId;
+    //}
+    // else if (frameId != _frameCount)
+    //{
+    //    LOG_TRACE("Prevented setting frame count! Old: {}, New: {}", _frameCount, frameId);
+    //}
+
+    _frameCount = frameId;
 }
 
 void IFGFeature::SetJitter(float x, float y, int index)

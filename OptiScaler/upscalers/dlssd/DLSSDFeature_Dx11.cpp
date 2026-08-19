@@ -195,7 +195,9 @@ bool DLSSDFeatureDx11::Evaluate(ID3D11DeviceContext* InDeviceContext, NVSDK_NGX_
             RCAS->CanRender())
         {
             RcasConstants rcasConstants {};
-
+            rcasConstants.DepthIsLinear = DepthLinear();
+            rcasConstants.DepthIsReversed = DepthInverted();
+            rcasConstants.IsHdr = IsHdr();
             rcasConstants.Sharpness = _sharpness;
             InParameters->Get(NVSDK_NGX_Parameter_MV_Scale_X, &rcasConstants.MvScaleX);
             InParameters->Get(NVSDK_NGX_Parameter_MV_Scale_Y, &rcasConstants.MvScaleY);
