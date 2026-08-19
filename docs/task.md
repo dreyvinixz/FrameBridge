@@ -129,3 +129,14 @@ Referência operacional: [`UPSTREAM_INTEGRATION.md`](UPSTREAM_INTEGRATION.md).
 - `[ ]` Reexecutar a validação estática, build e benchmark após cada correção de integração
 - `[ ]` Manter o RAR de referência apenas para auditoria; nunca incluí-lo no Git ou no pacote de release
 - `[ ]` Encerrar a integração somente após evidência registrada de build, benchmark e teste no FINAL FANTASY VII REBIRTH
+
+### Critérios das pendências atuais
+
+| Item | Por que permanece aberto | Evidência necessária para concluir |
+| --- | --- | --- |
+| 5B benchmark e validação; 6D suíte focada | Os scripts históricos em `tests/` instrumentam o backend `FSR31Feature_Dx12.cpp`, removido do runtime ativo. O workflow `benchmark_builds.yml` compila o DLL de validação, mas não coleta amostras de `EvaluateInternal()` no FFX DX12. | Cenário reproduzível no FFX DX12, amostras legacy/snapshot e métricas média, P50, P95, P99 e máximo. |
+| 6D APIs/backends | A compilação comprova a integração estática, não o comportamento de cada API/backend em uma GPU/jogo real. | Matriz de execução registrada por API/backend e logs sem erro crítico. |
+| 6D FINAL FANTASY VII REBIRTH e 6C asset FSR4 | O DLL AMD oficial foi verificado e incluído, mas compatibilidade só pode ser comprovada após instalação e execução no jogo. | Instalação limpa, sessão de jogo, log e resultado do preset/FG utilizados. |
+| Hashes finais de artefato | O instalador só existe depois do workflow de release em `main`. | URL/tag da release e SHA-256 do instalador publicado. |
+
+Os itens de build, manifesto, commits e CI serão atualizados somente quando o commit final da integração concluir os respectivos gates. O roadmap de Diagnostics/Launcher está em `docs/Sprint.md` e não é pré-requisito para esta release de runtime.
