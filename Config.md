@@ -207,7 +207,7 @@ FsrNonLinearPQ=auto
 FsrAgilitySDKUpgrade=auto
 ```
 
-`Dx12Upscaler=ffx` selects the current FFX DX12 backend. The official signed FSR 4.0.2 upscaler DLL is included as a pinned release input; use `UpscalerIndex=auto` unless you are diagnosing a title-specific issue.
+`Dx12Upscaler=ffx` selects the current FFX DX12 backend. The official signed FSR 4.0.2 upscaler DLL is included as a pinned release input for the optional Radeon RX 9000/RDNA4 installer task; use `UpscalerIndex=auto` unless you are diagnosing a title-specific issue. Other hardware should use the provider selected by `auto` (normally FSR 3.1.5 or another supported backend).
 
 To improve image quality, try to match the vertical or horizontal FOV of your game. The default is 60° vertical FOV and most of the time it works fine. The camera, reactive-mask, barrier, velocity and temporal-tuning values are runtime parameters: changes from the menu or a completed INI reload are published for the next evaluation. `UpscalerIndex`, `FGIndex`, colour-space hints and library/bootstrap options require context recreation or a restart; do not change them while diagnosing a live frame. Output scaling changes are handled through the normal resolution/resource-recreation path.
 
