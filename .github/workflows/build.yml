@@ -129,16 +129,17 @@ jobs:
         $content = $content -replace '#define MyAppVersion ".*"', '#define MyAppVersion "${{ steps.version.outputs.VERSION }}"'
         Set-Content -Path $issPath -Value $content -Encoding UTF8
 
+    - name: Install pinned Inno Setup 6.7.4
+      id: install_inno
+      shell: pwsh
+      run: .\scripts\Install-InnoSetup.ps1
+
     - name: Compile Inno Setup Installer
       shell: powershell
+      env:
+        ISCC_PATH: ${{ steps.install_inno.outputs.iscc }}
       run: |
-        choco install innosetup --version=6.7.4 -y
-        # The default install path for Inno Setup 6 via chocolatey
-        $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
-        if (-not (Test-Path $iscc)) {
-          $iscc = "C:\Program Files\Inno Setup 6\ISCC.exe"
-        }
-        & $iscc "installer\setup.iss" /O+
+        & $env:ISCC_PATH "installer\setup.iss" /O+
 
 
     - name: Get Commit Messages for Release Notes

@@ -73,21 +73,18 @@ jobs:
       run: .\scripts\Prepare-InstallerPayload.ps1
 
     - name: Install pinned Inno Setup 6.7.4
+      id: install_inno
       shell: pwsh
-      run: choco install innosetup --version=6.7.4 -y --no-progress
+      run: .\scripts\Install-InnoSetup.ps1
 
     - name: Compile and inspect installer payload
       shell: pwsh
+      env:
+        ISCC_PATH: ${{ steps.install_inno.outputs.iscc }}
       run: |
-        $isccCandidates = @(
-          "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
-          "C:\Program Files\Inno Setup 6\ISCC.exe"
-        )
-        $iscc = $isccCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-        if (-not $iscc) { throw "ISCC.exe was not found after installing Inno Setup 6.7.4." }
-
+        $iscc = $env:ISCC_PATH
+        if (-not (Test-Path -LiteralPath $iscc)) { throw "ISCC.exe is missing: $iscc" }
         $actualVersion = (Get-Item -LiteralPath $iscc).VersionInfo.ProductVersion
-        if (-not $actualVersion.StartsWith("6.7.4")) { throw "Expected Inno Setup 6.7.4, found $actualVersion." }
 
         $outputDir = Join-Path $env:RUNNER_TEMP "FrameBridgeInstallerOutput"
         New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
