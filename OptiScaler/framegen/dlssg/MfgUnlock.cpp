@@ -129,8 +129,8 @@ bool ApplyPatches(HMODULE module, const std::vector<BytePatch>& patches)
         }
 
         DWORD oldProtect = 0;
-        if (!VirtualProtect(reinterpret_cast<LPVOID>(patch.address), patch.bytes.size(),
-                            PAGE_EXECUTE_READWRITE, &oldProtect))
+        if (!VirtualProtect(reinterpret_cast<LPVOID>(patch.address), patch.bytes.size(), PAGE_EXECUTE_READWRITE,
+                            &oldProtect))
         {
             LOG_WARN("MFG unlock: VirtualProtect failed at {:X}", patch.address);
             break;
@@ -156,8 +156,8 @@ bool ApplyPatches(HMODULE module, const std::vector<BytePatch>& patches)
     for (auto it = applied.rbegin(); it != applied.rend(); ++it)
     {
         DWORD ignored = 0;
-        if (VirtualProtect(reinterpret_cast<LPVOID>(it->address), it->original.size(),
-                           PAGE_EXECUTE_READWRITE, &ignored))
+        if (VirtualProtect(reinterpret_cast<LPVOID>(it->address), it->original.size(), PAGE_EXECUTE_READWRITE,
+                           &ignored))
         {
             std::memcpy(reinterpret_cast<void*>(it->address), it->original.data(), it->original.size());
             FlushInstructionCache(GetCurrentProcess(), reinterpret_cast<LPCVOID>(it->address), it->original.size());
@@ -340,8 +340,8 @@ bool FindAdaPtxEntry(const uint8_t* fat, size_t fatSize, size_t& entryOffset)
 
 // Decompress the Ada PTX, rewrite the blend weights, and re-emit a truncated
 // fatbin that ends after it (dropping the precompiled cubin forces the JIT).
-bool BuildTemporalFatbin(const uint8_t* fat, size_t fatSize, const TemporalProfile& profile,
-                         std::vector<uint8_t>& out, std::string& why)
+bool BuildTemporalFatbin(const uint8_t* fat, size_t fatSize, const TemporalProfile& profile, std::vector<uint8_t>& out,
+                         std::string& why)
 {
     size_t entry = 0;
     if (!FindAdaPtxEntry(fat, fatSize, entry))
@@ -375,12 +375,10 @@ bool BuildTemporalFatbin(const uint8_t* fat, size_t fatSize, const TemporalProfi
 
     const std::string entrySignature = std::string(".entry ") + profile.entryName + "(";
     const std::string parameterName = std::string(profile.entryName) + "_param_0";
-    const std::string parameterSignature =
-        std::string(".param .align 8 .b8 ") + parameterName + "[144]";
+    const std::string parameterSignature = std::string(".param .align 8 .b8 ") + parameterName + "[144]";
     const std::string ptxText(reinterpret_cast<const char*>(ptx.data()), ptx.size());
 
-    if (ptxText.find(entrySignature) == std::string::npos ||
-        ptxText.find(parameterSignature) == std::string::npos ||
+    if (ptxText.find(entrySignature) == std::string::npos || ptxText.find(parameterSignature) == std::string::npos ||
         ptxText.find(".reg .f32 %f<1362>;") == std::string::npos)
     {
         why = "temporal kernel signature changed";
@@ -464,7 +462,8 @@ bool BuildTemporalFatbin(const uint8_t* fat, size_t fatSize, const TemporalProfi
         return false;
     }
 
-    const std::string temporalInput = "ld.param.f32 %f134, [" + parameterName + "+32];\r\n"
+    const std::string temporalInput = "ld.param.f32 %f134, [" + parameterName +
+                                      "+32];\r\n"
                                       "mov.f32 %f135, 0f3F800000;\r\n"
                                       "sub.ftz.f32 %f136, %f135, %f134;\r\n";
 
@@ -542,8 +541,8 @@ bool PointsToCString(const uint8_t* base, size_t imageSize, uint64_t value, cons
     return std::memcmp(s, expected, len + 1) == 0;
 }
 
-bool ReadRelativePointer(const uint8_t* base, size_t imageSize, const uint8_t* slot,
-                         ptrdiff_t displacement, uint64_t& value)
+bool ReadRelativePointer(const uint8_t* base, size_t imageSize, const uint8_t* slot, ptrdiff_t displacement,
+                         uint64_t& value)
 {
     const uintptr_t start = reinterpret_cast<uintptr_t>(base);
     const uintptr_t end = start + imageSize;
@@ -588,8 +587,7 @@ bool IsMappedToModule(HMODULE module, const void* address)
         return false;
 
     HMODULE owner = nullptr;
-    if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
-                                GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+    if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
                             reinterpret_cast<LPCWSTR>(address), &owner))
         return false;
 
@@ -746,10 +744,9 @@ bool FindTemporalTarget(HMODULE module, TemporalTarget& target, Accept&& accept,
 unsigned int ApplyMidpointFix(HMODULE module, std::string& detail)
 {
     TemporalTarget target;
-    const bool found = FindTemporalTarget(module, target,
-                                          [](const uint8_t* fat, size_t fatSize, const TemporalProfile& profile)
-                                          { return FindTemporalProfile(fat, fatSize) == &profile; },
-                                          detail);
+    const bool found = FindTemporalTarget(
+        module, target, [](const uint8_t* fat, size_t fatSize, const TemporalProfile& profile)
+        { return FindTemporalProfile(fat, fatSize) == &profile; }, detail);
     if (!found)
         return 0;
 
@@ -845,8 +842,7 @@ void Reset(HMODULE module)
     for (auto it = g_patches.rbegin(); it != g_patches.rend(); ++it)
     {
         HMODULE owner = nullptr;
-        if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
-                                    GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+        if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
                                 reinterpret_cast<LPCWSTR>(it->slot), &owner) ||
             owner != module)
             continue;
@@ -882,12 +878,18 @@ struct Direction
 constexpr Direction kDirections[] = {
     { "fma.rn.ftz.f32 %f14, %f7, %f7, %f157;\n",
       { "%f7", "%f8", "%f9" },
-      { { "%f55", "%f56", "%f57" }, { "%f78", "%f79", "%f80" }, { "%f97", "%f98", "%f99" }, { "%f120", "%f121", "%f122" } },
+      { { "%f55", "%f56", "%f57" },
+        { "%f78", "%f79", "%f80" },
+        { "%f97", "%f98", "%f99" },
+        { "%f120", "%f121", "%f122" } },
       "%f14",
       false },
     { "fma.rn.ftz.f32 %f22, %f15, %f15, %f942;\n",
       { "%f15", "%f16", "%f17" },
-      { { "%f840", "%f841", "%f842" }, { "%f863", "%f864", "%f865" }, { "%f882", "%f883", "%f884" }, { "%f905", "%f906", "%f907" } },
+      { { "%f840", "%f841", "%f842" },
+        { "%f863", "%f864", "%f865" },
+        { "%f882", "%f883", "%f884" },
+        { "%f905", "%f906", "%f907" } },
       "%f22",
       true },
 };
@@ -926,8 +928,7 @@ std::string GuardProgram(const Direction& direction, bool aggressive, const std:
 {
     const char* depthLimit = aggressive ? "0f40000000" : "0f40400000";
 
-    std::string program = std::format("// MFGUNLOCK_BOUNDARY_GUARD_{}_V1_{}\n",
-                                      aggressive ? "AGGRESSIVE" : "BALANCED",
+    std::string program = std::format("// MFGUNLOCK_BOUNDARY_GUARD_{}_V1_{}\n", aggressive ? "AGGRESSIVE" : "BALANCED",
                                       direction.reloadDivisor ? "PREV_TO_CURR" : "CURR_TO_PREV");
 
     if (direction.reloadDivisor)
@@ -981,8 +982,7 @@ std::string GuardProgram(const Direction& direction, bool aggressive, const std:
 
 // Pulls the sm_120 program out of the container. The guard anchors only exist in that
 // program; the Ada one uses different registers, so this is the upstream source.
-bool ExtractSource(const uint8_t* fat, size_t fatSize, const TemporalProfile& profile, Source& source,
-                   std::string& why)
+bool ExtractSource(const uint8_t* fat, size_t fatSize, const TemporalProfile& profile, Source& source, std::string& why)
 {
     if (fatSize < kOuterHeader || ReadU32(fat) != kFatbinMagic)
     {
@@ -991,8 +991,7 @@ bool ExtractSource(const uint8_t* fat, size_t fatSize, const TemporalProfile& pr
     }
 
     const size_t entry = kOuterHeader;
-    if (entry + 64 > fatSize || ReadU16(fat + entry) != kPtxKind ||
-        ReadU32(fat + entry + 28) != kGuardArch)
+    if (entry + 64 > fatSize || ReadU16(fat + entry) != kPtxKind || ReadU32(fat + entry + 28) != kGuardArch)
     {
         why = "container has no leading sm_120 PTX program";
         return false;
@@ -1018,8 +1017,8 @@ bool ExtractSource(const uint8_t* fat, size_t fatSize, const TemporalProfile& pr
         }
 
         text.resize(static_cast<size_t>(raw));
-        if (!Lz4BlockDecompress(fat + entry + entryHeader, compressed,
-                                reinterpret_cast<uint8_t*>(text.data()), text.size()))
+        if (!Lz4BlockDecompress(fat + entry + entryHeader, compressed, reinterpret_cast<uint8_t*>(text.data()),
+                                text.size()))
         {
             why = "sm_120 PTX decompression failed";
             return false;
@@ -1066,8 +1065,7 @@ bool BuildGuardFatbin(const Source& source, bool aggressive, std::vector<uint8_t
     if (!ReplaceOnce(text, ".target sm_120", ".target sm_89 ", "target directive", why))
         return false;
 
-    if (!ReplaceOnce(text, ".reg .pred %p<656>;\n",
-                     ".reg .pred %p<656>;\n.reg .pred %qgp<2>;\n.reg .f32 %qgf<12>;\n",
+    if (!ReplaceOnce(text, ".reg .pred %p<656>;\n", ".reg .pred %p<656>;\n.reg .pred %qgp<2>;\n.reg .f32 %qgf<12>;\n",
                      "guard register declaration", why))
         return false;
 
@@ -1164,9 +1162,8 @@ unsigned int Apply(HMODULE module, int mode, std::string& detail)
 
     g_allocation = mem;
     g_module = module;
-    detail = std::format("redirected {} {} descriptor(s) to the {} boundary guard program",
-                         g_patches.size(), target.profile->descriptorName,
-                         mode == kAggressive ? "aggressive" : "balanced");
+    detail = std::format("redirected {} {} descriptor(s) to the {} boundary guard program", g_patches.size(),
+                         target.profile->descriptorName, mode == kAggressive ? "aggressive" : "balanced");
     return static_cast<unsigned int>(g_patches.size());
 }
 } // namespace boundary
@@ -1211,9 +1208,8 @@ bool PatchAdvertise(HMODULE module)
     const uint8_t count[] = { kMaxGeneratedFrames };
     const uint8_t nop[] = { 0x0F, 0x1F, 0x40, 0x00 };
 
-    LOG_INFO("MFG unlock: advertise at {:X}, count {} -> {}, cmovl {} -> {}", address,
-             *(const uint8_t*) countAt, kMaxGeneratedFrames, Hex((const uint8_t*) cmovAt, sizeof(nop)),
-             Hex(nop, sizeof(nop)));
+    LOG_INFO("MFG unlock: advertise at {:X}, count {} -> {}, cmovl {} -> {}", address, *(const uint8_t*) countAt,
+             kMaxGeneratedFrames, Hex((const uint8_t*) cmovAt, sizeof(nop)), Hex(nop, sizeof(nop)));
 
     return ApplyPatches(module, { { countAt, std::vector<uint8_t>(count, count + sizeof(count)) },
                                   { cmovAt, std::vector<uint8_t>(nop, nop + sizeof(nop)) } });
@@ -1272,9 +1268,11 @@ unsigned int RewriteBlackwellKernels(HMODULE module)
 {
     auto base = reinterpret_cast<uint8_t*>(module);
     const auto dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(base);
-    if (dos->e_magic != IMAGE_DOS_SIGNATURE) return 0;
+    if (dos->e_magic != IMAGE_DOS_SIGNATURE)
+        return 0;
     const auto nt = reinterpret_cast<const IMAGE_NT_HEADERS64*>(base + dos->e_lfanew);
-    if (nt->Signature != IMAGE_NT_SIGNATURE) return 0;
+    if (nt->Signature != IMAGE_NT_SIGNATURE)
+        return 0;
     const auto section = IMAGE_FIRST_SECTION(nt);
 
     const uint8_t magic[] = { 0x50, 0xED, 0x55, 0xBA };
@@ -1321,8 +1319,8 @@ unsigned int RewriteBlackwellKernels(HMODULE module)
                 const auto payload = *reinterpret_cast<const uint64_t*>(image + kImagePayloadSize);
                 const auto arch = *reinterpret_cast<const uint32_t*>(image + kImageArch);
 
-                if (imageHeader < kImageArch + sizeof(uint32_t) || imageHeader > remaining ||
-                    payload == 0 || payload > remaining - imageHeader)
+                if (imageHeader < kImageArch + sizeof(uint32_t) || imageHeader > remaining || payload == 0 ||
+                    payload > remaining - imageHeader)
                 {
                     valid = false;
                     break;
@@ -1517,8 +1515,8 @@ void MfgUnlock::TryApply(HMODULE requestedModule)
 unsigned int MfgUnlock::UnlockedMax()
 {
     const auto& status = LastStatus();
-    const bool contentReady = status.KernelsRewritten > 0 || status.TemporalFixPatches > 0 ||
-                              status.BoundaryMitigationPatches > 0;
+    const bool contentReady =
+        status.KernelsRewritten > 0 || status.TemporalFixPatches > 0 || status.BoundaryMitigationPatches > 0;
 
     return status.AdvertiseMatched && status.ValidateMatched && contentReady ? kMaxGeneratedFrames : 0;
 }
@@ -1532,8 +1530,7 @@ bool MfgUnlock::Pending()
         return false;
 
     if (g_status.ModuleFound &&
-        (State::Instance().nativeDlssgModule == nullptr ||
-         State::Instance().nativeDlssgModule == g_attemptedModule))
+        (State::Instance().nativeDlssgModule == nullptr || State::Instance().nativeDlssgModule == g_attemptedModule))
         return false;
 
     if (!IsSupportedGpu())

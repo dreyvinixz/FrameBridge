@@ -43,8 +43,8 @@ Status ProbeCandidate(bool forceRefresh)
     const uint32_t archId = static_cast<uint32_t>(gpu.nvidiaArchInfo.architecture_id);
     // The third-party runtime documents RTX 20, not all SM75 devices. GTX 16
     // lacks Tensor Cores and is deliberately rejected despite sharing Turing's arch ID.
-    const bool isTuring = gpu.name.find("RTX 20") != std::string::npos ||
-                         gpu.name.find("TITAN RTX") != std::string::npos;
+    const bool isTuring =
+        gpu.name.find("RTX 20") != std::string::npos || gpu.name.find("TITAN RTX") != std::string::npos;
 
     auto basePath = Util::DllPath().parent_path();
     std::filesystem::path dllPath;
@@ -546,8 +546,8 @@ void TrySetup()
 
     // The third-party runtime documents RTX 20, not all SM75 devices. GTX 16
     // lacks Tensor Cores and is deliberately rejected despite sharing Turing's arch ID.
-    const bool isTuring = gpu.name.find("RTX 20") != std::string::npos ||
-                         gpu.name.find("TITAN RTX") != std::string::npos;
+    const bool isTuring =
+        gpu.name.find("RTX 20") != std::string::npos || gpu.name.find("TITAN RTX") != std::string::npos;
 
     if (!isAmpere && !isTuring)
     {

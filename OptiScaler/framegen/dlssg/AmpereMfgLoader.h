@@ -971,8 +971,7 @@ inline std::string ResolveRouter(uint32_t archId, const std::string& gpuName = "
     // Fallback: name matching
     if (!gpuName.empty())
     {
-        if (gpuName.find("RTX 20") != std::string::npos ||
-            gpuName.find("TITAN RTX") != std::string::npos ||
+        if (gpuName.find("RTX 20") != std::string::npos || gpuName.find("TITAN RTX") != std::string::npos ||
             gpuName.find("TU10") != std::string::npos || gpuName.find("TU11") != std::string::npos)
             return turingAuto;
 
@@ -997,12 +996,11 @@ std::string ResolveAutoKernelImage();
 
 inline std::string ResolveAutoKernelImage(uint32_t archId, const std::string& name, bool onLinux)
 {
-    const bool supportedTuring = name.find("RTX 20") != std::string::npos ||
-                                 name.find("TITAN RTX") != std::string::npos;
+    const bool supportedTuring =
+        name.find("RTX 20") != std::string::npos || name.find("TITAN RTX") != std::string::npos;
     return onLinux || (IsTuringArch(archId) && supportedTuring) || supportedTuring ||
-                   name.find("3080 Ti") != std::string::npos ||
-                   name.find("3080Ti") != std::string::npos || name.find("Laptop") != std::string::npos ||
-                   name.find("Mobile") != std::string::npos
+                   name.find("3080 Ti") != std::string::npos || name.find("3080Ti") != std::string::npos ||
+                   name.find("Laptop") != std::string::npos || name.find("Mobile") != std::string::npos
                ? "PTX"
                : "Auto";
 }

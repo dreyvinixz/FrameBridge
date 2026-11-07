@@ -681,12 +681,10 @@ sl::Result StreamlineHooks::hkslDLSSGSetOptions(const sl::ViewportHandle& viewpo
 
     const bool dlssgMayRun = newOptions.mode != sl::DLSSGMode::eOff;
     if (!state.externalFrameGeneration && nativeGameDlssg && dlssgMayRun &&
-        Config::Instance()->FGDLSSGOverrideForceDMFG.value_or_default() &&
-        state.dlssgGameDMFGSupported)
+        Config::Instance()->FGDLSSGOverrideForceDMFG.value_or_default() && state.dlssgGameDMFGSupported)
         newOptions.mode = sl::DLSSGMode::eDynamic;
 
-    if (newOptions.mode == sl::DLSSGMode::eDynamic &&
-        Config::Instance()->FGDLSSGFramerateTargetDMFG.has_value())
+    if (newOptions.mode == sl::DLSSGMode::eDynamic && Config::Instance()->FGDLSSGFramerateTargetDMFG.has_value())
         newOptions.dynamicTargetFrameRate = Config::Instance()->FGDLSSGFramerateTargetDMFG.value();
 
     if (!state.externalFrameGeneration && nativeGameDlssg && dlssgMayRun &&
@@ -700,9 +698,8 @@ sl::Result StreamlineHooks::hkslDLSSGSetOptions(const sl::ViewportHandle& viewpo
         else
         {
             const auto unlockedMax = MfgUnlock::UnlockedMax();
-            const int availableMax = unlockedMax > 0
-                                         ? static_cast<int>(unlockedMax)
-                                         : std::max(1, state.dlssgMaxInterpolationCount);
+            const int availableMax =
+                unlockedMax > 0 ? static_cast<int>(unlockedMax) : std::max(1, state.dlssgMaxInterpolationCount);
             newOptions.numFramesToGenerate = std::clamp(overrideCount, 1, std::min(5, availableMax));
         }
     }
@@ -737,8 +734,8 @@ sl::Result StreamlineHooks::hkslDLSSGGetState(const sl::ViewportHandle& viewport
         runtimeState.dlssgGameDMFGSupported = state.bIsDynamicMFGSupported == sl::Boolean::eTrue;
         if (state.structVersion >= 2)
         {
-            const bool nativeGameDlssg = runtimeState.activeFgInput == FGInput::NoFG &&
-                                         runtimeState.activeFgOutput == FGOutput::NoFG;
+            const bool nativeGameDlssg =
+                runtimeState.activeFgInput == FGInput::NoFG && runtimeState.activeFgOutput == FGOutput::NoFG;
             if (nativeGameDlssg && Config::Instance()->FGDLSSGAdaMfgUnlock.value_or_default())
                 MfgUnlock::TryApply(runtimeState.nativeDlssgModule);
             const auto unlockedMax = nativeGameDlssg ? MfgUnlock::UnlockedMax() : 0;

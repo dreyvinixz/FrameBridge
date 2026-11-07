@@ -246,8 +246,8 @@ bool Config::Reload(std::filesystem::path iniPath)
 
             if (FGDLSSGAmpereMfgUnlock.value_or_default())
             {
-                const bool adaUnlockRequested = FGDLSSGAdaMfgUnlock.value_or_default() ||
-                                                FGDLSSGUnlockAdaMFG.value_or_default();
+                const bool adaUnlockRequested =
+                    FGDLSSGAdaMfgUnlock.value_or_default() || FGDLSSGUnlockAdaMFG.value_or_default();
                 if (adaUnlockRequested)
                     LOG_WARN("Config: Ampere/Turing and Ada MFG unlocks conflict; disabling Ada unlock.");
                 FGDLSSGAdaMfgUnlock.set_from_config(false);
@@ -837,8 +837,7 @@ bool Config::SaveIni()
 
     // Frame Generation
     {
-        ini.SetValue("Performance", "LowVRAMMode",
-                     GetBoolValue(Instance()->LowVRAMMode.value_for_config()).c_str());
+        ini.SetValue("Performance", "LowVRAMMode", GetBoolValue(Instance()->LowVRAMMode.value_for_config()).c_str());
         ini.SetValue("FrameGen", "Enabled", GetBoolValue(Instance()->FGEnabled.value_for_config()).c_str());
         ini.SetValue("FrameGen", "DebugView", GetBoolValue(Instance()->FGDebugView.value_for_config()).c_str());
         std::string FGInputString = "auto";
@@ -958,12 +957,10 @@ bool Config::SaveIni()
                      GetIntValue(Instance()->FGDLSSGOverrideInterpolationCount.value_for_config()).c_str());
         ini.SetValue("DLSSG", "OverrideForceDMFG",
                      GetBoolValue(Instance()->FGDLSSGOverrideForceDMFG.value_for_config()).c_str());
-        ini.SetValue("DLSSG", "ForceDMFG",
-                     GetBoolValue(Instance()->FGDLSSGForceDMFG.value_for_config()).c_str());
+        ini.SetValue("DLSSG", "ForceDMFG", GetBoolValue(Instance()->FGDLSSGForceDMFG.value_for_config()).c_str());
         ini.SetValue("DLSSG", "FramerateTargetDMFG",
                      GetFloatValue(Instance()->FGDLSSGFramerateTargetDMFG.value_for_config()).c_str());
-        ini.SetValue("DLSSG", "AdaMfgUnlock",
-                     GetBoolValue(Instance()->FGDLSSGAdaMfgUnlock.value_for_config()).c_str());
+        ini.SetValue("DLSSG", "AdaMfgUnlock", GetBoolValue(Instance()->FGDLSSGAdaMfgUnlock.value_for_config()).c_str());
         ini.SetValue("DLSSG", "AdaBlackwellKernels",
                      GetBoolValue(Instance()->FGDLSSGAdaBlackwellKernels.value_for_config()).c_str());
         ini.SetValue("DLSSG", "BoundaryMitigation",
