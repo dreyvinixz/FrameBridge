@@ -4,7 +4,7 @@ Last reviewed: 2026-11-07
 
 ## Current state
 
-- **Current audit branch:** `codex/low-latency-audit-2026-11-07`, created from `codex/freetype-vram-audit-2026-11-07` at `6e141f6`. Audit and benchmark plan are in `docs/LOW_LATENCY_MFG_AUDIT.md`. This branch currently adds documentation only; no runtime performance change or latency improvement is claimed. `main` and release `v1.0.68` remain untouched. This branch has documentation commits on GitHub; no merge or release was made.
+- **Current audit branch:** `codex/low-latency-audit-2026-11-07`, created from `codex/freetype-vram-audit-2026-11-07` at `6e141f6`. Audit, implemented changes, benchmark matrix and release gates are in `docs/LOW_LATENCY_MFG_AUDIT.md`. This branch now includes an **opt-in experimental Streamline option cache** and corrected latency-report provenance; **no measured input-latency improvement is claimed**. `main` and release `v1.0.68` remain untouched. This branch has documentation commits on GitHub; no merge or release was made.
 - Previous integration work was on `codex/freetype-vram-audit-2026-11-07` (based on `codex/update-audit-2026-11-07`).
 - The runtime source tree is based on OptiScaler development commit `d94fb15f03800fe48d36cc31e9e042c66f508a3f` (446 commits after the old target). This is not the stable v0.9.4 release and remains a candidate pending build and runtime validation.
 - Updated pins: FidelityFX SDK v2.4.0, magic_enum v0.9.8, spdlog v1.17.0, unordered_dense v5.3.3, plus Vulkan-Headers aligned to upstream. XeSS v3.0.2 and Nukem9 v0.130 remain unchanged.
@@ -18,9 +18,12 @@ Last reviewed: 2026-11-07
 
 ## Low-latency audit findings (2026-11-07)
 
-- Static code review identified synthetic GPU/driver/OS latency fields in `OptiScaler/low_latency/input/input_common.cpp` and a missing Reflex backend in the low-latency translation layer (native Reflex pathways are separate). Do not report those synthetic fields as measured performance.
+- The synthetic GPU/driver/OS timing fields in `OptiScaler/low_latency/input/input_common.cpp` have now been removed from fallback reports (zero means unavailable); `Reflex_Hooks.cpp` guards missing/zero-duration timing data. The missing Reflex output backend in the translation layer is still an open research task; native Reflex pathways are separate.
 - Further hypotheses: repeated DLSS-G/Reflex SetOptions in Dispatch; possible FPS-cap mismatch with high MFG multipliers; LatencyFlex sleep/reset and lock contention; FSR-FG frame pacing; DXGI waitable-object ownership in Streamline. All require measurement; do not prematurely remove pacing sleeps or force DXGI latency limits.
 - Prioritize instrumentation, marker correctness, input-to-photon/FrameView measurements, then isolated A/B optimizations. See `docs/LOW_LATENCY_MFG_AUDIT.md` for evidence, line ranges, experiment matrix, and release gates.
+
+- Experimental `[Performance] OptimizeStreamlineOptions=true` (default `auto`/false) caches successful DLSS-G static and Reflex options, invalidates on lifecycle events, retries errors, and logs counts on deactivation. Dynamic MFG DLSS-G options are still applied on every dispatch. The cache is only a candidate optimization, not a proven input-to-photon fix. Test with OFF/ON captures and restart between edits.
+- Portable unit tests: `g++ -std=c++20 -Wall -Wextra -Werror tests/applied_options_cache_test.cpp -o cache_test && ./cache_test`; `python3 -m unittest discover -s tests -p 'compare_latency_csv_test.py'`. The CI workflow now runs them for `codex/**` and builds Windows independently of formatting; no release pipeline is triggered. Compare captured data with `scripts/compare_latency_csv.py`, specifying the measured CSV column. For FrameView `MsBetweenDisplayChange` describes display cadence, NOT input-to-photon.
 
 ## Validation and outstanding work
 
