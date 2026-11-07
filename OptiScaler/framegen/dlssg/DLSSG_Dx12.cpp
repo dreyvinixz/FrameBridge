@@ -389,11 +389,13 @@ bool DLSSG_Dx12::Dispatch()
     // Experimental, opt-in: avoid redundant host -> Streamline calls only after success.
     // Keep dynamic MFG on its original per-frame configuration path until validated.
     const bool optimizeOptions = Config::Instance()->OptimizeStreamlineOptions.value_or_default();
-    const DlssgOptionsKey dlssgKey { options.mode, options.numFramesToGenerate, options.queueParallelismMode,
-                                    options.dynamicTargetFrameRate };
+    DlssgOptionsKey dlssgKey {};
+    std::get<0>(dlssgKey) = options.mode;
+    std::get<1>(dlssgKey) = options.numFramesToGenerate;
+    std::get<2>(dlssgKey) = options.queueParallelismMode;
+    std::get<3>(dlssgKey) = options.dynamicTargetFrameRate;
 
-    if (!optimizeOptions || options.mode == sl::DLSSGMode::eDynamic ||
-        _dlssgOptionsCache.needs_update(dlssgKey))
+    if (!optimizeOptions || options.mode == sl::DLSSGMode::eDynamic || _dlssgOptionsCache.needs_update(dlssgKey))
     {
         ++_dlssgSetCalls;
         auto dlssgSetOptionsResult = StreamlineProxy::DLSSGSetOptions()(viewport, options);
