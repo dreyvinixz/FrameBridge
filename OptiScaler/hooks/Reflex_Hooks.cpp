@@ -274,7 +274,7 @@ void* ReflexHooks::getHookedReflex(unsigned int InterfaceId)
 }
 
 #define UPDATE_TIMING_ENTRY(name, type)                                                                                \
-    if (frameReport.name##EndTime >= frameReport.name##StartTime)                                                      \
+    if (frameReport.name##EndTime > frameReport.name##StartTime)                                                       \
     {                                                                                                                  \
         double name##Pos = (double) (frameReport.name##StartTime - start) / rangeNs;                                   \
         double name##Length = (double) (frameReport.name##EndTime - frameReport.name##StartTime) / rangeNs;            \
@@ -320,7 +320,7 @@ bool ReflexHooks::updateTimingData()
             end = time;
     }
 
-    if (end < start)
+    if (end <= start)
         return false;
 
     double rangeNs = static_cast<double>(end - start);

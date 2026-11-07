@@ -15,6 +15,12 @@
 
 using namespace DirectX;
 
+void DLSSG_Dx12::InvalidateOptionCaches()
+{
+    _dlssgOptionsCache.invalidate();
+    _reflexOptionsCache.invalidate();
+}
+
 feature_version DLSSG_Dx12::Version()
 {
     if (StreamlineProxy::LoadStreamline())
@@ -41,6 +47,7 @@ bool DLSSG_Dx12::CreateSwapchain(IDXGIFactory* factory, ID3D12CommandQueue* cmdQ
                               desc->BufferDesc.Format, desc->Flags) == S_OK;
 
             *swapChain = State::Instance().currentFGSwapchain;
+            InvalidateOptionCaches();
             return result;
         }
         // Game is creating new swapchain without releasing old one,
@@ -128,6 +135,7 @@ bool DLSSG_Dx12::CreateSwapchain(IDXGIFactory* factory, ID3D12CommandQueue* cmdQ
     _swapChain = *swapChain;
     _hwnd = desc->OutputWindow;
 
+    InvalidateOptionCaches();
     return true;
 }
 
@@ -144,6 +152,7 @@ bool DLSSG_Dx12::CreateSwapchain1(IDXGIFactory* factory, ID3D12CommandQueue* cmd
                               desc->BufferCount, desc->Width, desc->Height, desc->Format, desc->Flags) == S_OK;
 
             *swapChain = (IDXGISwapChain1*) State::Instance().currentFGSwapchain;
+            InvalidateOptionCaches();
             return result;
         }
         // Game is creating new swapchain without releasing old one,
@@ -240,6 +249,7 @@ bool DLSSG_Dx12::CreateSwapchain1(IDXGIFactory* factory, ID3D12CommandQueue* cmd
     _swapChain = *swapChain;
     _hwnd = hwnd;
 
+    InvalidateOptionCaches();
     return true;
 }
 
@@ -251,6 +261,7 @@ void DLSSG_Dx12::CreateContext(ID3D12Device* device, FG_Constants& fgConstants)
         return;
 
     _device = device;
+    InvalidateOptionCaches();
     CreateObjects(device);
 
     if (_isActive)
@@ -270,6 +281,11 @@ void DLSSG_Dx12::Activate()
     {
 
         UpdateTarget();
+        InvalidateOptionCaches();
+        _dlssgSetCalls = 0;
+        _dlssgSkippedCalls = 0;
+        _reflexSetCalls = 0;
+        _reflexSkippedCalls = 0;
         _isActive = true;
     }
 }
@@ -277,9 +293,16 @@ void DLSSG_Dx12::Activate()
 void DLSSG_Dx12::Deactivate()
 {
     LOG_DEBUG("");
+    InvalidateOptionCaches();
 
     if (_isActive)
     {
+        if (Config::Instance()->OptimizeStreamlineOptions.value_or_default())
+        {
+            LOG_INFO("Streamline option cache: DLSS-G SetOptions={}, skipped={}; Reflex SetOptions={}, skipped={}",
+                     _dlssgSetCalls, _dlssgSkippedCalls, _reflexSetCalls, _reflexSkippedCalls);
+        }
+
         sl::DLSSGOptions options {};
         options.mode = sl::DLSSGMode::eOff;
         options.queueParallelismMode = sl::DLSSGQueueParallelismMode::eBlockPresentingClientQueue;
@@ -363,22 +386,52 @@ bool DLSSG_Dx12::Dispatch()
         options.dynamicTargetFrameRate = Config::Instance()->FGDLSSGFramerateTargetDMFG.value_or_default();
     }
 
-    auto dlssgSetOptionsResult = StreamlineProxy::DLSSGSetOptions()(viewport, options);
+    // Experimental, opt-in: avoid redundant host -> Streamline calls only after success.
+    // Keep dynamic MFG on its original per-frame configuration path until validated.
+    const bool optimizeOptions = Config::Instance()->OptimizeStreamlineOptions.value_or_default();
+    DlssgOptionsKey dlssgKey {};
+    std::get<0>(dlssgKey) = options.mode;
+    std::get<1>(dlssgKey) = options.numFramesToGenerate;
+    std::get<2>(dlssgKey) = options.queueParallelismMode;
+    std::get<3>(dlssgKey) = options.dynamicTargetFrameRate;
 
-    if (dlssgSetOptionsResult != sl::Result::eOk)
+    if (!optimizeOptions || options.mode == sl::DLSSGMode::eDynamic || _dlssgOptionsCache.needs_update(dlssgKey))
     {
-        LOG_ERROR("Couldn't set DLSSG options, error: {}", magic_enum::enum_name(dlssgSetOptionsResult));
+        ++_dlssgSetCalls;
+        auto dlssgSetOptionsResult = StreamlineProxy::DLSSGSetOptions()(viewport, options);
+        if (dlssgSetOptionsResult == sl::Result::eOk)
+            _dlssgOptionsCache.mark_applied(dlssgKey);
+        else
+        {
+            _dlssgOptionsCache.invalidate();
+            LOG_ERROR("Couldn't set DLSSG options, error: {}", magic_enum::enum_name(dlssgSetOptionsResult));
+        }
+    }
+    else
+    {
+        ++_dlssgSkippedCalls;
     }
 
     sl::ReflexOptions reflexConst = {};
     reflexConst.mode = sl::ReflexMode::eLowLatency;
     reflexConst.useMarkersToOptimize = ReflexHooks::gameIsSendingMarkers();
 
-    auto reflexSetOptionsResult = StreamlineProxy::ReflexSetOptions()(reflexConst);
-
-    if (reflexSetOptionsResult != sl::Result::eOk)
+    const ReflexOptionsKey reflexKey { reflexConst.mode, reflexConst.useMarkersToOptimize };
+    if (!optimizeOptions || _reflexOptionsCache.needs_update(reflexKey))
     {
-        LOG_ERROR("Couldn't set Reflex options, error: {}", magic_enum::enum_name(reflexSetOptionsResult));
+        ++_reflexSetCalls;
+        auto reflexSetOptionsResult = StreamlineProxy::ReflexSetOptions()(reflexConst);
+        if (reflexSetOptionsResult == sl::Result::eOk)
+            _reflexOptionsCache.mark_applied(reflexKey);
+        else
+        {
+            _reflexOptionsCache.invalidate();
+            LOG_ERROR("Couldn't set Reflex options, error: {}", magic_enum::enum_name(reflexSetOptionsResult));
+        }
+    }
+    else
+    {
+        ++_reflexSkippedCalls;
     }
 
     if (!_haveHudless.has_value())
@@ -1137,6 +1190,7 @@ bool DLSSG_Dx12::ReleaseSwapchain(HWND hwnd)
         return false;
 
     LOG_DEBUG("");
+    InvalidateOptionCaches();
 
     if (Config::Instance()->FGUseMutexForSwapchain.value_or_default())
     {

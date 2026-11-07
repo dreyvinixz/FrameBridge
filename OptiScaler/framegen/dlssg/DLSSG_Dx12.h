@@ -3,6 +3,10 @@
 #include <framegen/IFGFeature_Dx12.h>
 
 #include <proxies/Streamline_Proxy.h>
+#include <runtime/AppliedOptionsCache.h>
+
+#include <tuple>
+#include <utility>
 
 class DLSSG_Dx12 : public virtual IFGFeature_Dx12
 {
@@ -17,6 +21,19 @@ class DLSSG_Dx12 : public virtual IFGFeature_Dx12
     ID3D12Fence* dlssgFence[BUFFER_COUNT] = {};
     UINT64 lastOptionFrame = 0;
 
+    // Only record options after Streamline reports successful application.
+    // These keys contain every non-default option currently sent by Dispatch().
+    using DlssgOptionsKey = std::tuple<sl::DLSSGMode, uint32_t, sl::DLSSGQueueParallelismMode, float>;
+    using ReflexOptionsKey = std::pair<sl::ReflexMode, bool>;
+    framebridge::AppliedOptionsCache<DlssgOptionsKey> _dlssgOptionsCache;
+    framebridge::AppliedOptionsCache<ReflexOptionsKey> _reflexOptionsCache;
+
+    UINT64 _dlssgSetCalls = 0;
+    UINT64 _dlssgSkippedCalls = 0;
+    UINT64 _reflexSetCalls = 0;
+    UINT64 _reflexSkippedCalls = 0;
+
+    void InvalidateOptionCaches();
     bool Dispatch();
 
   protected:

@@ -487,6 +487,8 @@ class Config
 
     // Performance profiles
     CustomOptional<bool> LowVRAMMode { false };
+    // Experimental: avoid redundant Streamline option setters when state is unchanged.
+    CustomOptional<bool> OptimizeStreamlineOptions { false };
 
     // Frame Generation
     CustomOptional<FGInput> FGInput { FGInput::NoFG };
