@@ -14,6 +14,7 @@
 #include <sl1_reflex.h>
 #include <nvapi/fakenvapi.h>
 #include <inputs/FG/DLSSG_Mod.h>
+#include <framegen/dlssg/MfgUnlock.h>
 
 sl::RenderAPI StreamlineHooks::renderApi = sl::RenderAPI::eCount;
 std::mutex StreamlineHooks::setConstantsMutex {};
@@ -667,9 +668,42 @@ bool StreamlineHooks::hkcommon_slOnPluginLoad(sl::param::IParameters* params, co
 
 sl::Result StreamlineHooks::hkslDLSSGSetOptions(const sl::ViewportHandle& viewport, const sl::DLSSGOptions& options)
 {
-    // Make DLSSG auto always mean On
+    // Make DLSSG auto always mean On while preserving native Dynamic MFG mode.
     sl::DLSSGOptions newOptions = options;
-    newOptions.mode = newOptions.mode == sl::DLSSGMode::eOff ? sl::DLSSGMode::eOff : sl::DLSSGMode::eOn;
+    if (newOptions.mode == sl::DLSSGMode::eAuto)
+        newOptions.mode = sl::DLSSGMode::eOn;
+
+    auto& state = State::Instance();
+    const bool nativeGameDlssg = state.activeFgInput == FGInput::NoFG && state.activeFgOutput == FGOutput::NoFG;
+    if (nativeGameDlssg && state.nativeDlssgModule != nullptr &&
+        Config::Instance()->FGDLSSGAdaMfgUnlock.value_or_default())
+        MfgUnlock::TryApply(state.nativeDlssgModule);
+
+    const bool dlssgMayRun = newOptions.mode != sl::DLSSGMode::eOff;
+    if (nativeGameDlssg && dlssgMayRun && Config::Instance()->FGDLSSGOverrideForceDMFG.value_or_default() &&
+        state.dlssgGameDMFGSupported)
+        newOptions.mode = sl::DLSSGMode::eDynamic;
+
+    if (newOptions.mode == sl::DLSSGMode::eDynamic &&
+        Config::Instance()->FGDLSSGFramerateTargetDMFG.has_value())
+        newOptions.dynamicTargetFrameRate = Config::Instance()->FGDLSSGFramerateTargetDMFG.value();
+
+    if (nativeGameDlssg && dlssgMayRun && Config::Instance()->FGDLSSGOverrideInterpolationCount.has_value())
+    {
+        const int overrideCount = Config::Instance()->FGDLSSGOverrideInterpolationCount.value();
+        if (overrideCount == 0)
+        {
+            newOptions.mode = sl::DLSSGMode::eOff;
+        }
+        else
+        {
+            const auto unlockedMax = MfgUnlock::UnlockedMax();
+            const int availableMax = unlockedMax > 0
+                                         ? static_cast<int>(unlockedMax)
+                                         : std::max(1, state.dlssgMaxInterpolationCount);
+            newOptions.numFramesToGenerate = std::clamp(overrideCount, 1, std::min(5, availableMax));
+        }
+    }
 
     if (State::Instance().swapchainApi == API::Vulkan)
     {
@@ -694,6 +728,23 @@ sl::Result StreamlineHooks::hkslDLSSGGetState(const sl::ViewportHandle& viewport
                                               const sl::DLSSGOptions* options)
 {
     auto result = o_slDLSSGGetState(viewport, state, options);
+
+    if (result == sl::Result::eOk)
+    {
+        auto& runtimeState = State::Instance();
+        runtimeState.dlssgGameDMFGSupported = state.bIsDynamicMFGSupported == sl::Boolean::eTrue;
+        if (state.structVersion >= 2)
+        {
+            const bool nativeGameDlssg = runtimeState.activeFgInput == FGInput::NoFG &&
+                                         runtimeState.activeFgOutput == FGOutput::NoFG;
+            if (nativeGameDlssg && Config::Instance()->FGDLSSGAdaMfgUnlock.value_or_default())
+                MfgUnlock::TryApply(runtimeState.nativeDlssgModule);
+            const auto unlockedMax = nativeGameDlssg ? MfgUnlock::UnlockedMax() : 0;
+            if (unlockedMax > state.numFramesToGenerateMax)
+                state.numFramesToGenerateMax = unlockedMax;
+            runtimeState.dlssgMaxInterpolationCount = state.numFramesToGenerateMax;
+        }
+    }
 
     auto& s = State::Instance();
 

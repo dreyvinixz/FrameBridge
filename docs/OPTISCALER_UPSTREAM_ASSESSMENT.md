@@ -25,6 +25,16 @@ FreeType is still 2.13.3. The project links a tracked `freetype.lib`; only repla
 
 `./scripts/Verify-Integration.ps1` passes locally. The AMD DLL version, SHA-256, and Authenticode signature were checked. No MSBuild/Visual Studio compiler or Inno Setup compiler was available on PATH during this pass, so no Release x64 build, installer build, or game test is claimed. Keep `main` and `v1.0.68` unchanged; review this branch and run those checks before merge or release.
 
+## Multi Frame Generation compatibility study
+
+FrameBridge already has native Streamline DLSSG integration. Streamline reports the provider's supported maximum and, on supported configurations, allows up to five generated frames (6X). The Streamline wrapper may report a lower ceiling, so raising that wrapper value alone cannot unlock an unsupported `nvngx_dlssg.dll` build.
+
+The `dev_8` OptiScaler-MFG fork was evaluated as a source reference, not as a runtime replacement. It is an archived development fork with a broad diff from our vendored OptiScaler revision, so importing its tree would replace unrelated runtime behavior. The narrower RTX 40 Ada memory patch is integrated behind `[DLSSG] AdaMfgUnlock`, which defaults off. It recognizes only reviewed DLSSG 310.7 and 310.9 code signatures, changes the in-memory capability gates and relevant interpolation kernels, and leaves unknown module versions unchanged. It does not ship a patched NVIDIA binary or proxy DLL. See `OptiScaler/framegen/dlssg/THIRD_PARTY_NOTICES.md` for provenance and notices.
+
+RTX 20/30 support from the fork was excluded: it depends on a `version.dll` sidecar, which conflicts with FrameBridge's proxy selection and has a separate install/runtime footprint. RTX 50 and other native Streamline providers continue to use their reported native capability.
+
+This remains experimental pending Release x64 compilation and RTX 40 game/API smoke tests. The upstream OptiScaler maintainers have publicly cited reverse-engineering and potential DMCA risk as reasons for not officially supporting RTX 30 MFG; the same caution applies to undocumented driver/runtime patching here. Do not enable this by default or describe it as a supported NVIDIA feature.
+
 ## References
 
 - [OptiScaler v0.9.4 stable release](https://github.com/optiscaler/OptiScaler/releases/tag/v0.9.4)
@@ -33,3 +43,6 @@ FreeType is still 2.13.3. The project links a tracked `freetype.lib`; only repla
 - [Streamline v2.14.16](https://github.com/NVIDIA-RTX/Streamline/releases/tag/v2.14.16)
 - [NVIDIA DLSS SDK](https://github.com/NVIDIA/DLSS/tree/v310.9.16)
 - [Inno Setup releases](https://jrsoftware.org/isdl.php)
+- [OptiScaler-MFG dev_8 reference](https://github.com/evairx/OptiScaler-MFG/releases/tag/dev_8)
+- [OptiScaler maintainer discussion on reverse-engineered MFG](https://github.com/optiscaler/OptiScaler/discussions/1146)
+- [NVIDIA Streamline DLSS-G programming guide](https://github.com/NVIDIA-RTX/Streamline/blob/main/docs/ProgrammingGuideDLSS_G.md)

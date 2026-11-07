@@ -116,6 +116,24 @@
       "commit": "9981c6350dc58c0ce21f024fd65e31e851c31689"
     }
   ],
+  "experimental_sources": [
+    {
+      "name": "OptiScaler-MFG Ada unlock reference",
+      "repository": "https://github.com/evairx/OptiScaler-MFG",
+      "release": "dev_8",
+      "commit": "e69d6f87072e381a77f65b5d4852b7167b5d10d5",
+      "license": "GPL-3.0",
+      "scope": "Source-only RTX 40 Ada MFG unlock adaptation; no candidate binary shipped",
+      "status": "experimental; off by default; signatures limited to reviewed DLSSG 310.7 and 310.9 builds"
+    },
+    {
+      "name": "MFGAdaUnlock-RenoDx reference",
+      "repository": "https://github.com/mavismmg/MFGAdaUnlock-RenoDx",
+      "license": "MIT",
+      "scope": "Ada interpolation kernel adaptation",
+      "status": "experimental; attribution and MIT license included with source"
+    }
+  ],
   "pending_dependency_updates": [
     {
       "name": "FreeType",

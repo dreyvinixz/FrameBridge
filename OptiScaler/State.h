@@ -198,6 +198,13 @@ class State
     int xefgMaxInterpolationCount = 1;
     bool WAR_xefgRequestFGToggle = false;
 
+    // DLSSG
+    int dlssgMaxInterpolationCount = 1;
+    bool dlssgGameDMFGSupported = false;
+    bool dlssgOptiDMFGSupported = false;
+    sl::DLSSGMode dlssgLastSetMode = sl::DLSSGMode::eOff;
+    HMODULE nativeDlssgModule = nullptr;
+
     // DLSS
     bool dlssPresetsOverriddenExternally = false;
     bool dlssPresetsOverridenByOpti = false;

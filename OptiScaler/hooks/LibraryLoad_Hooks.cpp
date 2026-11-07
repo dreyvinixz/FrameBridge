@@ -27,6 +27,7 @@
 #include <hooks/Vulkan_Hooks.h>
 #include <hooks/Gdi32_Hooks.h>
 #include <hooks/Streamline_Hooks.h>
+#include <framegen/dlssg/MfgUnlock.h>
 
 #include <fsr4/FSR4ModelSelection.h>
 #include <fsr4/FSR4Upgrade.h>
@@ -50,6 +51,23 @@ HMODULE LibraryLoadHooks::LoadLibraryCheckW(std::wstring libName, LPCWSTR lpLibF
 
     // C:\\Path\\like\\this.dll
     auto normalizedPath = std::filesystem::path(libName).lexically_normal().wstring();
+
+    // Keep track of the game's native DLSS-G module for the optional RTX 40 unlock.
+    auto loadedFileName = std::filesystem::path(normalizedPath).filename().wstring();
+    if (_wcsicmp(loadedFileName.c_str(), L"nvngx_dlssg.dll") == 0)
+    {
+        auto dlssgModule = NtdllProxy::LoadLibraryExW_Ldr(lpLibFullPath, NULL, 0);
+        if (dlssgModule != nullptr)
+        {
+            State::Instance().nativeDlssgModule = dlssgModule;
+            MfgUnlock::TryApply(dlssgModule);
+        }
+        else
+        {
+            LOG_ERROR("Trying to load native nvngx_dlssg.dll: {}", libNameA);
+        }
+        return dlssgModule;
+    }
 
     // If Opti is not loading as nvngx.dll
     if (State::Instance().workingMode != WorkingMode::Nvngx)

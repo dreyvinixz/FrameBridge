@@ -32,6 +32,9 @@ $configHeaderPath = Join-Path $RepositoryRoot "OptiScaler\Config.h"
 $configSourcePath = Join-Path $RepositoryRoot "OptiScaler\Config.cpp"
 $ffxPath = Join-Path $RepositoryRoot "OptiScaler\upscalers\ffx\FFXFeature_Dx12.cpp"
 $fsr31Path = Join-Path $RepositoryRoot "OptiScaler\upscalers\fsr31\FSR31Feature_Dx12.cpp"
+$mfgPath = Join-Path $RepositoryRoot "OptiScaler\framegen\dlssg\MfgUnlock.cpp"
+$mfgHeaderPath = Join-Path $RepositoryRoot "OptiScaler\framegen\dlssg\MfgUnlock.h"
+$iniPath = Join-Path $RepositoryRoot "OptiScaler.ini"
 
 Assert-Condition -Condition (Test-Path $manifestPath) -Message "Missing runtime dependency manifest."
 Assert-Condition -Condition (Test-Path $projectPath) -Message "Missing OptiScaler project."
@@ -39,6 +42,8 @@ Assert-Condition -Condition (Test-Path $configHeaderPath) -Message "Missing conf
 Assert-Condition -Condition (Test-Path $configSourcePath) -Message "Missing configuration source."
 Assert-Condition -Condition (Test-Path $ffxPath) -Message "Missing active FFX DX12 backend."
 Assert-Condition -Condition (Test-Path $fsr31Path) -Message "Upstream FSR 3.1 DX12 backend is missing."
+Assert-Condition -Condition (Test-Path $mfgPath) -Message "Experimental Ada MFG source is missing."
+Assert-Condition -Condition (Test-Path $mfgHeaderPath) -Message "Experimental Ada MFG header is missing."
 
 $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
 Assert-Condition -Condition ($manifest.runtime.import_strategy -eq "vendor-snapshot") -Message "Runtime import strategy must be vendor-snapshot."
@@ -87,6 +92,11 @@ foreach ($entry in @(
 
 $configHeader = Get-Content $configHeaderPath -Raw
 $configSource = Get-Content $configSourcePath -Raw
+Assert-Condition -Condition ((Get-Content $iniPath -Raw).Contains("AdaMfgUnlock=auto")) -Message "Ada MFG unlock must remain documented as default-off."
+Assert-Condition -Condition ($project.Contains("framegen\dlssg\MfgUnlock.cpp")) -Message "Experimental Ada MFG source is not registered in the native project."
+Assert-Condition -Condition ($configHeader.Contains("FGDLSSGAdaMfgUnlock { false }")) -Message "Ada MFG unlock must default off in the configuration model."
+$mfgSource = Get-Content $mfgPath -Raw
+Assert-Condition -Condition ($mfgSource.Contains("kAdvertisePattern") -and $mfgSource.Contains("kAdvertisePattern309") -and $mfgSource.Contains("kValidatePattern") -and $mfgSource.Contains("kValidatePattern309")) -Message "Ada MFG must retain separate reviewed signature sets."
 Assert-Condition -Condition ($configHeader.Contains("void NotifyRuntimeConfigurationChanged();")) -Message "Configuration changes do not publish runtime snapshot events."
 Assert-Condition -Condition ($configSource.Contains("NotifyRuntimeConfigurationChanged();")) -Message "INI loading does not publish a final runtime snapshot event."
 $volatileMutationStart = $configHeader.IndexOf("constexpr void set_volatile_value")

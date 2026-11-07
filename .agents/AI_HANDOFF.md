@@ -12,6 +12,7 @@ Last reviewed: 2026-11-07
 - Inno Setup CI install is pinned to 6.7.4.
 - FreeType remains 2.13.3 because the tracked static library must be rebuilt alongside upgraded headers. Do not change headers alone.
 - The repository-local `github-actions-efficiency` skill exists under `.agents/skills/`.
+- Native DLSSG config/state wiring was restored for the imported runtime. Optional RTX 40 Ada 6X unlock source is integrated in `OptiScaler/framegen/dlssg/`, off by default, exact-signature gated to reviewed DLSSG 310.7/310.9 layouts, and limited to native Streamline flow. The RTX 20/30 `version.dll` sidecar was intentionally excluded. Read `docs/OPTISCALER_UPSTREAM_ASSESSMENT.md` and the adjacent `THIRD_PARTY_NOTICES.md` before changing or distributing it.
 
 ## Validation and outstanding work
 
@@ -19,6 +20,7 @@ Last reviewed: 2026-11-07
 - Release x64 and installer builds, plus game/API smoke tests, have not run. MSBuild, C++ compiler, and ISCC were not found on PATH in this environment.
 - Before merge/release: run the native build with Visual Studio Build Tools; confirm new output paths and license payload against `installer/setup.iss` and `.github/workflows/build.yml`; build installer; exercise supported game/API scenarios; record artifact hashes. Upgrade FreeType source and library together when a suitable MSVC environment is available.
 - Preserve this as a candidate branch until all gates are evidenced. Do not represent static integration verification as build/runtime validation.
+- The MFG integration has not yet been compiled or exercised in a game. Treat it as experimental; obtain RTX 40 smoke-test evidence before considering any default change or release claim.
 
 ## Read order
 

@@ -196,6 +196,34 @@ bool Config::Reload(std::filesystem::path iniPath)
             FGXeFGForceBorderless.set_from_config(readBool("XeFG", "ForceBorderless"));
         }
 
+        // DLSSG / native Multi Frame Generation
+        {
+            FGDLSSGInterpolationCount.set_from_config(readInt("DLSSG", "InterpolationCount"));
+            if (FGDLSSGInterpolationCount.has_value() &&
+                (FGDLSSGInterpolationCount.value() < 1 || FGDLSSGInterpolationCount.value() > 5))
+                FGDLSSGInterpolationCount.reset();
+
+            FGDLSSGUseGamesReflexMarkers.set_from_config(readBool("DLSSG", "UseGamesReflexMarkers"));
+            FGDLSSGOverrideInterpolationCount.set_from_config(readInt("DLSSG", "OverrideInterpolationCount"));
+            if (FGDLSSGOverrideInterpolationCount.has_value() &&
+                (FGDLSSGOverrideInterpolationCount.value() < 0 || FGDLSSGOverrideInterpolationCount.value() > 5))
+                FGDLSSGOverrideInterpolationCount.reset();
+
+            FGDLSSGOverrideForceDMFG.set_from_config(readBool("DLSSG", "OverrideForceDMFG"));
+            FGDLSSGForceDMFG.set_from_config(readBool("DLSSG", "ForceDMFG"));
+            FGDLSSGFramerateTargetDMFG.set_from_config(readFloat("DLSSG", "FramerateTargetDMFG"));
+            FGDLSSGAdaBlackwellKernels.set_from_config(readBool("DLSSG", "AdaBlackwellKernels"));
+            auto adaUnlock = readBool("DLSSG", "AdaMfgUnlock");
+            if (!adaUnlock.has_value())
+                adaUnlock = readBool("DLSSG", "UnlockAdaMFG");
+            FGDLSSGAdaMfgUnlock.set_from_config(adaUnlock);
+            FGDLSSGUnlockAdaMFG.set_from_config(adaUnlock);
+            FGDLSSGBoundaryMitigation.set_from_config(readInt("DLSSG", "BoundaryMitigation"));
+            if (FGDLSSGBoundaryMitigation.has_value() &&
+                (FGDLSSGBoundaryMitigation.value() < 0 || FGDLSSGBoundaryMitigation.value() > 2))
+                FGDLSSGBoundaryMitigation.reset();
+        }
+
         // FSR FG Inputs
         {
             FSRFGSkipConfigForHudless.set_from_config(readBool("FSRFGInputs", "SkipConfigForHudless"));
@@ -870,6 +898,28 @@ bool Config::SaveIni()
         ini.SetValue("XeFG", "DebugView", GetBoolValue(Instance()->FGXeFGDebugView.value_for_config()).c_str());
         ini.SetValue("XeFG", "ForceBorderless",
                      GetBoolValue(Instance()->FGXeFGForceBorderless.value_for_config()).c_str());
+    }
+
+    // DLSSG / native Multi Frame Generation
+    {
+        ini.SetValue("DLSSG", "InterpolationCount",
+                     GetIntValue(Instance()->FGDLSSGInterpolationCount.value_for_config()).c_str());
+        ini.SetValue("DLSSG", "UseGamesReflexMarkers",
+                     GetBoolValue(Instance()->FGDLSSGUseGamesReflexMarkers.value_for_config()).c_str());
+        ini.SetValue("DLSSG", "OverrideInterpolationCount",
+                     GetIntValue(Instance()->FGDLSSGOverrideInterpolationCount.value_for_config()).c_str());
+        ini.SetValue("DLSSG", "OverrideForceDMFG",
+                     GetBoolValue(Instance()->FGDLSSGOverrideForceDMFG.value_for_config()).c_str());
+        ini.SetValue("DLSSG", "ForceDMFG",
+                     GetBoolValue(Instance()->FGDLSSGForceDMFG.value_for_config()).c_str());
+        ini.SetValue("DLSSG", "FramerateTargetDMFG",
+                     GetFloatValue(Instance()->FGDLSSGFramerateTargetDMFG.value_for_config()).c_str());
+        ini.SetValue("DLSSG", "AdaMfgUnlock",
+                     GetBoolValue(Instance()->FGDLSSGAdaMfgUnlock.value_for_config()).c_str());
+        ini.SetValue("DLSSG", "AdaBlackwellKernels",
+                     GetBoolValue(Instance()->FGDLSSGAdaBlackwellKernels.value_for_config()).c_str());
+        ini.SetValue("DLSSG", "BoundaryMitigation",
+                     GetIntValue(Instance()->FGDLSSGBoundaryMitigation.value_for_config()).c_str());
     }
 
     // OptiFG

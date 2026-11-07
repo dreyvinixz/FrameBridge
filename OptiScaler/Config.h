@@ -572,6 +572,18 @@ class Config
     CustomOptional<bool> FGXeFGDebugView { false };
     CustomOptional<bool> FGXeFGForceBorderless { false };
 
+    // OptiFG - DLSSG
+    CustomOptional<int> FGDLSSGInterpolationCount { 1 };
+    CustomOptional<bool> FGDLSSGUseGamesReflexMarkers { true };
+    CustomOptional<int, NoDefault> FGDLSSGOverrideInterpolationCount;
+    CustomOptional<bool> FGDLSSGOverrideForceDMFG { false };
+    CustomOptional<bool> FGDLSSGForceDMFG { false };
+    CustomOptional<float> FGDLSSGFramerateTargetDMFG { 0.0f };
+    CustomOptional<bool> FGDLSSGAdaMfgUnlock { false };
+    CustomOptional<bool, NoDefault> FGDLSSGAdaBlackwellKernels;
+    CustomOptional<bool> FGDLSSGUnlockAdaMFG { false };
+    CustomOptional<int> FGDLSSGBoundaryMitigation { 1 };
+
     // fakenvapi
     CustomOptional<bool> FN_EnableLogs { true };
     CustomOptional<bool> FN_EnableTraceLogs { false };
