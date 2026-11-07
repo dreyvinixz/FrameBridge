@@ -3,7 +3,7 @@
 Data: 2026-11-07  
 Branch: codex/low-latency-audit-2026-11-07  
 Base inicial: 6e141f6fa0f16d070e2f9bcab6040b24a0f2a331 (codex/freetype-vram-audit-2026-11-07)  
-Estado: auditoria estática; **nenhuma alteração no runtime, build Release ou benchmark executado**.
+Estado: auditoria estática e primeiro protótipo experimental implementado; **sem build Release validado, sem teste em jogo e sem ganho de latência comprovado**.
 
 ## 1. Objetivo e escopo
 
@@ -159,15 +159,38 @@ Não realizar merge ou release automática. O workflow de release do repositóri
 - AMD FSR3 integration (histórico): https://gpuopen.com/presentations/2023/AMD_FidelityFX_Super_Resolution_3-Overview_and_Integration.pdf  
   Interpolação assíncrona pode sobrepor trabalho de GPU, mas deve ser mensurada na implementação atual.
 
-## 7. Estado desta auditoria
+## 7. Implementação experimental — rodada L0/L2
 
-- [x] Branch isolada criada a partir da base de desenvolvimento mais recente encontrada.
-- [x] Mapeamento inicial de código, principais hipóteses e riscos de sincronização.
-- [x] Plano de medição, critérios de aceitação e protótipos candidatos.
-- [ ] Instrumentação implementada e testada.
-- [ ] Build Release x64 e validação de CI.
-- [ ] Benchmarks com hardware e jogos reais.
-- [ ] Implementação de modo baixa latência.
-- [ ] PR de implementação / merge / release.
+Esta branch inclui uma implementação inicial **opt-in**. O comportamento padrão do runtime permanece conservador. Não se trata ainda de um perfil global de baixa latência.
 
-**Conclusão:** a prioridade não deve ser “forçar 6X e diminuir sleeps”, mas observar a pipeline correta, preservar o provider de pacing e reduzir trabalho/filas desnecessários com evidência objetiva. O primeiro PR técnico recomendado é de observabilidade e correção da proveniência das métricas.
+### O que foi alterado
+
+- `OptiScaler/runtime/AppliedOptionsCache.h`: cache portátil que só considera uma configuração aplicada depois de a API reportar êxito; em erro ou reinitialização, o cache é invalidado. `tests/applied_options_cache_test.cpp` cobre primeira aplicação, mesmas opções, alterações de MFG/markers, erro e invalidação.
+- `OptiScaler/Config.h`, `OptiScaler/Config.cpp` e `OptiScaler.ini`: nova opção `[Performance] OptimizeStreamlineOptions=true`, default `auto` (false). Reiniciar o jogo após alterar o INI para garantir leitura; o mecanismo atual `set_from_config` não garante que um reload de INI reconfigure opções já preenchidas em memória.
+- `OptiScaler/framegen/dlssg/DLSSG_Dx12.cpp` e `.h`: ao ativar a opção, em modo DLSS-G **estático**, chama `DLSSGSetOptions` apenas quando mudam modo, número de frames, parallelism ou target FPS; `ReflexSetOptions` apenas quando mudam modo/uso de markers. O modo Dynamic MFG mantém `DLSSGSetOptions` a cada dispatch por precaução. Erros são registrados e provocam nova tentativa; caches são invalidados em ativação/desativação, criação/retenção/release da swapchain e contexto de dispositivo. Contadores de chamadas executadas/ignoradas são registrados ao desativar FG quando a otimização está habilitada.
+- `OptiScaler/low_latency/input/input_common.cpp`: parou de inventar timestamps de driver, GPU e fila do SO. O caminho de marcadores passa a usar **um timestamp real de CPU por marcador**; outros campos permanecem zerados quando indisponíveis. `Reflex_Hooks.cpp` e o macro de timing evitam desenhar durações de campos zerados ou intervalos nulos.
+- `scripts/compare_latency_csv.py`: comparador de baseline A/B usando CSV com métricas **medidas**; calcula média, p50, p95, p99 e variação percentual sem dependências externas. Exemplo: `python scripts/compare_latency_csv.py sem-cache.csv com-cache.csv --column MsBetweenDisplayChange --min-samples 300 --json-output comparacao.json`. `tests/compare_latency_csv_test.py` cobre percentis, dados ausentes e colunas inválidas. Importante: `MsBetweenDisplayChange` mede a **cadência de exibição**, não input-to-photon.
+- `.github/workflows/ci.yml`: habilita checks de push em `codex/**`; executa testes portáteis e validação da integração/build Windows. **Não** altera o workflow de release. Resultado da CI ainda depende do GitHub Actions; sem execução em jogo.
+
+### Interpretação cautelosa
+
+Menos chamadas `SetOptions` não implica necessariamente menos latência input-to-photon; os SDKs podem usar atualizações muito baratas ou uma política interna de estado. O benefício somente será considerado confirmado com medições A/B reproduzíveis. O protótipo é desativável imediatamente configurando `OptimizeStreamlineOptions=false` e reiniciando o jogo.
+
+**Atenção à integração:** outro subsistema pode alterar as opções Streamline ou recriar o plugin sem passar pelo objeto `DLSSG_Dx12`; é possível que o cache precise de pontos adicionais de invalidação. Verificar jogos com múltiplas swapchains, Dynamic MFG, alt-tab, VSync/VRR, troca de GPU/provedor e versões de Streamline antes de propor ativação por padrão.
+
+**Telemetria:** relatórios de GPU/driver/OS zerados são mais precisos semanticamente do que tempos artificiais, mas consumidores que assumiam valores preenchidos podem precisar tratar `0` como “indisponível”. Validar esse contrato no Reflex Verification Test.
+
+## 8. Estado desta auditoria
+
+- [x] Branch isolada criada a partir da base mais recente encontrada.
+- [x] Mapeamento do código e priorização de hipóteses com riscos de sincronização.
+- [x] Política de cache experimental com fallback default OFF, contadores e testes unitários portáteis.
+- [x] Remoção de campos de tempo fabricados e comparador A/B para amostras medidas.
+- [x] CI da branch configurada para testes portáteis e build Windows.
+- [ ] Compilação integral Release x64 e validação do workflow (confirmar logs).
+- [ ] Testes com jogos e medições de input-to-photon com hardware externo.
+- [ ] Estudos específicos de locks, FPS cap e frame pacing FSR/XeFG após baseline.
+- [ ] Avaliar modo geral de baixa latência após evidência em diferentes providers.
+- [ ] PR, merge e release.
+
+**Conclusão atual:** otimização candidata e instrumentação básica introduzidas, sem resultados de latência comprovados. A próxima decisão técnica depende da CI e de medições de frames exibidos e input-to-photon, não de FPS gerado.
