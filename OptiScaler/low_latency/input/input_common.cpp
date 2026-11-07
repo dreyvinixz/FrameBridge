@@ -250,49 +250,39 @@ bool InputCommon::update_low_latency_tech(IUnknown* pDevice, std::optional<LowLa
 
 void InputCommon::add_marker_to_report(const MarkerParams& marker_params)
 {
-    auto current_timestamp = get_timestamp() / 1000;
-    static auto last_sim_start = current_timestamp;
-    static auto _2nd_last_sim_start = current_timestamp;
+    // Only CPU-side marker timestamps are available in this path. In particular,
+    // simulation interval is NOT GPU frame time: keep GPU, driver and OS queue
+    // fields unavailable (zero) until a native backend supplies actual values.
+    // A single timestamp per marker also avoids a second clock query on SIMULATION_START.
+    const auto current_timestamp = get_timestamp() / 1000;
     auto current_report = &frame_reports[marker_params.frame_id % FRAME_REPORTS_BUFFER_SIZE];
 
     if (current_report->frameID != marker_params.frame_id)
-    {
         *current_report = FrameReport {};
-    }
 
     current_report->frameID = marker_params.frame_id;
-    current_report->gpuFrameTimeUs = (uint32_t) (last_sim_start - _2nd_last_sim_start);
-    current_report->gpuActiveRenderTimeUs = 100;
-    current_report->driverStartTime = current_timestamp;
-    current_report->driverEndTime = current_timestamp + 100;
-    current_report->gpuRenderStartTime = current_timestamp;
-    current_report->gpuRenderEndTime = current_timestamp + 100;
-    current_report->osRenderQueueStartTime = current_timestamp;
-    current_report->osRenderQueueEndTime = current_timestamp + 100;
     switch (marker_params.marker_type)
     {
     case MarkerType::SIMULATION_START:
-        _2nd_last_sim_start = last_sim_start;
-        last_sim_start = get_timestamp() / 1000;
-        current_report->simStartTime = last_sim_start;
+        current_report->simStartTime = current_timestamp;
         break;
     case MarkerType::SIMULATION_END:
-        current_report->simEndTime = get_timestamp() / 1000;
+        current_report->simEndTime = current_timestamp;
         break;
     case MarkerType::RENDERSUBMIT_START:
-        current_report->renderSubmitStartTime = get_timestamp() / 1000;
+        current_report->renderSubmitStartTime = current_timestamp;
         break;
     case MarkerType::RENDERSUBMIT_END:
-        current_report->renderSubmitEndTime = get_timestamp() / 1000;
+        current_report->renderSubmitEndTime = current_timestamp;
         break;
     case MarkerType::PRESENT_START:
-        current_report->presentStartTime = get_timestamp() / 1000;
+        current_report->presentStartTime = current_timestamp;
         break;
     case MarkerType::PRESENT_END:
-        current_report->presentEndTime = get_timestamp() / 1000;
+        current_report->presentEndTime = current_timestamp;
         break;
     case MarkerType::INPUT_SAMPLE:
-        current_report->inputSampleTime = get_timestamp() / 1000;
+        current_report->inputSampleTime = current_timestamp;
         break;
     default:
         break;
