@@ -2,60 +2,73 @@
 
 #include "Streamline_Hooks.h"
 
-#include <Util.h>
-#include <Config.h>
-
-#include <nvapi/fakenvapi.h>
-#include <misc/IdentifyGpu.h>
-#include <hooks/Reflex_Hooks.h>
-#include <menu/menu_overlay_base.h>
-#include <framegen/nvngx/Nvngx_FG.h>
-#include <proxies/KernelBase_Proxy.h>
-#include <imgui/ImGuiNotify.hpp>
-
 #include <json.hpp>
-#include <sl1_reflex.h>
-#include <magic_enum.hpp>
 #include "detours/detours.h"
 
-static bool IsSL1AndDLSSGActive()
-{
-    return State::Instance().streamlineVersion.major == 1 && State::Instance().activeFgInput == FGInput::DLSSG &&
-           (State::Instance().activeFgOutput == FGOutput::FSRFG || State::Instance().activeFgOutput == FGOutput::XeFG);
-}
+#include <Util.h>
+#include <Config.h>
+#include <proxies/KernelBase_Proxy.h>
+#include <menu/menu_overlay_base.h>
+#include <hooks/Reflex_Hooks.h>
+#include <magic_enum.hpp>
+#include <sl1_reflex.h>
+#include <nvapi/fakenvapi.h>
+#include <inputs/FG/DLSSG_Mod.h>
 
-static bool IsSL1AndFGActive()
-{
-    const auto& state = State::Instance();
+sl::RenderAPI StreamlineHooks::renderApi = sl::RenderAPI::eCount;
+std::mutex StreamlineHooks::setConstantsMutex {};
+SystemCaps* StreamlineHooks::systemCaps = nullptr;
+SystemCapsSl15* StreamlineHooks::systemCapsSl15 = nullptr;
 
-    return state.streamlineVersion.major == 1 && state.activeFgInput == FGInput::DLSSG;
-}
+// interposer
+decltype(&slInit) StreamlineHooks::o_slInit = nullptr;
+decltype(&slSetTag) StreamlineHooks::o_slSetTag = nullptr;
+decltype(&slSetTagForFrame) StreamlineHooks::o_slSetTagForFrame = nullptr;
+decltype(&slEvaluateFeature) StreamlineHooks::o_slEvaluateFeature = nullptr;
+decltype(&slAllocateResources) StreamlineHooks::o_slAllocateResources = nullptr;
+decltype(&slSetConstants) StreamlineHooks::o_slSetConstants = nullptr;
+decltype(&slGetNativeInterface) StreamlineHooks::o_slGetNativeInterface = nullptr;
+decltype(&slSetD3DDevice) StreamlineHooks::o_slSetD3DDevice = nullptr;
+decltype(&slGetNewFrameToken) StreamlineHooks::o_slGetNewFrameToken = nullptr;
 
-static void PatchSL1PluginJson(nlohmann::json& configJson)
-{
-    if (!IsSL1AndFGActive())
-        return;
+decltype(&sl1::slInit) StreamlineHooks::o_slInit_sl1 = nullptr;
 
-    LOG_DEBUG("Patching SL1 plugin JSON for external FG management");
+sl::PFun_LogMessageCallback* StreamlineHooks::o_logCallback = nullptr;
+sl1::pfunLogMessageCallback* StreamlineHooks::o_logCallback_sl1 = nullptr;
 
-    if (configJson.contains("/hooks"_json_pointer))
-        configJson["hooks"].clear();
+// DLSS
+StreamlineHooks::PFN_slGetPluginFunction StreamlineHooks::o_dlss_slGetPluginFunction = nullptr;
+StreamlineHooks::PFN_slOnPluginLoad StreamlineHooks::o_dlss_slOnPluginLoad = nullptr;
+decltype(&slDLSSGetOptimalSettings) StreamlineHooks::o_slDLSSGetOptimalSettings = nullptr;
 
-    if (configJson.contains("/exclusive_hooks"_json_pointer))
-        configJson["exclusive_hooks"].clear();
+// DLSSG
+StreamlineHooks::PFN_slGetPluginFunction StreamlineHooks::o_dlssg_slGetPluginFunction = nullptr;
+StreamlineHooks::PFN_slOnPluginLoad StreamlineHooks::o_dlssg_slOnPluginLoad = nullptr;
+decltype(&slDLSSGSetOptions) StreamlineHooks::o_slDLSSGSetOptions = nullptr;
+decltype(&slDLSSGGetState) StreamlineHooks::o_slDLSSGGetState = nullptr;
 
-    if (configJson.contains("/external/feature/tags"_json_pointer))
-        configJson["external"]["feature"]["tags"].clear();
+// Reflex
+StreamlineHooks::PFN_slGetPluginFunction StreamlineHooks::o_reflex_slGetPluginFunction = nullptr;
+StreamlineHooks::PFN_slSetConstants_sl1 StreamlineHooks::o_reflex_slSetConstants_sl1 = nullptr;
+StreamlineHooks::PFN_slOnPluginLoad StreamlineHooks::o_reflex_slOnPluginLoad = nullptr;
+decltype(&slReflexSetOptions) StreamlineHooks::o_slReflexSetOptions = nullptr;
+sl::ReflexMode StreamlineHooks::reflexGamesLastMode = sl::ReflexMode::eOff;
 
-    if (configJson.contains("/vsync/supported"_json_pointer))
-        configJson["vsync"]["supported"] = true;
+// PCL
+StreamlineHooks::PFN_slGetPluginFunction StreamlineHooks::o_pcl_slGetPluginFunction = nullptr;
+StreamlineHooks::PFN_slOnPluginLoad StreamlineHooks::o_pcl_slOnPluginLoad = nullptr;
+decltype(&slPCLSetMarker) StreamlineHooks::o_slPCLSetMarker = nullptr;
 
-    if (configJson.contains("/external/hws/required"_json_pointer))
-        configJson["external"]["hws"]["required"] = false;
-}
+// Common
+StreamlineHooks::PFN_slGetPluginFunction StreamlineHooks::o_common_slGetPluginFunction = nullptr;
+StreamlineHooks::PFN_slOnPluginLoad StreamlineHooks::o_common_slOnPluginLoad = nullptr;
+StreamlineHooks::PFN_slSetParameters_sl1 StreamlineHooks::o_common_slSetParameters_sl1 = nullptr;
+StreamlineHooks::PFN_setVoid StreamlineHooks::o_setVoid = nullptr;
 
 char* StreamlineHooks::trimStreamlineLog(const char* msg)
 {
+    int bracket_count = 0;
+
     char* result = (char*) malloc(strlen(msg) + 1);
     if (!result)
         return nullptr;
@@ -122,226 +135,13 @@ sl::Result StreamlineHooks::hkslInit(const sl::Preferences& pref, uint64_t sdkVe
     if (localPref.engine == sl::EngineType::eUnreal)
         State::Instance().gameQuirks |= GameQuirk::ForceUnrealEngine;
 
-    std::filesystem::path localSlPath(Config::Instance()->MainDllPath.value());
-    localSlPath = localSlPath / L"streamline"; // Hardcoded streamline folder
-
-    auto localSlPathStr = localSlPath.wstring();
-
-    std::vector<const wchar_t*> storage;
-
-    // Replace the SL files to allow for MFG
-    if (State::Instance().activeFgInput == FGInput::NvngxFG && std::filesystem::exists(localSlPath / L"sl.common.dll"))
-    {
-        storage.assign(localPref.pathsToPlugins, localPref.pathsToPlugins + localPref.numPathsToPlugins);
-
-        std::filesystem::path pluginsDir;
-
-        // Find the first path that contains sl.common.dll
-        // If storage is empty, look in the exe folder. pathsToPlugins is an optional field
-        if (storage.empty())
-        {
-            std::filesystem::path exeFolder = Util::ExePath().parent_path();
-            if (std::filesystem::exists(exeFolder / L"sl.common.dll"))
-            {
-                pluginsDir = exeFolder;
-            }
-        }
-        else
-        {
-            for (const wchar_t* pathStr : storage)
-            {
-                if (!pathStr)
-                    continue;
-
-                std::filesystem::path p = pathStr;
-                if (std::filesystem::exists(p / L"sl.common.dll"))
-                {
-                    pluginsDir = p;
-                    break;
-                }
-            }
-        }
-
-        std::vector<std::string> missingDlls;
-        bool hasNewerPlugin = false;
-
-        // If we found the plugins folder, scan its contents
-        if (!pluginsDir.empty() && std::filesystem::exists(pluginsDir))
-        {
-            for (const auto& entry : std::filesystem::directory_iterator(pluginsDir))
-            {
-                if (!entry.is_regular_file())
-                    continue;
-
-                std::wstring filename = entry.path().filename().wstring();
-
-                std::wstring lowerName = filename;
-                to_lower_in_place(lowerName);
-
-                // Skip interposer
-                if (lowerName == L"sl.interposer.dll")
-                    continue;
-
-                const bool isSlDll = lowerName.starts_with(L"sl.") && lowerName.ends_with(L".dll");
-                const bool isNvLowLatency = lowerName == L"nvlowlatencyvk.dll";
-
-                if (isSlDll || isNvLowLatency)
-                {
-                    std::filesystem::path localDllPath = localSlPath / filename;
-
-                    // Check if localSlPath also has this DLL
-                    if (!std::filesystem::exists(localDllPath))
-                    {
-                        missingDlls.push_back(entry.path().filename().string());
-                    }
-                    else
-                    {
-                        // Compare versions
-                        version_t pluginVer, pluginProdVer;
-                        version_t localVer, localProdVer;
-
-                        bool gotPluginVer = Util::GetFileVersion(entry.path().wstring(), &pluginVer, &pluginProdVer);
-                        bool gotLocalVer = Util::GetFileVersion(localDllPath.wstring(), &localVer, &localProdVer);
-
-                        if (gotPluginVer && gotLocalVer)
-                        {
-                            if (localVer > pluginVer)
-                            {
-                                hasNewerPlugin = true;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Insert local path only if a newer plugin was found
-        if (hasNewerPlugin)
-        {
-            LOG_DEBUG("Making the game use local streamline files");
-
-            storage.insert(storage.begin(), localSlPathStr.c_str());
-            localPref.pathsToPlugins = storage.data();
-            localPref.numPathsToPlugins = (uint32_t) storage.size();
-
-            if (!missingDlls.empty())
-            {
-                std::string toastMsg = "You are missing the following dlls from the streamline folder:\n";
-                for (const auto& missingDll : missingDlls)
-                {
-                    toastMsg += "- " + missingDll + "\n";
-                }
-
-                ImGui::InsertNotification({ ImGuiToastType::Warning, 20000, toastMsg.c_str() });
-            }
-        }
-    }
-
-    if (State::Instance().activeFgInput == FGInput::DLSSG || State::Instance().activeFgOutput == FGOutput::DLSSG)
-    {
-        std::vector<sl::Feature> localFeaturesToLoad(pref.featuresToLoad, pref.featuresToLoad + pref.numFeaturesToLoad);
-        std::erase(localFeaturesToLoad, sl::kFeatureDLSS_G);
-
-        localPref.featuresToLoad = localFeaturesToLoad.data();
-        localPref.numFeaturesToLoad = localFeaturesToLoad.size();
-
-        // return so that localFeaturesToLoad is valid
-        return o_slInit(localPref, sdkVersion);
-    }
-
     // bool hookSetTag =
-    //     (State::Instance().activeFgInput == FGInput::NvngxFG || State::Instance().activeFgInput == FGInput::DLSSG);
+    //     (State::Instance().activeFgInput == FGInput::Nukems || State::Instance().activeFgInput == FGInput::DLSSG);
 
     // if (hookSetTag)
     //     localPref->flags &= ~(sl::PreferenceFlags::eAllowOTA | sl::PreferenceFlags::eLoadDownloadedPlugins);
 
-    // To prevent mixed up OTA situations
-    // if (State::Instance().activeFgOutput == FGOutput::DLSSG)
-    //{
-    //    localPref.flags &= ~sl::PreferenceFlags::eAllowOTA;
-    //    localPref.flags &= ~sl::PreferenceFlags::eLoadDownloadedPlugins;
-    //}
-
     return o_slInit(localPref, sdkVersion);
-}
-
-sl::Result StreamlineHooks::hkslIsFeatureSupported(sl::Feature feature, const sl::AdapterInfo& adapterInfo)
-{
-    if (feature == sl::kFeatureDLSS_G)
-        return sl::Result::eOk;
-
-    return o_slIsFeatureSupported(feature, adapterInfo);
-}
-
-sl::Result StreamlineHooks::hkslIsFeatureLoaded(sl::Feature feature, bool& loaded)
-{
-    if (feature == sl::kFeatureDLSS_G)
-    {
-        loaded = true;
-        return sl::Result::eOk;
-    }
-
-    return o_slIsFeatureLoaded(feature, loaded);
-}
-
-sl::Result StreamlineHooks::hkslGetFeatureRequirements(sl::Feature feature, sl::FeatureRequirements& requirements)
-{
-    if (feature == sl::kFeatureDLSS_G)
-        return sl::Result::eOk;
-
-    return o_slGetFeatureRequirements(feature, requirements);
-}
-
-sl::Result StreamlineHooks::hkslGetFeatureVersion(sl::Feature feature, sl::FeatureVersion& version)
-{
-    if (feature == sl::kFeatureDLSS_G)
-    {
-        version.versionSL = { State::Instance().streamlineVersion.major, State::Instance().streamlineVersion.minor,
-                              State::Instance().streamlineVersion.patch };
-        version.versionNGX = { 4, 2, 0 };
-
-        return sl::Result::eOk;
-    }
-
-    return o_slGetFeatureVersion(feature, version);
-}
-
-static sl::Result dummy_slDLSSGGetState(const sl::ViewportHandle& viewport, sl::DLSSGState& state,
-                                        const sl::DLSSGOptions* options)
-{
-    state.numFramesActuallyPresented = 1; // TODO: can do better
-    state.numFramesToGenerateMax = 1;
-    state.bIsVsyncSupportAvailable = sl::Boolean::eTrue;
-    state.estimatedVRAMUsageInBytes = 300 * 1024 * 1024;
-
-    return sl::Result::eOk;
-}
-
-static sl::Result dummy_slDLSSGSetOptions(const sl::ViewportHandle& viewport, const sl::DLSSGOptions& options)
-{
-    return sl::Result::eOk;
-}
-
-sl::Result StreamlineHooks::hkslGetFeatureFunction(sl::Feature feature, const char* functionName, void*& function)
-{
-    if (feature == sl::kFeatureDLSS_G)
-    {
-        if (strcmp(functionName, "slDLSSGSetOptions") == 0)
-        {
-            function = &dummy_slDLSSGSetOptions;
-
-            return sl::Result::eOk;
-        }
-
-        if (strcmp(functionName, "slDLSSGGetState") == 0)
-        {
-            function = &dummy_slDLSSGGetState;
-
-            return sl::Result::eOk;
-        }
-    }
-
-    return o_slGetFeatureFunction(feature, functionName, function);
 }
 
 sl::Result StreamlineHooks::hkslSetTag(const sl::ViewportHandle& viewport, const sl::ResourceTag* tags,
@@ -362,43 +162,11 @@ sl::Result StreamlineHooks::hkslSetTag(const sl::ViewportHandle& viewport, const
         return o_slSetTag(viewport, tags, numTags, cmdBuffer);
     }
 
-    if (State::Instance().activeFgInput == FGInput::DLSSG &&
-        State::Instance().gameQuirks[GameQuirk::IgnoreTagsWithoutHudlessForFG])
-    {
-        bool hasDepth = false;
-        bool hasMVs = false;
-        bool hasHudless = false;
-
-        for (uint32_t i = 0; i < numTags; i++)
-        {
-            if (tags[i].resource == nullptr || tags[i].resource->native == nullptr)
-                continue;
-
-            if (tags[i].type == sl::kBufferTypeDepth)
-                hasDepth = true;
-
-            if (tags[i].type == sl::kBufferTypeMotionVectors)
-                hasMVs = true;
-
-            if (tags[i].type == sl::kBufferTypeHUDLessColor)
-                hasHudless = true;
-        }
-
-        // Try to skip a DLSS call
-        if (hasDepth && hasMVs && !hasHudless)
-        {
-            LOG_DEBUG("Skipping the FG tagging of potential DLSS resources");
-            return o_slSetTag(viewport, tags, numTags, cmdBuffer);
-        }
-    }
-
     for (uint32_t i = 0; i < numTags; i++)
     {
-        const auto typeEnum = (BufferType) tags[i].type;
-
         if (tags[i].resource == nullptr || tags[i].resource->native == nullptr)
         {
-            LOG_TRACE("Resource of type: {} is null, continuing", magic_enum::enum_name(typeEnum));
+            LOG_TRACE("Resource of type: {} is null, continuing", tags[i].type);
             continue;
         }
 
@@ -420,9 +188,9 @@ sl::Result StreamlineHooks::hkslSetTag(const sl::ViewportHandle& viewport, const
         {
             State::Instance().slFGInputs.reportResource(tags[i], (ID3D12GraphicsCommandList*) cmdBuffer, 0);
         }
-        else if (State::Instance().activeFgInput == FGInput::NvngxFG)
+        else if (State::Instance().activeFgInput == FGInput::Nukems)
         {
-            LOG_TRACE("Tagging resource of type: {}", magic_enum::enum_name(typeEnum));
+            LOG_TRACE("Tagging resource of type: {}", tags[i].type);
         }
     }
 
@@ -451,43 +219,11 @@ sl::Result StreamlineHooks::hkslSetTagForFrame(const sl::FrameToken& frame, cons
 
     LOG_DEBUG("frameIndex: {}", static_cast<uint32_t>(frame));
 
-    if (State::Instance().activeFgInput == FGInput::DLSSG &&
-        State::Instance().gameQuirks[GameQuirk::IgnoreTagsWithoutHudlessForFG])
-    {
-        bool hasDepth = false;
-        bool hasMVs = false;
-        bool hasHudless = false;
-
-        for (uint32_t i = 0; i < numResources; i++)
-        {
-            if (resources[i].resource == nullptr || resources[i].resource->native == nullptr)
-                continue;
-
-            if (resources[i].type == sl::kBufferTypeDepth)
-                hasDepth = true;
-
-            if (resources[i].type == sl::kBufferTypeMotionVectors)
-                hasMVs = true;
-
-            if (resources[i].type == sl::kBufferTypeHUDLessColor)
-                hasHudless = true;
-        }
-
-        // Try to skip a DLSS call
-        if (hasDepth && hasMVs && !hasHudless)
-        {
-            LOG_DEBUG("Skipping the FG tagging of potential DLSS resources");
-            return o_slSetTagForFrame(frame, viewport, resources, numResources, cmdBuffer);
-        }
-    }
-
     for (uint32_t i = 0; i < numResources; i++)
     {
-        const auto typeEnum = (BufferType) resources[i].type;
-
         if (resources[i].resource == nullptr || resources[i].resource->native == nullptr)
         {
-            LOG_TRACE("Resource of type: {} is null, continuing", magic_enum::enum_name(typeEnum));
+            LOG_TRACE("Resource of type: {} is null, continuing", resources[i].type);
             continue;
         }
 
@@ -500,9 +236,9 @@ sl::Result StreamlineHooks::hkslSetTagForFrame(const sl::FrameToken& frame, cons
             State::Instance().slFGInputs.reportResource(resources[i], (ID3D12GraphicsCommandList*) cmdBuffer,
                                                         (uint32_t) frame);
         }
-        else if (State::Instance().activeFgInput == FGInput::NvngxFG)
+        else if (State::Instance().activeFgInput == FGInput::Nukems)
         {
-            LOG_TRACE("Tagging resource of type: {}", magic_enum::enum_name(typeEnum));
+            LOG_TRACE("Tagging resource of type: {}", resources[i].type);
         }
     }
 
@@ -567,9 +303,6 @@ sl::Result StreamlineHooks::hkslSetD3DDevice(void* d3dDevice)
 
 void StreamlineHooks::streamlineLogCallback_sl1(sl1::LogType type, const char* msg)
 {
-    if (msg == nullptr)
-        return;
-
     char* trimmed_msg = trimStreamlineLog(msg);
 
     if (trimmed_msg != nullptr)
@@ -610,51 +343,6 @@ bool StreamlineHooks::hkslInit_sl1(const sl1::Preferences& pref, int application
     return o_slInit_sl1(localPref, applicationId);
 }
 
-bool StreamlineHooks::hkslSetTag_sl1(const sl1::Resource* resource, sl1::BufferType tag, uint32_t id,
-                                     const sl1::Extent* extent)
-{
-    if (IsSL1AndFGActive())
-        State::Instance().s_sl1FGInputs.setTag(resource, tag, id, extent);
-
-    return o_slSetTag_sl1(resource, tag, id, extent);
-}
-
-bool StreamlineHooks::hkslSetConstants_sl1(const sl1::Constants& values, uint32_t frameIndex, uint32_t id)
-{
-    std::scoped_lock lock(setConstantsMutex);
-
-    LOG_TRACE("SL1 slSetConstants frameIndex: {}, id: {}", frameIndex, id);
-
-    if (IsSL1AndFGActive())
-        State::Instance().s_sl1FGInputs.setConstants(values, frameIndex, id);
-
-    return o_slSetConstants_interposer_sl1(values, frameIndex, id);
-}
-
-bool StreamlineHooks::hkslEvaluateFeature_sl1(sl1::CommandBuffer* cmdBuffer, sl1::Feature feature, uint32_t frameIndex,
-                                              uint32_t id)
-{
-    LOG_TRACE("SL1 slEvaluateFeature feature: {}, frameIndex: {}, id: {}", magic_enum::enum_name(feature), frameIndex,
-              id);
-
-    if (IsSL1AndFGActive() && feature == sl1::Feature::eFeatureReflex)
-    {
-        const auto marker = (sl1::ReflexMarker) id;
-
-        if (marker == sl1::ReflexMarker::eReflexMarkerRenderSubmitStart)
-        {
-            State::Instance().s_sl1FGInputs.evaluateState();
-            State::Instance().s_sl1FGInputs.evaluateFeature(cmdBuffer, feature, frameIndex, id);
-        }
-        else if (marker == sl1::ReflexMarker::eReflexMarkerPresentStart)
-        {
-            State::Instance().s_sl1FGInputs.markPresent(frameIndex);
-        }
-    }
-
-    return o_slEvaluateFeature_sl1(cmdBuffer, feature, frameIndex, id);
-}
-
 void StreamlineHooks::hookSystemCaps(sl::param::IParameters* params)
 {
     if (State::Instance().streamlineVersion.major > 1)
@@ -674,19 +362,17 @@ void StreamlineHooks::hookSystemCaps(sl::param::IParameters* params)
     }
 }
 
-uint32_t StreamlineHooks::getSystemCapsArch(SystemCaps* altSystemCaps)
+uint32_t StreamlineHooks::getSystemCapsArch()
 {
     uint32_t highestArch = 0;
 
-    auto primaryGpu = IdentifyGpu::getPrimaryGpu();
-    if (!fakenvapi::isUsingAsMainNvapi() && primaryGpu.vendorId == VendorId::Nvidia)
+    if (!fakenvapi::isUsingFakenvapi() && State::Instance().isRunningOnNvidia)
     {
         if (State::Instance().streamlineVersion.major > 1)
         {
-            auto caps = altSystemCaps != nullptr ? altSystemCaps : systemCaps;
-            if (caps)
+            if (systemCaps)
             {
-                for (auto& adapter : caps->adapters)
+                for (auto& adapter : systemCaps->adapters)
                 {
                     if (adapter.architecture > highestArch)
                         highestArch = adapter.architecture;
@@ -714,27 +400,22 @@ uint32_t StreamlineHooks::getSystemCapsArch(SystemCaps* altSystemCaps)
     return highestArch;
 }
 
-void StreamlineHooks::setArch(uint32_t arch, SystemCaps* altSystemCaps)
+void StreamlineHooks::setArch(uint32_t arch)
 {
-    auto primaryGpu = IdentifyGpu::getPrimaryGpu();
-
-    // altSystemCaps has to be sl2+
-    if (State::Instance().streamlineVersion.major > 1 || altSystemCaps)
+    if (State::Instance().streamlineVersion.major > 1)
     {
-        // Assumes that altCaps are always for SL2+
-        auto caps = altSystemCaps != nullptr ? altSystemCaps : systemCaps;
-        if (caps)
+        if (systemCaps)
         {
-            for (uint32_t i = 0; i < caps->gpuCount; i++)
+            for (uint32_t i = 0; i < systemCaps->gpuCount; i++)
             {
-                caps->adapters[i].architecture = arch;
-                caps->adapters[i].vendor = VendorId::Nvidia;
+                systemCaps->adapters[i].architecture = arch;
+                systemCaps->adapters[i].vendor = VendorId::Nvidia;
             }
 
-            if (fakenvapi::isUsingAsMainNvapi() || primaryGpu.vendorId != VendorId::Nvidia)
-                caps->driverVersionMajor = 999;
+            if (fakenvapi::isUsingFakenvapi() || !State::Instance().isRunningOnNvidia)
+                systemCaps->driverVersionMajor = 999;
 
-            caps->hwsSupported = true;
+            systemCaps->hwsSupported = true;
         }
     }
     else if (State::Instance().streamlineVersion.major == 1)
@@ -744,7 +425,7 @@ void StreamlineHooks::setArch(uint32_t arch, SystemCaps* altSystemCaps)
             for (uint32_t i = 0; i < systemCapsSl15->gpuCount; i++)
                 systemCapsSl15->architecture[i] = arch;
 
-            if (fakenvapi::isUsingAsMainNvapi() || primaryGpu.vendorId != VendorId::Nvidia)
+            if (fakenvapi::isUsingFakenvapi() || !State::Instance().isRunningOnNvidia)
                 systemCapsSl15->driverVersionMajor = 999;
 
             systemCapsSl15->hwSchedulingEnabled = true;
@@ -753,7 +434,7 @@ void StreamlineHooks::setArch(uint32_t arch, SystemCaps* altSystemCaps)
 }
 
 // Spoof arch based on feature and current arch
-void StreamlineHooks::spoofArch(uint32_t currentArch, sl::Feature feature, SystemCaps* altSystemCaps)
+void StreamlineHooks::spoofArch(uint32_t currentArch, sl::Feature feature)
 {
     constexpr uint32_t maxArch = 0xFFFFFFFF;
 
@@ -761,7 +442,7 @@ void StreamlineHooks::spoofArch(uint32_t currentArch, sl::Feature feature, Syste
     if (feature == sl::kFeatureDLSS)
     {
         if (currentArch < NV_GPU_ARCHITECTURE_TU100)
-            return setArch(maxArch, altSystemCaps);
+            return setArch(maxArch);
     }
 
     // Don't spoof DLSSD at all
@@ -773,20 +454,22 @@ void StreamlineHooks::spoofArch(uint32_t currentArch, sl::Feature feature, Syste
     // Don't change arch for DLSSG with ada and above
     else if (feature == sl::kFeatureDLSS_G)
     {
-        if (State::Instance().activeFgNvngx != FGNvngxReplacement::None)
+        if (State::Instance().activeFgOutput == FGOutput::Nukems)
         {
-            if (!Nvngx_FG::isDx12Available() && !Nvngx_FG::isVulkanAvailable())
+            DLSSGMod::InitDLSSGMod_Dx12();
+            DLSSGMod::InitDLSSGMod_Vulkan();
+            if (!DLSSGMod::isDx12Available() && !DLSSGMod::isVulkanAvailable())
                 return setArch(0);
         }
 
         if (currentArch < NV_GPU_ARCHITECTURE_AD100)
-            return setArch(maxArch, altSystemCaps);
+            return setArch(maxArch);
     }
 
     else if (feature == sl::kFeatureReflex || feature == sl::kFeaturePCL)
     {
-        if (fakenvapi::isUsingAsMainNvapi())
-            return setArch(maxArch, altSystemCaps);
+        if (fakenvapi::isUsingFakenvapi())
+            return setArch(maxArch);
     }
 }
 
@@ -813,8 +496,7 @@ bool StreamlineHooks::hkdlss_slOnPluginLoad(sl::param::IParameters* params, cons
 
     nlohmann::json configJson = nlohmann::json::parse(*pluginJSON);
 
-    auto primaryGpu = IdentifyGpu::getPrimaryGpu();
-    if (primaryGpu.vendorId != VendorId::Nvidia || !primaryGpu.dlssCapable)
+    if (!State::Instance().isRunningOnNvidia || State::Instance().isPascalOrOlder)
     {
         if (Config::Instance()->VulkanExtensionSpoofing.value_or_default())
         {
@@ -831,8 +513,6 @@ bool StreamlineHooks::hkdlss_slOnPluginLoad(sl::param::IParameters* params, cons
                 configJson["external"]["vk"]["device"]["1.3_features"].clear();
         }
     }
-
-    PatchSL1PluginJson(configJson);
 
     config = configJson.dump();
 
@@ -878,7 +558,7 @@ bool StreamlineHooks::hkdlssg_slOnPluginLoad(sl::param::IParameters* params, con
 
     bool shouldSpoofArch =
         Config::Instance()->StreamlineSpoofing.value_or_default() &&
-        (State::Instance().activeFgInput == FGInput::NvngxFG || State::Instance().activeFgInput == FGInput::DLSSG);
+        (Config::Instance()->FGInput == FGInput::Nukems || Config::Instance()->FGInput == FGInput::DLSSG);
 
     uint32_t currentArch = 0;
     if (shouldSpoofArch)
@@ -896,7 +576,7 @@ bool StreamlineHooks::hkdlssg_slOnPluginLoad(sl::param::IParameters* params, con
     nlohmann::json configJson = nlohmann::json::parse(*pluginJSON);
 
     // Kill the DLSSG streamline swapchain hooks
-    if (State::Instance().activeFgInput == FGInput::DLSSG || State::Instance().activeFgOutput == FGOutput::DLSSG)
+    if (State::Instance().activeFgInput == FGInput::DLSSG)
     {
         if (configJson.contains("/hooks"_json_pointer))
             configJson["hooks"].clear();
@@ -920,7 +600,7 @@ bool StreamlineHooks::hkdlssg_slOnPluginLoad(sl::param::IParameters* params, con
             configJson["external"]["vk"]["device"]["1.3_features"].clear();
     }
 
-    if (State::Instance().activeFgInput == FGInput::DLSSG || State::Instance().activeFgInput == FGInput::NvngxFG)
+    if (State::Instance().activeFgInput == FGInput::DLSSG || State::Instance().activeFgInput == FGInput::Nukems)
     {
         if (configJson.contains("/vsync/supported"_json_pointer))
             configJson["vsync"]["supported"] = true; // disable eVSyncOffRequired
@@ -931,88 +611,6 @@ bool StreamlineHooks::hkdlssg_slOnPluginLoad(sl::param::IParameters* params, con
         // if (configJson.contains("/external/vk/opticalflow/supported"_json_pointer))
         //     configJson["external"]["vk"]["opticalflow"]["supported"] = true;
     }
-
-    if (Config::Instance()->VulkanExtensionSpoofing.value_or_default())
-    {
-        if (configJson.contains("/external/vk/instance/extensions"_json_pointer))
-            configJson["external"]["vk"]["instance"]["extensions"].clear();
-
-        if (configJson.contains("/external/vk/device/extensions"_json_pointer))
-            configJson["external"]["vk"]["device"]["extensions"].clear();
-    }
-
-    PatchSL1PluginJson(configJson);
-
-    config = configJson.dump();
-
-    *pluginJSON = config.c_str();
-
-    return result;
-}
-
-const char* StreamlineHooks::hkdlssg_slGetPluginJSONConfig_sl1()
-{
-    static std::string patchedConfig;
-
-    const char* originalConfig = o_dlssg_slGetPluginJSONConfig_sl1();
-
-    if (originalConfig == nullptr)
-        return originalConfig;
-
-    try
-    {
-        auto configJson = nlohmann::json::parse(originalConfig);
-
-        LOG_DEBUG("SL1 DLSSG JSON before patch: {}", configJson.dump());
-
-        PatchSL1PluginJson(configJson);
-        // RemoveSL1DLSSGHookEntriesRecursive(configJson);
-
-        patchedConfig = configJson.dump();
-
-        LOG_DEBUG("SL1 DLSSG JSON after patch: {}", patchedConfig);
-
-        return patchedConfig.c_str();
-    }
-    catch (const std::exception& e)
-    {
-        LOG_ERROR("Failed to patch SL1 DLSSG JSON config: {}", e.what());
-        return originalConfig;
-    }
-}
-
-bool StreamlineHooks::hklocal_dlssg_slOnPluginLoad(sl::param::IParameters* params, const char* loaderJSON,
-                                                   const char** pluginJSON)
-{
-    LOG_FUNC();
-
-    // TODO: do it better than "static" and hoping for the best
-    static std::string config;
-
-    bool shouldSpoofArch = Config::Instance()->StreamlineSpoofing.value_or_default();
-
-    uint32_t currentArch = 0;
-    SystemCaps* localSystemCaps = nullptr;
-    if (shouldSpoofArch)
-    {
-        sl::param::getPointerParam(params, sl::param::common::kSystemCaps, &localSystemCaps);
-
-        if (localSystemCaps)
-        {
-            currentArch = getSystemCapsArch(localSystemCaps);
-            spoofArch(currentArch, sl::kFeatureDLSS_G, localSystemCaps);
-        }
-    }
-
-    auto result = o_local_dlssg_slOnPluginLoad(params, loaderJSON, pluginJSON);
-
-    if (shouldSpoofArch && localSystemCaps)
-        setArch(currentArch, localSystemCaps);
-
-    nlohmann::json configJson = nlohmann::json::parse(*pluginJSON);
-
-    if (configJson.contains("/external/hws/required"_json_pointer))
-        configJson["external"]["hws"]["required"] = false; // disable eHardwareSchedulingRequired
 
     if (Config::Instance()->VulkanExtensionSpoofing.value_or_default())
     {
@@ -1051,130 +649,43 @@ bool StreamlineHooks::hkcommon_slOnPluginLoad(sl::param::IParameters* params, co
 
     auto result = o_common_slOnPluginLoad(params, loaderJSON, pluginJSON);
 
-    nlohmann::json configJson = nlohmann::json::parse(*pluginJSON);
-
-    auto& slVersion = State::Instance().streamlineVersion;
-
-    // Grab a version of the potentially updated sl.common
-    // Opti assumes that all plugins will have this version
-    configJson.at("version").at("major").get_to(slVersion.major);
-    configJson.at("version").at("minor").get_to(slVersion.minor);
-    configJson.at("version").at("build").get_to(slVersion.patch);
-
     // Completely disables Streamline hooks
     // if (true)
+    //{
+    //    nlohmann::json configJson = nlohmann::json::parse(*pluginJSON);
+
     //    configJson["hooks"].clear();
     //    configJson["exclusive_hooks"].clear();
+
+    //    config = configJson.dump();
+
+    //    *pluginJSON = config.c_str();
     //}
-
-    PatchSL1PluginJson(configJson);
-
-    config = configJson.dump();
-
-    *pluginJSON = config.c_str();
 
     return result;
 }
 
 sl::Result StreamlineHooks::hkslDLSSGSetOptions(const sl::ViewportHandle& viewport, const sl::DLSSGOptions& options)
 {
-    lastDlssgViewport = viewport;
-    lastDlssgOptions = options;
-
-    // Avoid reading past the game's struct's size
-    sl::DLSSGOptions newOptions {};
-    auto newStructVer = newOptions.structVersion;
-
-    if (options.structVersion == 1)
-        memcpy(&newOptions, &options, 104);
-    else if (options.structVersion == 2 || options.structVersion == 3)
-        memcpy(&newOptions, &options, 112);
-    else if (options.structVersion == 4 || options.structVersion == 5)
-        memcpy(&newOptions, &options, 120);
-    else
-        newOptions = options;
-
-    newOptions.structVersion = newStructVer;
-
-    auto& state = State::Instance();
-
-    // Disable game's DLSSG when we are trying to create our own instance of DLSSG
-    if (state.activeFgInput != FGInput::DLSSG && state.activeFgOutput == FGOutput::DLSSG)
-    {
-        newOptions.mode = sl::DLSSGMode::eOff;
-        return o_slDLSSGSetOptions(viewport, newOptions);
-    }
-
     // Make DLSSG auto always mean On
-    if (newOptions.mode == sl::DLSSGMode::eAuto)
-        newOptions.mode = sl::DLSSGMode::eOn;
+    sl::DLSSGOptions newOptions = options;
+    newOptions.mode = newOptions.mode == sl::DLSSGMode::eOff ? sl::DLSSGMode::eOff : sl::DLSSGMode::eOn;
 
-    const auto dlssgPotentiallyActive = newOptions.mode == sl::DLSSGMode::eOn ||
-                                        newOptions.mode == sl::DLSSGMode::eAuto ||
-                                        newOptions.mode == sl::DLSSGMode::eDynamic;
-
-    bool enableDynamicMode = Config::Instance()->FGDLSSGOverrideForceDMFG.value_or_default() &&
-                             state.dlssgGameDMFGSupported && dlssgPotentiallyActive;
-
-    if (enableDynamicMode)
-    {
-        newOptions.mode = sl::DLSSGMode::eDynamic;
-    }
-
-    if (newOptions.mode == sl::DLSSGMode::eDynamic && Config::Instance()->FGDLSSGFramerateTargetDMFG.has_value())
-    {
-        newOptions.dynamicTargetFrameRate = Config::Instance()->FGDLSSGFramerateTargetDMFG.value();
-    }
-
-    if (state.swapchainApi == API::Vulkan)
+    if (State::Instance().swapchainApi == API::Vulkan)
     {
         // Only matters for Vulkan, DX doesn't use this delay
-        if (dlssgPotentiallyActive && !MenuOverlayBase::IsVisible())
-            state.delayMenuRenderBy = 10;
+        if (options.mode != sl::DLSSGMode::eOff && !MenuOverlayBase::IsVisible())
+            State::Instance().delayMenuRenderBy = 10;
 
         if (MenuOverlayBase::IsVisible())
         {
             newOptions.mode = sl::DLSSGMode::eOff;
             newOptions.flags |= sl::DLSSGFlags::eRetainResourcesWhenOff;
-            ReflexHooks::setDlssgFrameCount(0);
+            ReflexHooks::setDlssgDetectedState(false);
         }
     }
 
     LOG_TRACE("DLSSG Modified Mode: {}", magic_enum::enum_name(newOptions.mode));
-
-    if (dlssgPotentiallyActive && state.streamlineVersion >= feature_version { 2, 7, 1 })
-    {
-        // Populate dlssgMfgMax once
-        if (!state.dlssgMfgMax.has_value())
-        {
-            sl::DLSSGState localState {};
-            sl::DLSSGOptions localOptions {};
-            if (o_slDLSSGGetState(viewport, localState, &localOptions) == sl::Result::eOk &&
-                localState.numFramesToGenerateMax > 0 && localState.numFramesToGenerateMax < 6)
-            {
-                state.dlssgMfgMax = localState.numFramesToGenerateMax;
-                LOG_TRACE("Saving original numFramesToGenerateMax: {}", state.dlssgMfgMax.value());
-
-                if (Config::Instance()->FGDLSSGOverrideInterpolationCount.has_value() &&
-                    Config::Instance()->FGDLSSGOverrideInterpolationCount.value() > state.dlssgMfgMax.value())
-                {
-                    Config::Instance()->FGDLSSGOverrideInterpolationCount = state.dlssgMfgMax.value();
-                }
-            }
-        }
-
-        // Won't take effect with Dynamic
-        if (Config::Instance()->FGDLSSGOverrideInterpolationCount.has_value())
-        {
-            auto overrideCount = Config::Instance()->FGDLSSGOverrideInterpolationCount.value();
-            if (overrideCount != 0)
-                newOptions.numFramesToGenerate = overrideCount;
-            else if (!enableDynamicMode)
-                newOptions.mode = sl::DLSSGMode::eOff;
-        }
-    }
-
-    state.dlssgLastSetMode = newOptions.mode;
 
     return o_slDLSSGSetOptions(viewport, newOptions);
 }
@@ -1182,73 +693,13 @@ sl::Result StreamlineHooks::hkslDLSSGSetOptions(const sl::ViewportHandle& viewpo
 sl::Result StreamlineHooks::hkslDLSSGGetState(const sl::ViewportHandle& viewport, sl::DLSSGState& state,
                                               const sl::DLSSGOptions* options)
 {
-    sl::Result result {};
+    auto result = o_slDLSSGGetState(viewport, state, options);
 
-    const auto originalStructVersion = state.structVersion;
-    if (originalStructVersion < 4)
+    auto& s = State::Instance();
+
+    if (s.activeFgInput == FGInput::DLSSG)
     {
-        sl::DLSSGState newState {};
-
-        // We might be feeding a newer struct to an older SL but that seems to work just fine for this Get function
-        result = o_slDLSSGGetState(viewport, dynamic_cast<sl::DLSSGState&>(newState), options);
-
-        // Copy back data to game's struct
-        memcpy(&state, &newState, 56); // struct ver 1 size
-        state.structVersion = originalStructVersion;
-
-        if (originalStructVersion >= 2)
-        {
-            state.numFramesToGenerateMax = newState.numFramesToGenerateMax;
-            state.bReserved4 = newState.bReserved4;
-            state.bIsVsyncSupportAvailable = newState.bIsVsyncSupportAvailable;
-        }
-
-        if (originalStructVersion >= 3)
-        {
-            state.inputsProcessingCompletionFence = newState.inputsProcessingCompletionFence;
-            state.lastPresentInputsProcessingCompletionFenceValue =
-                newState.lastPresentInputsProcessingCompletionFenceValue;
-        }
-
-        State::Instance().dlssgGameDMFGSupported = newState.bIsDynamicMFGSupported == sl::eTrue;
-    }
-    else
-    {
-        result = o_slDLSSGGetState(viewport, state, options);
-        State::Instance().dlssgGameDMFGSupported = state.bIsDynamicMFGSupported == sl::eTrue;
-    }
-
-    if (!State::Instance().dlssgGameDMFGSupported)
-    {
-        Config::Instance()->FGDLSSGOverrideForceDMFG.set_volatile_value(false);
-    }
-
-    auto& optiState = State::Instance();
-
-    if (optiState.streamlineVersion >= feature_version { 2, 7, 1 })
-    {
-        if (!optiState.dlssgMfgMax.has_value())
-        {
-            sl::DLSSGState localState {};
-            sl::DLSSGOptions localOptions {};
-            if (o_slDLSSGGetState(viewport, localState, &localOptions) == sl::Result::eOk &&
-                localState.numFramesToGenerateMax > 0 && localState.numFramesToGenerateMax < 6)
-            {
-                optiState.dlssgMfgMax = localState.numFramesToGenerateMax;
-                LOG_TRACE("Saving original numFramesToGenerateMax: {}", optiState.dlssgMfgMax.value());
-
-                if (Config::Instance()->FGDLSSGOverrideInterpolationCount.has_value() &&
-                    Config::Instance()->FGDLSSGOverrideInterpolationCount.value() > optiState.dlssgMfgMax.value())
-                {
-                    Config::Instance()->FGDLSSGOverrideInterpolationCount = optiState.dlssgMfgMax.value();
-                }
-            }
-        }
-    }
-
-    if (optiState.activeFgInput == FGInput::DLSSG)
-    {
-        auto fg = optiState.currentFG;
+        auto fg = s.currentFG;
 
         if (fg != nullptr)
         {
@@ -1301,8 +752,7 @@ bool StreamlineHooks::hkreflex_slOnPluginLoad(sl::param::IParameters* params, co
 
     nlohmann::json configJson = nlohmann::json::parse(*pluginJSON);
 
-    if (IdentifyGpu::getPrimaryGpu().vendorId != VendorId::Nvidia &&
-        Config::Instance()->VulkanExtensionSpoofing.value_or_default())
+    if (!State::Instance().isRunningOnNvidia && Config::Instance()->VulkanExtensionSpoofing.value_or_default())
     {
         if (configJson.contains("/external/vk/instance/extensions"_json_pointer))
             configJson["external"]["vk"]["instance"]["extensions"].clear();
@@ -1317,8 +767,6 @@ bool StreamlineHooks::hkreflex_slOnPluginLoad(sl::param::IParameters* params, co
             configJson["external"]["vk"]["device"]["1.3_features"].clear();
     }
 
-    PatchSL1PluginJson(configJson);
-
     config = configJson.dump();
 
     *pluginJSON = config.c_str();
@@ -1332,7 +780,7 @@ sl::Result StreamlineHooks::hkslReflexSetOptions(const sl::ReflexOptions& option
 
     sl::ReflexOptions newOptions = options;
 
-    if (Config::Instance()->FN_ForceReflex == ForceReflex::ForceEnable)
+    if (Config::Instance()->FN_ForceReflex == 2)
         newOptions.mode = sl::ReflexMode::eLowLatencyWithBoost;
 
     // Will cause a pink screen when used with DLSSG
@@ -1340,17 +788,6 @@ sl::Result StreamlineHooks::hkslReflexSetOptions(const sl::ReflexOptions& option
     //     newOptions.mode = sl::ReflexMode::eOff;
 
     return o_slReflexSetOptions(newOptions);
-}
-
-sl::Result StreamlineHooks::hkslReflexSleep(const sl::FrameToken& frame)
-{
-    // if (State::Instance().activeFgOutput == FGOutput::DLSSG && StreamlineProxy::IsD3D12Inited() &&
-    //     Config::Instance()->FGDLSSGUseGamesReflexMarkers.value_or_default())
-    //{
-    //     return StreamlineProxy::ReflexSleep()(frame);
-    // }
-
-    return o_slReflexSleep(frame);
 }
 
 void* StreamlineHooks::hkdlss_slGetPluginFunction(const char* functionName)
@@ -1385,67 +822,37 @@ void* StreamlineHooks::hkdlssg_slGetPluginFunction(const char* functionName)
 
     if (strcmp(functionName, "slDLSSGSetOptions") == 0)
     {
-        o_slDLSSGSetOptions = (decltype(&slDLSSGSetOptions)) o_dlssg_slGetPluginFunction(functionName);
-
         // Give steam overlay the original as it seems to be hooking it
         auto steamOverlay = KernelBaseProxy::GetModuleHandleA_()("gameoverlayrenderer64.dll");
         if (steamOverlay != nullptr)
         {
             if (HMODULE callerModule = Util::GetCallerModule(_ReturnAddress()); callerModule == steamOverlay)
-                return o_slDLSSGSetOptions;
+            {
+                return o_dlssg_slGetPluginFunction(functionName);
+            }
         }
 
+        o_slDLSSGSetOptions = (decltype(&slDLSSGSetOptions)) o_dlssg_slGetPluginFunction(functionName);
         return &hkslDLSSGSetOptions;
     }
 
     if (strcmp(functionName, "slDLSSGGetState") == 0)
     {
-        o_slDLSSGGetState = (decltype(&slDLSSGGetState)) o_dlssg_slGetPluginFunction(functionName);
-
         // Give steam overlay the original as it seems to be hooking it
         auto steamOverlay = KernelBaseProxy::GetModuleHandleA_()("gameoverlayrenderer64.dll");
         if (steamOverlay != nullptr)
         {
             if (HMODULE callerModule = Util::GetCallerModule(_ReturnAddress()); callerModule == steamOverlay)
-                return o_slDLSSGGetState;
+            {
+                return o_dlssg_slGetPluginFunction(functionName);
+            }
         }
 
+        o_slDLSSGGetState = (decltype(&slDLSSGGetState)) o_dlssg_slGetPluginFunction(functionName);
         return &hkslDLSSGGetState;
     }
 
-    if (strcmp(functionName, "slGetPluginJSONConfig") == 0 && IsSL1AndDLSSGActive())
-    {
-        o_dlssg_slGetPluginJSONConfig_sl1 =
-            reinterpret_cast<PFN_slGetPluginJSONConfig_sl1>(o_dlssg_slGetPluginFunction(functionName));
-
-        if (o_dlssg_slGetPluginJSONConfig_sl1 != nullptr)
-        {
-            LOG_WARN("Hooking SL1 DLSSG slGetPluginJSONConfig");
-            return &hkdlssg_slGetPluginJSONConfig_sl1;
-        }
-    }
-
-    // Ensure that we have those DLSSG calls
-    if (!o_slDLSSGSetOptions)
-        o_slDLSSGSetOptions = (decltype(&slDLSSGSetOptions)) o_dlssg_slGetPluginFunction("slDLSSGSetOptions");
-
-    if (!o_slDLSSGGetState)
-        o_slDLSSGGetState = (decltype(&slDLSSGGetState)) o_dlssg_slGetPluginFunction("slDLSSGGetState");
-
     return o_dlssg_slGetPluginFunction(functionName);
-}
-
-void* StreamlineHooks::hklocal_dlssg_slGetPluginFunction(const char* functionName)
-{
-    // LOG_DEBUG("{}", functionName);
-
-    if (strcmp(functionName, "slOnPluginLoad") == 0 && State::Instance().activeFgNvngx != FGNvngxReplacement::None)
-    {
-        o_local_dlssg_slOnPluginLoad = (PFN_slOnPluginLoad) o_local_dlssg_slGetPluginFunction(functionName);
-        return &hklocal_dlssg_slOnPluginLoad;
-    }
-
-    return o_local_dlssg_slGetPluginFunction(functionName);
 }
 
 bool StreamlineHooks::hkreflex_slSetConstants_sl1(const void* data, uint32_t frameIndex, uint32_t id)
@@ -1458,7 +865,7 @@ bool StreamlineHooks::hkreflex_slSetConstants_sl1(const void* data, uint32_t fra
 
     LOG_DEBUG("mode: {}, frameIndex: {}, id: {}", (uint32_t) constants.mode, frameIndex, id);
 
-    if (Config::Instance()->FN_ForceReflex == ForceReflex::ForceEnable)
+    if (Config::Instance()->FN_ForceReflex == 2)
         constants.mode = sl1::ReflexMode::eReflexModeLowLatencyWithBoost;
 
     // Will cause a pink screen when used with DLSSG
@@ -1490,80 +897,30 @@ void* StreamlineHooks::hkreflex_slGetPluginFunction(const char* functionName)
         return &hkslReflexSetOptions;
     }
 
-    if (strcmp(functionName, "slReflexSleep") == 0)
-    {
-        o_slReflexSleep = (decltype(&slReflexSleep)) o_reflex_slGetPluginFunction(functionName);
-        return &hkslReflexSleep;
-    }
-
-    // TODO: Hopefully a game doesn't call both, maybe separate
-    if (strcmp(functionName, "slReflexSetMarker") == 0 &&
-        (State::Instance().gameQuirks & GameQuirk::FixSlSimulationMarkers ||
-         State::Instance().activeFgInput == FGInput::DLSSG))
-    {
-        o_slPCLSetMarker = (decltype(&slPCLSetMarker)) o_reflex_slGetPluginFunction(functionName);
-        return &hkslPCLSetMarker;
-    }
-
     return o_reflex_slGetPluginFunction(functionName);
 }
 
 sl::Result StreamlineHooks::hkslPCLSetMarker(sl::PCLMarker marker, const sl::FrameToken& frame)
 {
-    // if (State::Instance().activeFgOutput == FGOutput::DLSSG && StreamlineProxy::IsD3D12Inited() &&
-    //     Config::Instance()->FGDLSSGUseGamesReflexMarkers.value_or_default())
-    //{
-    //     return StreamlineProxy::PCLSetMarker()(marker, frame);
-    // }
-
     // HACK for broken games
-    if (State::Instance().gameQuirks & GameQuirk::FixSlSimulationMarkers)
+    static uint64_t last_simulation_end_id = 0;
+    if (marker == sl::PCLMarker::eSimulationEnd)
     {
-        static uint64_t last_simulation_end_id = 0;
-        if (marker == sl::PCLMarker::eSimulationEnd)
-        {
-            last_simulation_end_id = frame;
-        }
-
-        if (marker == sl::PCLMarker::eSimulationStart && last_simulation_end_id >= frame && o_slGetNewFrameToken)
-        {
-            const uint64_t correction_offset = last_simulation_end_id - frame + 1;
-            uint32_t newFrameId = static_cast<uint32_t>(frame + correction_offset);
-
-            sl::FrameToken* newFramePointer {};
-            auto result = o_slGetNewFrameToken(newFramePointer, &newFrameId);
-
-            LOG_WARN("Simulation start marker sent after end marker, offset: {}", correction_offset);
-
-            result = o_slPCLSetMarker(marker, *newFramePointer);
-            return result;
-        }
+        last_simulation_end_id = frame;
     }
 
-    if (State::Instance().activeFgInput == FGInput::DLSSG)
+    if (marker == sl::PCLMarker::eSimulationStart && last_simulation_end_id >= frame && o_slGetNewFrameToken)
     {
-        if (State::Instance().streamlineVersion.major == 1)
-        {
-            if (marker == sl::PCLMarker::eRenderSubmitStart)
-            {
-                State::Instance().s_sl1FGInputs.evaluateState();
-            }
-            else if (marker == sl::PCLMarker::ePresentStart)
-            {
-                State::Instance().s_sl1FGInputs.markPresent(frame);
-            }
-        }
-        else
-        {
-            if (marker == sl::PCLMarker::eRenderSubmitStart)
-            {
-                State::Instance().slFGInputs.evaluateState();
-            }
-            else if (marker == sl::PCLMarker::ePresentStart)
-            {
-                State::Instance().slFGInputs.markPresent(frame);
-            }
-        }
+        const uint64_t correction_offset = last_simulation_end_id - frame + 1;
+        uint32_t newFrameId = static_cast<uint32_t>(frame + correction_offset);
+
+        sl::FrameToken* newFramePointer {};
+        auto result = o_slGetNewFrameToken(newFramePointer, &newFrameId);
+
+        LOG_WARN("Simulation start marker sent after end marker, offset: {}", correction_offset);
+
+        result = o_slPCLSetMarker(marker, *newFramePointer);
+        return result;
     }
 
     return o_slPCLSetMarker(marker, frame);
@@ -1594,9 +951,7 @@ void* StreamlineHooks::hkpcl_slGetPluginFunction(const char* functionName)
 {
     // LOG_DEBUG("{}", functionName);
 
-    if (strcmp(functionName, "slPCLSetMarker") == 0 &&
-        (State::Instance().gameQuirks & GameQuirk::FixSlSimulationMarkers ||
-         State::Instance().activeFgInput == FGInput::DLSSG))
+    if (strcmp(functionName, "slPCLSetMarker") == 0 && State::Instance().gameQuirks & GameQuirk::FixSlSimulationMarkers)
     {
         o_slPCLSetMarker = (decltype(&slPCLSetMarker)) o_pcl_slGetPluginFunction(functionName);
         return &hkslPCLSetMarker;
@@ -1694,28 +1049,14 @@ void StreamlineHooks::updateForceReflex()
 
         auto forceReflex = Config::Instance()->FN_ForceReflex.value_or_default();
 
-        if (forceReflex == ForceReflex::ForceEnable)
+        if (forceReflex == 2)
             options.mode = sl::ReflexMode::eLowLatencyWithBoost;
-        else if (forceReflex == ForceReflex::ForceDisable)
+        else if (forceReflex == 1)
             options.mode = sl::ReflexMode::eOff;
-        else if (forceReflex == ForceReflex::InGame)
+        else if (forceReflex == 0)
             options.mode = reflexGamesLastMode;
 
         auto result = o_slReflexSetOptions(options);
-        if (result != sl::Result::eOk)
-        {
-            LOG_WARN("Failed to update Reflex mode with error code: {} ({:X})", magic_enum::enum_name(result),
-                     (UINT) result);
-        }
-    }
-}
-
-void StreamlineHooks::updateDlssgOptions()
-{
-    if (o_slDLSSGSetOptions)
-    {
-        LOG_FUNC();
-        hkslDLSSGSetOptions(lastDlssgViewport, lastDlssgOptions);
     }
 }
 
@@ -1731,29 +1072,11 @@ void StreamlineHooks::unhookInterposer()
     if (o_slSetTag)
         DetourDetach(&(PVOID&) o_slSetTag, hkslSetTag);
 
-    if (o_slSetTagForFrame)
-        DetourDetach(&(PVOID&) o_slSetTagForFrame, hkslSetTagForFrame);
-
-    if (o_slSetConstants)
-        DetourDetach(&(PVOID&) o_slSetConstants, hkslSetConstants);
-
-    if (o_slEvaluateFeature)
-        DetourDetach(&(PVOID&) o_slEvaluateFeature, hkslEvaluateFeature);
-
     if (o_slInit)
         DetourDetach(&(PVOID&) o_slInit, hkslInit);
 
     if (o_slInit_sl1)
         DetourDetach(&(PVOID&) o_slInit_sl1, hkslInit_sl1);
-
-    if (o_slSetTag_sl1)
-        DetourDetach(&(PVOID&) o_slSetTag_sl1, hkslSetTag_sl1);
-
-    if (o_slSetConstants_interposer_sl1)
-        DetourDetach(&(PVOID&) o_slSetConstants_interposer_sl1, hkslSetConstants_sl1);
-
-    if (o_slEvaluateFeature_sl1)
-        DetourDetach(&(PVOID&) o_slEvaluateFeature_sl1, hkslEvaluateFeature_sl1);
 
     // if (o_logCallback)
     //     DetourDetach(&(PVOID&) o_logCallback, streamlineLogCallback);
@@ -1770,12 +1093,6 @@ void StreamlineHooks::unhookInterposer()
         o_slInit = nullptr;
         o_slInit_sl1 = nullptr;
         o_slSetTag = nullptr;
-        o_slSetTagForFrame = nullptr;
-        o_slEvaluateFeature = nullptr;
-        o_slSetConstants = nullptr;
-        o_slSetTag_sl1 = nullptr;
-        o_slSetConstants_interposer_sl1 = nullptr;
-        o_slEvaluateFeature_sl1 = nullptr;
         o_logCallback = nullptr;
         o_logCallback_sl1 = nullptr;
     }
@@ -1802,11 +1119,9 @@ void StreamlineHooks::hookInterposer(HMODULE slInterposer)
 
     // Looks like when reading DLL version load methods are called
     // To prevent loops disabling checks for sl.interposer.dll
-    auto owner = State::GetOwner();
-    State::DisableChecks(owner, "sl.interposer");
+    State::DisableChecks(7, "sl.interposer");
 
-    if (o_slSetTag || o_slInit || o_slInit_sl1 || o_slSetTag_sl1 || o_slSetConstants_interposer_sl1 ||
-        o_slEvaluateFeature_sl1)
+    if (o_slSetTag || o_slInit || o_slInit_sl1)
         unhookInterposer();
 
     {
@@ -1815,8 +1130,8 @@ void StreamlineHooks::hookInterposer(HMODULE slInterposer)
 
         LOG_TRACE("slInterposer path: {}", dllPath);
 
-        version_t sl_version;
-        Util::GetFileVersion(string_to_wstring(dllPath), &sl_version);
+        Util::version_t sl_version;
+        Util::GetDLLVersion(string_to_wstring(dllPath), &sl_version);
 
         State::Instance().streamlineVersion.major = sl_version.major;
         State::Instance().streamlineVersion.minor = sl_version.minor;
@@ -1844,19 +1159,6 @@ void StreamlineHooks::hookInterposer(HMODULE slInterposer)
             o_slGetNewFrameToken = reinterpret_cast<decltype(&slGetNewFrameToken)>(
                 KernelBaseProxy::GetProcAddress_()(slInterposer, "slGetNewFrameToken")); // Not hooked
 
-            // For making the game think DLSSG is loaded and supported
-            // but making SL not actually load the plugin
-            o_slIsFeatureSupported = reinterpret_cast<decltype(&slIsFeatureSupported)>(
-                KernelBaseProxy::GetProcAddress_()(slInterposer, "slIsFeatureSupported"));
-            o_slIsFeatureLoaded = reinterpret_cast<decltype(&slIsFeatureLoaded)>(
-                KernelBaseProxy::GetProcAddress_()(slInterposer, "slIsFeatureLoaded"));
-            o_slGetFeatureRequirements = reinterpret_cast<decltype(&slGetFeatureRequirements)>(
-                KernelBaseProxy::GetProcAddress_()(slInterposer, "slGetFeatureRequirements"));
-            o_slGetFeatureVersion = reinterpret_cast<decltype(&slGetFeatureVersion)>(
-                KernelBaseProxy::GetProcAddress_()(slInterposer, "slGetFeatureVersion"));
-            o_slGetFeatureFunction = reinterpret_cast<decltype(&slGetFeatureFunction)>(
-                KernelBaseProxy::GetProcAddress_()(slInterposer, "slGetFeatureFunction"));
-
             if (o_slInit != nullptr)
             {
                 LOG_TRACE("Hooking v2");
@@ -1865,39 +1167,20 @@ void StreamlineHooks::hookInterposer(HMODULE slInterposer)
 
                 DetourAttach(&(PVOID&) o_slInit, hkslInit);
 
+                bool hookSetTag = (State::Instance().activeFgInput == FGInput::Nukems ||
+                                   State::Instance().activeFgInput == FGInput::DLSSG);
+
+                if (o_slSetTag != nullptr && hookSetTag)
+                    DetourAttach(&(PVOID&) o_slSetTag, hkslSetTag);
+
+                if (o_slSetTagForFrame != nullptr && hookSetTag)
+                    DetourAttach(&(PVOID&) o_slSetTagForFrame, hkslSetTagForFrame);
+
+                if (o_slSetConstants != nullptr && hookSetTag)
+                    DetourAttach(&(PVOID&) o_slSetConstants, hkslSetConstants);
+
                 if (o_slEvaluateFeature != nullptr)
                     DetourAttach(&(PVOID&) o_slEvaluateFeature, hkslEvaluateFeature);
-
-                if (State::Instance().activeFgInput == FGInput::NvngxFG ||
-                    State::Instance().activeFgInput == FGInput::DLSSG)
-                {
-                    if (o_slSetTag != nullptr)
-                        DetourAttach(&(PVOID&) o_slSetTag, hkslSetTag);
-
-                    if (o_slSetTagForFrame != nullptr)
-                        DetourAttach(&(PVOID&) o_slSetTagForFrame, hkslSetTagForFrame);
-
-                    if (o_slSetConstants != nullptr)
-                        DetourAttach(&(PVOID&) o_slSetConstants, hkslSetConstants);
-                }
-
-                if (State::Instance().activeFgInput == FGInput::DLSSG)
-                {
-                    if (o_slIsFeatureSupported != nullptr)
-                        DetourAttach(&(PVOID&) o_slIsFeatureSupported, hkslIsFeatureSupported);
-
-                    if (o_slIsFeatureLoaded != nullptr)
-                        DetourAttach(&(PVOID&) o_slIsFeatureLoaded, hkslIsFeatureLoaded);
-
-                    if (o_slGetFeatureRequirements != nullptr)
-                        DetourAttach(&(PVOID&) o_slGetFeatureRequirements, hkslGetFeatureRequirements);
-
-                    if (o_slGetFeatureVersion != nullptr)
-                        DetourAttach(&(PVOID&) o_slGetFeatureVersion, hkslGetFeatureVersion);
-
-                    if (o_slGetFeatureFunction != nullptr)
-                        DetourAttach(&(PVOID&) o_slGetFeatureFunction, hkslGetFeatureFunction);
-                }
 
                 // if (o_slAllocateResources != nullptr)
                 //     DetourAttach(&(PVOID&) o_slAllocateResources, hkslAllocateResources);
@@ -1920,64 +1203,36 @@ void StreamlineHooks::hookInterposer(HMODULE slInterposer)
                     o_slSetConstants = nullptr;
                     o_slGetNativeInterface = nullptr;
                     o_slSetD3DDevice = nullptr;
-                    o_slIsFeatureSupported = nullptr;
-                    o_slIsFeatureLoaded = nullptr;
-                    o_slGetFeatureRequirements = nullptr;
-                    o_slGetFeatureVersion = nullptr;
-                    o_slGetFeatureFunction = nullptr;
                 }
             }
         }
         else if (sl_version.major == 1)
         {
+            if (State::Instance().activeFgInput == FGInput::DLSSG)
+                State::Instance().activeFgInput = FGInput::NoFG;
+
             o_slInit_sl1 =
                 reinterpret_cast<decltype(&sl1::slInit)>(KernelBaseProxy::GetProcAddress_()(slInterposer, "slInit"));
-            o_slSetTag_sl1 = reinterpret_cast<decltype(&sl1::slSetTag)>(
-                KernelBaseProxy::GetProcAddress_()(slInterposer, "slSetTag"));
-            o_slSetConstants_interposer_sl1 = reinterpret_cast<decltype(&sl1::slSetConstants)>(
-                KernelBaseProxy::GetProcAddress_()(slInterposer, "slSetConstants"));
-            o_slEvaluateFeature_sl1 = reinterpret_cast<decltype(&sl1::slEvaluateFeature)>(
-                KernelBaseProxy::GetProcAddress_()(slInterposer, "slEvaluateFeature"));
 
-            LOG_INFO("SL1 exports - slInit: {}, slSetTag: {}, slSetConstants: {}, slEvaluateFeature: {}",
-                     o_slInit_sl1 != nullptr, o_slSetTag_sl1 != nullptr, o_slSetConstants_interposer_sl1 != nullptr,
-                     o_slEvaluateFeature_sl1 != nullptr);
-
-            if (o_slInit_sl1 || o_slSetTag_sl1 || o_slSetConstants_interposer_sl1 || o_slEvaluateFeature_sl1)
+            if (o_slInit_sl1)
             {
                 LOG_TRACE("Hooking v1");
                 DetourTransactionBegin();
                 DetourUpdateThread(GetCurrentThread());
 
-                if (o_slInit_sl1)
-                    DetourAttach(&(PVOID&) o_slInit_sl1, hkslInit_sl1);
-
-                if (IsSL1AndFGActive())
-                {
-                    if (o_slSetTag_sl1)
-                        DetourAttach(&(PVOID&) o_slSetTag_sl1, hkslSetTag_sl1);
-
-                    if (o_slSetConstants_interposer_sl1)
-                        DetourAttach(&(PVOID&) o_slSetConstants_interposer_sl1, hkslSetConstants_sl1);
-
-                    if (o_slEvaluateFeature_sl1)
-                        DetourAttach(&(PVOID&) o_slEvaluateFeature_sl1, hkslEvaluateFeature_sl1);
-                }
+                DetourAttach(&(PVOID&) o_slInit_sl1, hkslInit_sl1);
 
                 auto detourResult = DetourTransactionCommit();
                 if (detourResult != NO_ERROR)
                 {
                     LOG_ERROR("Failed to hook sl.interposer v1: {:X}", detourResult);
                     o_slInit_sl1 = nullptr;
-                    o_slSetTag_sl1 = nullptr;
-                    o_slSetConstants_interposer_sl1 = nullptr;
-                    o_slEvaluateFeature_sl1 = nullptr;
                 }
             }
         }
     }
 
-    State::EnableChecks(owner);
+    State::EnableChecks(7);
 }
 
 // SL DLSS
@@ -2086,52 +1341,6 @@ void StreamlineHooks::hookDlssg(HMODULE slDlssg)
             LOG_ERROR("Failed to hook DLSSG: {:X}", detourResult);
             o_dlssg_slGetPluginFunction = nullptr;
         }
-    }
-}
-
-// Local SL DLSSG
-
-void StreamlineHooks::unhookLocalDlssg()
-{
-    LOG_FUNC();
-
-    DetourTransactionBegin();
-    DetourUpdateThread(GetCurrentThread());
-
-    if (o_local_dlssg_slGetPluginFunction)
-    {
-        DetourDetach(&(PVOID&) o_local_dlssg_slGetPluginFunction, hklocal_dlssg_slGetPluginFunction);
-        o_local_dlssg_slGetPluginFunction = nullptr;
-    }
-
-    DetourTransactionCommit();
-}
-
-void StreamlineHooks::hookLocalDlssg(HMODULE slDlssg)
-{
-    LOG_FUNC();
-
-    if (!slDlssg)
-    {
-        LOG_WARN("Dlssg module in NULL");
-        return;
-    }
-
-    if (o_local_dlssg_slGetPluginFunction)
-        unhookLocalDlssg();
-
-    o_local_dlssg_slGetPluginFunction =
-        reinterpret_cast<PFN_slGetPluginFunction>(KernelBaseProxy::GetProcAddress_()(slDlssg, "slGetPluginFunction"));
-
-    if (o_local_dlssg_slGetPluginFunction != nullptr)
-    {
-        LOG_TRACE("Hooking slGetPluginFunction in local sl.dlssg");
-        DetourTransactionBegin();
-        DetourUpdateThread(GetCurrentThread());
-
-        DetourAttach(&(PVOID&) o_local_dlssg_slGetPluginFunction, hklocal_dlssg_slGetPluginFunction);
-
-        DetourTransactionCommit();
     }
 }
 
@@ -2310,8 +1519,6 @@ bool StreamlineHooks::isInterposerHooked() { return o_slInit != nullptr || o_slI
 bool StreamlineHooks::isDlssHooked() { return o_dlss_slGetPluginFunction != nullptr; }
 
 bool StreamlineHooks::isDlssgHooked() { return o_dlssg_slGetPluginFunction != nullptr; }
-
-bool StreamlineHooks::isLocalDlssgHooked() { return o_local_dlssg_slGetPluginFunction != nullptr; }
 
 bool StreamlineHooks::isCommonHooked() { return o_common_slGetPluginFunction != nullptr; }
 

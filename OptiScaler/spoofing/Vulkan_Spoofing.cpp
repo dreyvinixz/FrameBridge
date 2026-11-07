@@ -12,7 +12,6 @@
 #include <detours/detours.h>
 
 #include <vulkan/vulkan_core.h>
-#include <misc/IdentifyGpu.h>
 
 static std::map<std::string, bool> vkDeviceExtensions;
 static std::map<std::string, bool> vkInstanceExtensions;
@@ -98,6 +97,17 @@ inline static void hkvkGetPhysicalDeviceProperties(VkPhysicalDevice physical_dev
 {
     o_vkGetPhysicalDeviceProperties(physical_device, properties);
 
+    // Report adapter info
+    auto uniqueId = properties->vendorID | properties->deviceID;
+    if (properties->vendorID != VendorId::Microsoft && !State::Instance().adapterDescs.contains(uniqueId))
+    {
+        std::string szName(properties->deviceName);
+        std::string descStr = std::format("Adapter: {}, VendorId: {:#x}, DeviceId: {:#x}", szName, properties->vendorID,
+                                          properties->deviceID);
+        LOG_INFO("{}", descStr);
+        State::Instance().adapterDescs.insert_or_assign(uniqueId, descStr);
+    }
+
     auto targetVendorIdMatches = !Config::Instance()->TargetVendorId.has_value() ||
                                  Config::Instance()->TargetVendorId.value() == properties->vendorID;
 
@@ -125,6 +135,17 @@ inline static void hkvkGetPhysicalDeviceProperties(VkPhysicalDevice physical_dev
 inline static void hkvkGetPhysicalDeviceProperties2(VkPhysicalDevice phys_dev, VkPhysicalDeviceProperties2* properties2)
 {
     o_vkGetPhysicalDeviceProperties2(phys_dev, properties2);
+
+    // Report adapter info
+    auto uniqueId = properties2->properties.vendorID | properties2->properties.deviceID;
+    if (properties2->properties.vendorID != VendorId::Microsoft && !State::Instance().adapterDescs.contains(uniqueId))
+    {
+        std::string szName(properties2->properties.deviceName);
+        std::string descStr = std::format("Adapter: {}, VendorId: {:#x}, DeviceId: {:#x}", szName,
+                                          properties2->properties.vendorID, properties2->properties.deviceID);
+        LOG_INFO("{}", descStr);
+        State::Instance().adapterDescs.insert_or_assign(uniqueId, descStr);
+    }
 
     auto targetVendorIdMatches = !Config::Instance()->TargetVendorId.has_value() ||
                                  Config::Instance()->TargetVendorId.value() == properties2->properties.vendorID;
@@ -172,6 +193,17 @@ inline static void hkvkGetPhysicalDeviceProperties2KHR(VkPhysicalDevice phys_dev
                                                        VkPhysicalDeviceProperties2* properties2)
 {
     o_vkGetPhysicalDeviceProperties2KHR(phys_dev, properties2);
+
+    // Report adapter info
+    auto uniqueId = properties2->properties.vendorID | properties2->properties.deviceID;
+    if (properties2->properties.vendorID != VendorId::Microsoft && !State::Instance().adapterDescs.contains(uniqueId))
+    {
+        std::string szName(properties2->properties.deviceName);
+        std::string descStr = std::format("Adapter: {}, VendorId: {:#x}, DeviceId: {:#x}", szName,
+                                          properties2->properties.vendorID, properties2->properties.deviceID);
+        LOG_INFO("{}", descStr);
+        State::Instance().adapterDescs.insert_or_assign(uniqueId, descStr);
+    }
 
     auto targetVendorIdMatches = !Config::Instance()->TargetVendorId.has_value() ||
                                  Config::Instance()->TargetVendorId.value() == properties2->properties.vendorID;
@@ -273,9 +305,7 @@ VkResult VulkanSpoofing::hkvkCreateInstance(VkInstanceCreateInfo* pCreateInfo, c
     }
 
     if (pCreateInfo->pApplicationInfo != nullptr && pCreateInfo->pApplicationInfo->pApplicationName != nullptr)
-    {
         LOG_DEBUG("ApplicationName: {}", pCreateInfo->pApplicationInfo->pApplicationName);
-    }
 
     static std::vector<const char*> newExtensionList;
     newExtensionList.clear();
@@ -287,9 +317,7 @@ VkResult VulkanSpoofing::hkvkCreateInstance(VkInstanceCreateInfo* pCreateInfo, c
         newExtensionList.push_back(pCreateInfo->ppEnabledExtensionNames[i]);
     }
 
-    auto primaryGpu = IdentifyGpu::getPrimaryGpu();
-
-    if (primaryGpu.dlssCapable && Config::Instance()->DLSSEnabled.value_or_default())
+    if (State::Instance().isRunningOnNvidia && Config::Instance()->DLSSEnabled.value_or_default())
     {
         LOG_INFO("Adding NVNGX Vulkan extensions");
         if (vkInstanceExtensions.contains(std::string(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME)))
@@ -427,14 +455,12 @@ VkResult VulkanSpoofing::hkvkCreateDevice(VkPhysicalDevice physicalDevice, VkDev
     static std::vector<const char*> newExtensionList;
     newExtensionList.clear();
 
-    auto primaryGpu = IdentifyGpu::getPrimaryGpu();
-
     LOG_DEBUG("Checking extensions and removing Streamline ones");
     for (size_t i = 0; i < pCreateInfo->enabledExtensionCount; i++)
     {
         auto extName = pCreateInfo->ppEnabledExtensionNames[i];
 
-        if (Config::Instance()->VulkanExtensionSpoofing.value_or_default() && primaryGpu.vendorId != VendorId::Nvidia)
+        if (Config::Instance()->VulkanExtensionSpoofing.value_or_default() && !State::Instance().isRunningOnNvidia)
         {
             auto binaryImport = std::strcmp(extName, VK_NVX_BINARY_IMPORT_EXTENSION_NAME) == 0;
             auto imgViewHandle = std::strcmp(extName, VK_NVX_IMAGE_VIEW_HANDLE_EXTENSION_NAME) == 0;
@@ -456,7 +482,8 @@ VkResult VulkanSpoofing::hkvkCreateDevice(VkPhysicalDevice physicalDevice, VkDev
         newExtensionList.push_back(extName);
     }
 
-    if (primaryGpu.vendorId == VendorId::Nvidia)
+    const bool isPascalOrOlder = State::Instance().isPascalOrOlder;
+    if (State::Instance().isRunningOnNvidia)
     {
         LOG_INFO("Adding NVNGX Vulkan extensions");
         if (vkDeviceExtensions.contains(std::string(VK_NVX_MULTIVIEW_PER_VIEW_ATTRIBUTES_EXTENSION_NAME)))
@@ -483,7 +510,7 @@ VkResult VulkanSpoofing::hkvkCreateDevice(VkPhysicalDevice physicalDevice, VkDev
             newExtensionList.push_back(VK_EXT_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
         }
 
-        if (primaryGpu.dlssCapable)
+        if (!isPascalOrOlder)
         {
             if (vkDeviceExtensions.contains(std::string(VK_NVX_BINARY_IMPORT_EXTENSION_NAME)))
             {
@@ -572,12 +599,6 @@ VkResult VulkanSpoofing::hkvkCreateDevice(VkPhysicalDevice physicalDevice, VkDev
     }
 #endif
 
-    if (State::Instance().vkAntiLagSupported)
-    {
-        LOG_INFO("Adding AntiLag extension");
-        newExtensionList.push_back(VK_AMD_ANTI_LAG_EXTENSION_NAME);
-    }
-
     pCreateInfo->enabledExtensionCount = static_cast<uint32_t>(newExtensionList.size());
     pCreateInfo->ppEnabledExtensionNames = newExtensionList.data();
 
@@ -619,8 +640,7 @@ inline static VkResult hkvkEnumerateDeviceExtensionProperties(VkPhysicalDevice p
         // Count query, modify and add 5 to final count
         if (pProperties == nullptr && pPropertyCount != nullptr && count == 0)
         {
-            if (State::Instance().activeFgInput == FGInput::DLSSG ||
-                State::Instance().activeFgInput == FGInput::NvngxFG)
+            if (State::Instance().activeFgInput == FGInput::DLSSG || State::Instance().activeFgInput == FGInput::Nukems)
                 *pPropertyCount += 7;
             else
                 *pPropertyCount += 5;
@@ -656,8 +676,7 @@ inline static VkResult hkvkEnumerateDeviceExtensionProperties(VkPhysicalDevice p
                                         VK_EXT_BUFFER_DEVICE_ADDRESS_SPEC_VERSION };
             memcpy(&pProperties[*pPropertyCount - 5], &bda, sizeof(VkExtensionProperties));
 
-            if (State::Instance().activeFgInput == FGInput::DLSSG ||
-                State::Instance().activeFgInput == FGInput::NvngxFG)
+            if (State::Instance().activeFgInput == FGInput::DLSSG || State::Instance().activeFgInput == FGInput::Nukems)
             {
                 VkExtensionProperties of { VK_NV_OPTICAL_FLOW_EXTENSION_NAME, VK_NV_OPTICAL_FLOW_SPEC_VERSION };
                 memcpy(&pProperties[*pPropertyCount - 6], &of, sizeof(VkExtensionProperties));
@@ -677,7 +696,7 @@ inline static VkResult hkvkEnumerateDeviceExtensionProperties(VkPhysicalDevice p
         vkEnumerateDeviceExtensionPropertiesListed = true;
 
         auto minusCount = 5;
-        if (State::Instance().activeFgInput == FGInput::DLSSG || State::Instance().activeFgInput == FGInput::NvngxFG)
+        if (State::Instance().activeFgInput == FGInput::DLSSG || State::Instance().activeFgInput == FGInput::Nukems)
             minusCount = 7;
 
         LOG_DEBUG("Extensions returned:");
@@ -920,7 +939,8 @@ void VulkanSpoofing::HookForVulkanSpoofing(HMODULE vulkanModule)
 {
     Vulkan_wDx12::Hook(vulkanModule);
 
-    if (Config::Instance()->VulkanSpoofing.value_or_default() && o_vkGetPhysicalDeviceProperties == nullptr)
+    if (State::Instance().workingMode != WorkingMode::Nvngx && Config::Instance()->VulkanSpoofing.value_or_default() &&
+        o_vkGetPhysicalDeviceProperties == nullptr)
     {
         FARPROC address = nullptr;
 
@@ -963,7 +983,7 @@ void VulkanSpoofing::HookForVulkanSpoofing(HMODULE vulkanModule)
 
 void VulkanSpoofing::HookForVulkanExtensionSpoofing(HMODULE vulkanModule)
 {
-    if (o_vkEnumerateInstanceExtensionProperties == nullptr)
+    if (State::Instance().workingMode != WorkingMode::Nvngx && o_vkEnumerateInstanceExtensionProperties == nullptr)
     {
         FARPROC address = nullptr;
 
@@ -1003,7 +1023,8 @@ void VulkanSpoofing::HookForVulkanExtensionSpoofing(HMODULE vulkanModule)
 
 void VulkanSpoofing::HookForVulkanVRAMSpoofing(HMODULE vulkanModule)
 {
-    if (Config::Instance()->VulkanVRAM.has_value() && o_vkGetPhysicalDeviceMemoryProperties == nullptr)
+    if (State::Instance().workingMode != WorkingMode::Nvngx && Config::Instance()->VulkanVRAM.has_value() &&
+        o_vkGetPhysicalDeviceMemoryProperties == nullptr)
     {
         FARPROC address = nullptr;
 

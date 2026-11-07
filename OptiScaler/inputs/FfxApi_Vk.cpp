@@ -395,7 +395,7 @@ ffxReturnCode_t ffxCreateContext_Vk(ffxContext* context, ffxCreateContextDescHea
             return ffxApiResult;
     }
 
-    if (!State::Instance().nvngxVkInited)
+    if (!State::Instance().NvngxVkInited)
     {
         NVSDK_NGX_FeatureCommonInfo fcInfo {};
         auto exePath = Util::ExePath().remove_filename();
@@ -815,7 +815,7 @@ ffxReturnCode_t ffxDispatch_Vk(ffxContext* context, ffxDispatchDescHeader* desc)
     LOG_DEBUG("handle: {:X}, internalResolution: {}x{}", handle->Id, dispatchDesc->renderSize.width,
               dispatchDesc->renderSize.height);
 
-    State::Instance().setInputApiName = ApiUpscalerInput::FFX_VK;
+    State::Instance().setInputApiName = "FFX-VK";
 
     auto evalResult =
         NVSDK_NGX_VULKAN_EvaluateFeature((VkCommandBuffer) dispatchDesc->commandList, handle, params, nullptr);

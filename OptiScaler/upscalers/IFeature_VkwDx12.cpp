@@ -9,13 +9,10 @@
 #include <proxies/D3D12_Proxy.h>
 
 #include <hooks/VulkanwDx12_Hooks.h>
-#include <with_dx12/with_dx12.h>
 
-#include <misc/IdentifyGpu.h>
+#include <detours/detours.h>
 
 #include <magic_enum.hpp>
-#include <detours/detours.h>
-#include <imgui/ImGuiNotify.hpp>
 
 // Used Nukem's VKToDX as a base
 // https://github.com/Nukem9/dlssg-to-fsr3/blob/eca4a79b4d23339a1dcf02e30b9f3bafe7901513/source/maindll/FFFrameInterpolatorVKToDX.cpp
@@ -24,6 +21,16 @@
     dest.Width = width;                                                                                                \
     dest.Height = height;                                                                                              \
     dest.Format = format;
+
+#define SAFE_RELEASE(p)                                                                                                \
+    do                                                                                                                 \
+    {                                                                                                                  \
+        if (p && p != nullptr)                                                                                         \
+        {                                                                                                              \
+            (p)->Release();                                                                                            \
+            (p) = nullptr;                                                                                             \
+        }                                                                                                              \
+    } while ((void) 0, 0)
 
 #define SAFE_DESTROY_VK(func, device, handle, allocator)                                                               \
     do                                                                                                                 \
@@ -322,7 +329,7 @@ bool IFeature_VkwDx12::CreateVulkanCommandBuffers(uint32_t queueFamilyIndex)
 
     auto& b = VulkanQueueCommandBuffers[queueFamilyIndex];
 
-    for (uint32_t i = 0; i < VKDX12_BUFFER_COUNT; i++)
+    for (uint32_t i = 0; i < 2; i++)
     {
         if (b.VulkanCopyCommandPool[i] == VK_NULL_HANDLE)
         {
@@ -647,9 +654,17 @@ bool IFeature_VkwDx12::CopyTextureFromVkToDx12(VkCommandBuffer InCmdBuffer, NVSD
             OutResource->VkSharedMemory = VK_NULL_HANDLE;
         }
 
-        SAFE_CLOSE_HANDLE(OutResource->SharedHandle);
+        if (OutResource->SharedHandle != NULL)
+        {
+            CloseHandle(OutResource->SharedHandle);
+            OutResource->SharedHandle = NULL;
+        }
 
-        SAFE_RELEASE(OutResource->Dx12Resource);
+        if (OutResource->Dx12Resource != nullptr)
+        {
+            OutResource->Dx12Resource->Release();
+            OutResource->Dx12Resource = nullptr;
+        }
 
         ASSIGN_VK_DESC((*OutResource), (*OutResource), InParam->Resource.ImageViewInfo.Width,
                        InParam->Resource.ImageViewInfo.Height, InParam->Resource.ImageViewInfo.Format);
@@ -676,11 +691,6 @@ bool IFeature_VkwDx12::CopyTextureFromVkToDx12(VkCommandBuffer InCmdBuffer, NVSD
         if (!CreateSharedTexture(imageCreateInfo, OutResource->VkSharedImage, OutResource->VkSharedMemory,
                                  OutResource->Dx12Resource, !InCopy))
         {
-            if (State::Instance().isRunningOnLinux)
-                ImGui::InsertNotification(
-                    { ImGuiToastType::Warning, 10000,
-                      "Failed to create a shared texture\nMake sure you are using at least Wine/Proton 11" });
-
             LOG_ERROR("Failed to create shared texture!");
             return false;
         }
@@ -952,7 +962,7 @@ bool IFeature_VkwDx12::ProcessVulkanTextures(VkCommandBuffer InCmdList, const NV
 {
     LOG_FUNC();
 
-    auto frame = _frameCount % VKDX12_BUFFER_COUNT;
+    auto frame = _frameCount % 2;
     LOG_DEBUG("frame: {}", frame);
 
     auto queueFamilyOpt = Vulkan_wDx12::cmdBufferStateTracker.GetCommandBufferQueueFamily(InCmdList);
@@ -1070,7 +1080,7 @@ bool IFeature_VkwDx12::ProcessVulkanTextures(VkCommandBuffer InCmdList, const NV
             !NvVkResourceNotValid(paramExposure))
         {
             LOG_WARN("AutoExposure disabled but ExposureTexture is not exist, it may cause problems!!");
-            State::Instance().autoExposure = true;
+            State::Instance().AutoExposure = true;
             State::Instance().changeBackend[Handle()->Id] = true;
             paramExposure = nullptr;
         }
@@ -1403,7 +1413,7 @@ bool IFeature_VkwDx12::CopyBackOutput()
 {
     LOG_FUNC();
 
-    auto frame = _frameCount % VKDX12_BUFFER_COUNT;
+    auto frame = _frameCount % 2;
     LOG_DEBUG("frame: {}", frame);
 
     std::vector<D3D12_RESOURCE_BARRIER> barriers;
@@ -1764,18 +1774,42 @@ void IFeature_VkwDx12::ReleaseSharedResources()
     SAFE_RELEASE(vkExp.Dx12Resource);
 
     // Close handles
-    SAFE_CLOSE_HANDLE(vkColor.SharedHandle);
-    SAFE_CLOSE_HANDLE(vkMv.SharedHandle);
-    SAFE_CLOSE_HANDLE(vkOut.SharedHandle);
-    SAFE_CLOSE_HANDLE(vkDepth.SharedHandle);
-    SAFE_CLOSE_HANDLE(vkReactive.SharedHandle);
-    SAFE_CLOSE_HANDLE(vkExp.SharedHandle);
+    if (vkColor.SharedHandle != NULL)
+    {
+        CloseHandle(vkColor.SharedHandle);
+        vkColor.SharedHandle = NULL;
+    }
+    if (vkMv.SharedHandle != NULL)
+    {
+        CloseHandle(vkMv.SharedHandle);
+        vkMv.SharedHandle = NULL;
+    }
+    if (vkOut.SharedHandle != NULL)
+    {
+        CloseHandle(vkOut.SharedHandle);
+        vkOut.SharedHandle = NULL;
+    }
+    if (vkDepth.SharedHandle != NULL)
+    {
+        CloseHandle(vkDepth.SharedHandle);
+        vkDepth.SharedHandle = NULL;
+    }
+    if (vkReactive.SharedHandle != NULL)
+    {
+        CloseHandle(vkReactive.SharedHandle);
+        vkReactive.SharedHandle = NULL;
+    }
+    if (vkExp.SharedHandle != NULL)
+    {
+        CloseHandle(vkExp.SharedHandle);
+        vkExp.SharedHandle = NULL;
+    }
 
     // Cleanup Vulkan copy command buffer
     // Loop in VulkanQueueCommandBuffers instead of hardcoding 2 command buffers, in case we have more in the future
     for (auto& [index, b] : VulkanQueueCommandBuffers)
     {
-        for (size_t i = 0; i < VKDX12_BUFFER_COUNT; i++)
+        for (size_t i = 0; i < 2; i++)
         {
             if (b.VulkanBarrierCommandBuffer[i] != VK_NULL_HANDLE && b.VulkanBarrierCommandPool[i] != VK_NULL_HANDLE)
             {
@@ -1783,7 +1817,11 @@ void IFeature_VkwDx12::ReleaseSharedResources()
                 b.VulkanBarrierCommandBuffer[i] = VK_NULL_HANDLE;
             }
 
-            SAFE_DESTROY_VK(vkDestroyCommandPool, VulkanDevice, b.VulkanBarrierCommandPool[i], nullptr);
+            if (b.VulkanBarrierCommandPool[i] != VK_NULL_HANDLE)
+            {
+                vkDestroyCommandPool(VulkanDevice, b.VulkanBarrierCommandPool[i], nullptr);
+                b.VulkanBarrierCommandPool[i] = VK_NULL_HANDLE;
+            }
 
             if (b.VulkanCopyCommandBuffer[i] != VK_NULL_HANDLE && b.VulkanCopyCommandPool[i] != VK_NULL_HANDLE)
             {
@@ -1791,7 +1829,11 @@ void IFeature_VkwDx12::ReleaseSharedResources()
                 b.VulkanCopyCommandBuffer[i] = VK_NULL_HANDLE;
             }
 
-            SAFE_DESTROY_VK(vkDestroyCommandPool, VulkanDevice, b.VulkanCopyCommandPool[i], nullptr);
+            if (b.VulkanCopyCommandPool[i] != VK_NULL_HANDLE)
+            {
+                vkDestroyCommandPool(VulkanDevice, b.VulkanCopyCommandPool[i], nullptr);
+                b.VulkanCopyCommandPool[i] = VK_NULL_HANDLE;
+            }
         }
     }
 
@@ -1799,38 +1841,151 @@ void IFeature_VkwDx12::ReleaseSharedResources()
 
     ReleaseSyncResources();
 
-    for (size_t i = 0; i < VKDX12_BUFFER_COUNT; i++)
-    {
-        SAFE_RELEASE(Dx12CommandList[i]);
-        SAFE_RELEASE(Dx12CommandAllocator[i]);
-    }
-
+    SAFE_RELEASE(Dx12CommandList[0]);
+    SAFE_RELEASE(Dx12CommandList[1]);
     SAFE_RELEASE(Dx12CommandQueue);
+    SAFE_RELEASE(Dx12CommandAllocator[0]);
+    SAFE_RELEASE(Dx12CommandAllocator[1]);
     SAFE_RELEASE(Dx12Fence);
 
-    SAFE_CLOSE_HANDLE(Dx12FenceEvent);
+    if (Dx12FenceEvent)
+    {
+        CloseHandle(Dx12FenceEvent);
+        Dx12FenceEvent = nullptr;
+    }
 
-    ColorCopy.reset();
-    VelocityCopy.reset();
-    DT.reset();
-    DepthCopy.reset();
-    ReactiveCopy.reset();
-    ExpCopy.reset();
-    OutCopy.reset();
-    OutCopy2.reset();
+    if (ColorCopy != nullptr && ColorCopy.get() != nullptr)
+    {
+        ColorCopy.reset();
+        ColorCopy = nullptr;
+    }
+
+    if (VelocityCopy != nullptr && VelocityCopy.get() != nullptr)
+    {
+        VelocityCopy.reset();
+        VelocityCopy = nullptr;
+    }
+
+    if (DT != nullptr && DT.get() != nullptr)
+    {
+        DT.reset();
+        DT = nullptr;
+    }
+
+    if (DepthCopy != nullptr && DepthCopy.get() != nullptr)
+    {
+        DepthCopy.reset();
+        DepthCopy = nullptr;
+    }
+
+    if (ReactiveCopy != nullptr && ReactiveCopy.get() != nullptr)
+    {
+        ReactiveCopy.reset();
+        ReactiveCopy = nullptr;
+    }
+
+    if (ExpCopy != nullptr && ExpCopy.get() != nullptr)
+    {
+        ExpCopy.reset();
+        ExpCopy = nullptr;
+    }
+
+    if (OutCopy != nullptr && OutCopy.get() != nullptr)
+    {
+        OutCopy.reset();
+        OutCopy = nullptr;
+    }
+
+    if (OutCopy2 != nullptr && OutCopy2.get() != nullptr)
+    {
+        OutCopy2.reset();
+        OutCopy2 = nullptr;
+    }
 }
 
 void IFeature_VkwDx12::ReleaseSyncResources()
 {
     LOG_FUNC();
-    for (uint32_t i = 0; i < VKDX12_BUFFER_COUNT; i++)
+    for (uint32_t i = 0; i < 2; i++)
     {
         SAFE_DESTROY_VK(vkDestroySemaphore, VulkanDevice, vkSemaphoreTextureCopy[i], nullptr);
         SAFE_RELEASE(dx12FenceTextureCopy[i]);
 
-        SAFE_CLOSE_HANDLE(vkSHForTextureCopy[i]);
+        if (vkSHForTextureCopy[i] != NULL)
+        {
+            CloseHandle(vkSHForTextureCopy[i]);
+            vkSHForTextureCopy[i] = NULL;
+        }
 
         SAFE_DESTROY_VK(vkDestroySemaphore, VulkanDevice, vkSemaphoreCopyBack[i], nullptr);
+    }
+}
+
+void IFeature_VkwDx12::GetHardwareAdapter(IDXGIFactory1* InFactory, IDXGIAdapter** InAdapter,
+                                          D3D_FEATURE_LEVEL InFeatureLevel, bool InRequestHighPerformanceAdapter)
+{
+    LOG_FUNC();
+
+    *InAdapter = nullptr;
+
+    IDXGIAdapter1* adapter;
+
+    IDXGIFactory6* factory6;
+    if (SUCCEEDED(InFactory->QueryInterface(IID_PPV_ARGS(&factory6))))
+    {
+        LOG_DEBUG("Using IDXGIFactory6 & EnumAdapterByGpuPreference");
+
+        for (UINT adapterIndex = 0;
+             DXGI_ERROR_NOT_FOUND != factory6->EnumAdapterByGpuPreference(adapterIndex,
+                                                                          InRequestHighPerformanceAdapter == true
+                                                                              ? DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE
+                                                                              : DXGI_GPU_PREFERENCE_UNSPECIFIED,
+                                                                          IID_PPV_ARGS(&adapter));
+             ++adapterIndex)
+        {
+            DXGI_ADAPTER_DESC1 desc;
+            adapter->GetDesc1(&desc);
+
+            if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
+            {
+                adapter->Release();
+                continue;
+            }
+
+            *InAdapter = adapter;
+            break;
+        }
+
+        factory6->Release();
+    }
+    else
+    {
+        LOG_DEBUG("Using InFactory & EnumAdapters1");
+        for (UINT adapterIndex = 0; DXGI_ERROR_NOT_FOUND != InFactory->EnumAdapters1(adapterIndex, &adapter);
+             ++adapterIndex)
+        {
+            DXGI_ADAPTER_DESC1 desc;
+            adapter->GetDesc1(&desc);
+
+            if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
+            {
+                adapter->Release();
+                continue;
+            }
+
+            auto result = D3d12Proxy::D3D12CreateDevice_()(adapter, InFeatureLevel, _uuidof(ID3D12Device), nullptr);
+
+            if (result == S_FALSE)
+            {
+                LOG_DEBUG("D3D12CreateDevice test result: {:X}", (UINT) result);
+                *InAdapter = adapter;
+                break;
+            }
+            else
+            {
+                adapter->Release();
+            }
+        }
     }
 }
 
@@ -1861,16 +2016,19 @@ HRESULT IFeature_VkwDx12::CreateDx12Device()
         }
 
         IDXGIAdapter* hwAdapter = nullptr;
-        IdentifyGpu::getHardwareAdapter(factory, &hwAdapter, featureLevel);
+        GetHardwareAdapter(factory, &hwAdapter, featureLevel, true);
 
         if (hwAdapter == nullptr)
             LOG_WARN("Can't get hwAdapter, will try nullptr!");
 
-        _localDx11on12Device = WithDx12::RequestD3D12Device(featureLevel, hwAdapter);
+        if (D3d12Proxy::Module() == nullptr)
+            result = D3D12CreateDevice(hwAdapter, featureLevel, IID_PPV_ARGS(&_localDx11on12Device));
+        else
+            result = D3d12Proxy::D3D12CreateDevice_()(hwAdapter, featureLevel, IID_PPV_ARGS(&_localDx11on12Device));
 
-        if (_localDx11on12Device == nullptr)
+        if (result != S_OK)
         {
-            LOG_ERROR("Can't create device!");
+            LOG_ERROR("Can't create device: {:X}", (UINT) result);
             return result;
         }
 
@@ -1879,10 +2037,11 @@ HRESULT IFeature_VkwDx12::CreateDx12Device()
         if (hwAdapter != nullptr)
         {
             DXGI_ADAPTER_DESC desc {};
-            auto primaryGpu = IdentifyGpu::getPrimaryGpu();
-            if (hwAdapter->GetDesc(&desc) == S_OK && !IsEqualLUID(desc.AdapterLuid, primaryGpu.luid))
+            if (hwAdapter->GetDesc(&desc) == S_OK)
             {
-                LOG_WARN("D3D12Device created with non-primary GPU");
+                auto adapterDesc = wstring_to_string(desc.Description);
+                LOG_INFO("D3D12Device created with adapter: {}", adapterDesc);
+                State::Instance().DeviceAdapterNames[_dx11on12Device] = adapterDesc;
             }
         }
 
@@ -1921,7 +2080,7 @@ HRESULT IFeature_VkwDx12::CreateDx12Device()
         }
     }
 
-    for (size_t i = 0; i < VKDX12_BUFFER_COUNT; i++)
+    for (size_t i = 0; i < 2; i++)
     {
         if (Dx12CommandAllocator[i] == nullptr)
         {
@@ -2041,7 +2200,6 @@ bool IFeature_VkwDx12::BaseInit(VkInstance InInstance, VkPhysicalDevice InPD, Vk
 IFeature_VkwDx12::IFeature_VkwDx12(unsigned int InHandleId, NVSDK_NGX_Parameter* InParameters)
     : IFeature(InHandleId, InParameters), IFeature_Vk(InHandleId, InParameters)
 {
-    SetInitParameters(InParameters);
 }
 
 IFeature_VkwDx12::~IFeature_VkwDx12()
@@ -2051,10 +2209,29 @@ IFeature_VkwDx12::~IFeature_VkwDx12()
 
     ReleaseSharedResources();
 
-    DT.reset();
-    OutputScaler.reset();
-    RCAS.reset();
-    Bias.reset();
+    if (DT != nullptr && DT.get() != nullptr)
+    {
+        DT.reset();
+        DT = nullptr;
+    }
+
+    if (OutputScaler != nullptr && OutputScaler.get() != nullptr)
+    {
+        OutputScaler.reset();
+        OutputScaler = nullptr;
+    }
+
+    if (RCAS != nullptr && RCAS.get() != nullptr)
+    {
+        RCAS.reset();
+        RCAS = nullptr;
+    }
+
+    if (Bias != nullptr && Bias.get() != nullptr)
+    {
+        Bias.reset();
+        Bias = nullptr;
+    }
 }
 
 bool IFeature_VkwDx12::CreateSharedFenceSemaphore()
@@ -2067,7 +2244,7 @@ bool IFeature_VkwDx12::CreateSharedFenceSemaphore()
         return true;
     }
 
-    for (uint32_t i = 0; i < VKDX12_BUFFER_COUNT; i++)
+    for (uint32_t i = 0; i < 2; i++)
     {
         // Create D3D12 fence with shared flag (only once)
         if (dx12FenceTextureCopy[i] == nullptr)

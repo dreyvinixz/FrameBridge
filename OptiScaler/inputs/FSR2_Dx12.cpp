@@ -403,15 +403,12 @@ static Fsr212::FfxErrorCode ffxFsr2ContextCreate_Dx12(Fsr212::FfxFsr2Context* co
         _d3d12Device = state.d3d12Devices[state.d3d12Devices.size() - 1];
 
     if (_d3d12Device == nullptr)
-        _d3d12Device = state.currentD3D12Device;
-
-    if (_d3d12Device == nullptr)
     {
-        LOG_ERROR("D3D12 device not found!");
+        LOG_WARN("D3D12 device not found!");
         return ccResult;
     }
 
-    if (!state.nvngxDx12Inited)
+    if (!state.NvngxDx12Inited)
     {
         NVSDK_NGX_FeatureCommonInfo fcInfo {};
         auto exePath = Util::ExePath().remove_filename();
@@ -492,15 +489,12 @@ static Fsr212::FfxErrorCode ffxFsr2ContextCreate_Pattern_Dx12(Fsr212::FfxFsr2Con
         _d3d12Device = state.d3d12Devices[state.d3d12Devices.size() - 1];
 
     if (_d3d12Device == nullptr)
-        _d3d12Device = state.currentD3D12Device;
-
-    if (_d3d12Device == nullptr)
     {
-        LOG_ERROR("D3D12 device not found!");
+        LOG_WARN("D3D12 device not found!");
         return ccResult;
     }
 
-    if (!state.nvngxDx12Inited)
+    if (!state.NvngxDx12Inited)
     {
         NVSDK_NGX_FeatureCommonInfo fcInfo {};
 
@@ -599,7 +593,7 @@ static Fsr212::FfxErrorCode ffxFsr2ContextDispatch_Dx12(Fsr212::FfxFsr2Context* 
     LOG_DEBUG("handle: {:X}, internalResolution: {}x{}", handle->Id, dispatchDescription->renderSize.width,
               dispatchDescription->renderSize.height);
 
-    State::Instance().setInputApiName = ApiUpscalerInput::FSR2X_DX12;
+    State::Instance().setInputApiName = "FSR2.X";
 
     auto evalResult = NVSDK_NGX_D3D12_EvaluateFeature((ID3D12GraphicsCommandList*) dispatchDescription->commandList,
                                                       handle, params, nullptr);
@@ -663,7 +657,7 @@ ffxFsr2ContextDispatch_Pattern_Dx12(Fsr212::FfxFsr2Context* context,
     LOG_DEBUG("handle: {:X}, internalResolution: {}x{}", handle->Id, dispatchDescription->renderSize.width,
               dispatchDescription->renderSize.height);
 
-    State::Instance().setInputApiName = ApiUpscalerInput::FSR2X_DX12;
+    State::Instance().setInputApiName = "FSR2.X";
 
     auto evalResult = NVSDK_NGX_D3D12_EvaluateFeature((ID3D12GraphicsCommandList*) dispatchDescription->commandList,
                                                       handle, params, nullptr);
@@ -730,7 +724,7 @@ static Fsr212::FfxErrorCode ffxFsr20ContextDispatch_Dx12(Fsr212::FfxFsr2Context*
     LOG_DEBUG("handle: {:X}, internalResolution: {}x{}", handle->Id, dispatchDescription->renderSize.width,
               dispatchDescription->renderSize.height);
 
-    State::Instance().setInputApiName = ApiUpscalerInput::FSR20_DX12;
+    State::Instance().setInputApiName = "FSR2.0";
 
     auto evalResult = NVSDK_NGX_D3D12_EvaluateFeature((ID3D12GraphicsCommandList*) dispatchDescription->commandList,
                                                       handle, params, nullptr);
@@ -739,7 +733,7 @@ static Fsr212::FfxErrorCode ffxFsr20ContextDispatch_Dx12(Fsr212::FfxFsr2Context*
         return Fsr212::FFX_OK;
 
     // HACK, DLSS thinks it's using dynamic res here and errors out when changing quality
-    if (evalResult == NVSDK_NGX_Result_Fail && State::Instance().currentFeature->GetUpscalerType() == Upscaler::DLSS)
+    if (evalResult == NVSDK_NGX_Result_Fail && State::Instance().currentFeature->Name() == "DLSS")
         State::Instance().changeBackend[handle->Id] = true;
 
     LOG_ERROR("evalResult: {:X}", (UINT) evalResult);
@@ -798,7 +792,7 @@ static Fsr212::FfxErrorCode ffxFsr20ContextDispatch_Pattern_Dx12(Fsr212::FfxFsr2
     LOG_DEBUG("handle: {:X}, internalResolution: {}x{}", handle->Id, dispatchDescription->renderSize.width,
               dispatchDescription->renderSize.height);
 
-    State::Instance().setInputApiName = ApiUpscalerInput::FSR20_DX12;
+    State::Instance().setInputApiName = "FSR2.0";
 
     auto evalResult = NVSDK_NGX_D3D12_EvaluateFeature((ID3D12GraphicsCommandList*) dispatchDescription->commandList,
                                                       handle, params, nullptr);
@@ -851,11 +845,8 @@ static Fsr212::FfxErrorCode ffxFsr2TinyContextDispatch_Dx12(Fsr212::FfxFsr2Conte
     params->Set(NVSDK_NGX_Parameter_Color, dispatchDescription->color.resource);
     params->Set(NVSDK_NGX_Parameter_MotionVectors, dispatchDescription->motionVectors.resource);
     params->Set(NVSDK_NGX_Parameter_Output, dispatchDescription->output.resource);
-
-    // Those values are set to 0 in Tiny Tina, don't use them
-    // params->Set("FSR.cameraNear", dispatchDescription->cameraNear);
-    // params->Set("FSR.cameraFar", dispatchDescription->cameraFar);
-
+    params->Set("FSR.cameraNear", dispatchDescription->cameraNear);
+    params->Set("FSR.cameraFar", dispatchDescription->cameraFar);
     params->Set("FSR.cameraFovAngleVertical", dispatchDescription->cameraFovAngleVertical);
     params->Set("FSR.frameTimeDelta", dispatchDescription->frameTimeDelta);
     params->Set("FSR.transparencyAndComposition", dispatchDescription->transparencyAndComposition.resource);
@@ -865,7 +856,7 @@ static Fsr212::FfxErrorCode ffxFsr2TinyContextDispatch_Dx12(Fsr212::FfxFsr2Conte
     LOG_DEBUG("handle: {:X}, internalResolution: {}x{}", handle->Id, dispatchDescription->renderSize.width,
               dispatchDescription->renderSize.height);
 
-    State::Instance().setInputApiName = ApiUpscalerInput::FSR2_TinyTina;
+    State::Instance().setInputApiName = "FSR2.TT";
 
     auto evalResult = NVSDK_NGX_D3D12_EvaluateFeature((ID3D12GraphicsCommandList*) dispatchDescription->commandList,
                                                       handle, params, nullptr);
@@ -923,11 +914,6 @@ static float ffxFsr2GetUpscaleRatioFromQualityMode_Dx12(Fsr212::FfxFsr2QualityMo
     LOG_DEBUG("");
 
     auto ratio = GetQualityOverrideRatioFfx(qualityMode).value_or(qualityRatios[(UINT) qualityMode]);
-
-    // FSR 2 didn't have an official Native AA so some games dislike the 1.0 ratio
-    if (ratio == 1.0f)
-        ratio = 1.002f;
-
     LOG_DEBUG("Quality mode: {}, Upscale ratio: {}", (UINT) qualityMode, ratio);
     return ratio;
 }
@@ -974,7 +960,7 @@ void HookFSR2ExeInputs()
         KernelBaseProxy::GetProcAddress_()(exeModule, "ffxGetResourceKTGL") != nullptr)
     {
         LOG_WARN("Katana Engine exports detected, disabling FSR2 hooks!");
-        State::Instance().gameEngine = GameEngineType::Katana;
+        State::Instance().GameEngine = GameEngineType::Katana;
         return;
     }
 

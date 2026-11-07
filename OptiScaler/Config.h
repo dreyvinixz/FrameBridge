@@ -119,7 +119,7 @@ template <class T, HasDefaultValue defaultState = WithDefault> class CustomOptio
             return this->has_value() ? std::move(this->value()) : std::move(_defaultValue);
         }
 
-        constexpr std::optional<T> value_for_config()
+        constexpr std::optional<T> value_for_config(bool forceSave = false)
             requires(defaultState == WithDefault)
     {
         if (_volatile)
@@ -130,10 +130,22 @@ template <class T, HasDefaultValue defaultState = WithDefault> class CustomOptio
             return std::nullopt;
         }
 
-        if (!this->has_value() || *this == _defaultValue)
+        if (!this->has_value() || (!forceSave && *this == _defaultValue))
             return std::nullopt;
 
         return this->value();
+    }
+
+    constexpr std::optional<T> value_for_config_ignore_default()
+        requires(defaultState == WithDefault)
+    {
+        if (_volatile)
+            return _configIni;
+
+        if (this->has_value())
+            return this->value();
+
+        return std::nullopt;
     }
 
     constexpr std::optional<T> value_for_config()
@@ -160,16 +172,6 @@ template <class T, HasDefaultValue defaultState = WithDefault> class CustomOptio
 };
 
 constexpr inline int UnboundKey = -1;
-constexpr uint32_t NV_PRESET_LATEST = 0x00FFFFFF;
-
-enum FpsOverlayPos : uint32_t
-{
-    FpsOverlayPos_TopLeft,
-    FpsOverlayPos_TopRight,
-    FpsOverlayPos_BottomLeft,
-    FpsOverlayPos_BottomRight,
-    FpsOverlayPos_COUNT,
-};
 
 enum FpsOverlay : uint32_t
 {
@@ -195,44 +197,6 @@ enum class Scaler : uint32_t
     Kaiser3 = 6,
     Magic = 7,
     Count
-};
-
-enum class ForceReflex : uint32_t
-{
-    InGame,
-    ForceDisable,
-    ForceEnable,
-    Count
-};
-
-enum class LFXMode : uint32_t
-{
-    Conservative,
-    Aggressive,
-    ReflexIDs,
-    Count
-};
-
-enum class LowLatencyInput : uint32_t
-{
-    None,
-    Auto,
-    AntiLag2,
-    Reflex,
-    XeLL,
-    UeLowLatency,
-    _
-};
-
-enum class LowLatencyMode : uint32_t
-{
-    None,
-    Auto,
-    LatencyFlex,
-    AntiLag2,
-    XeLL,
-    AntiLagVk,
-    Reflex
 };
 
 class Config
@@ -289,7 +253,7 @@ class Config
     CustomOptional<uint32_t> DLSSDRenderPresetUltraPerformance { 0 };
 
     // Nukems
-    CustomOptional<bool> NvngxFGMakeDepthCopy { false };
+    CustomOptional<bool> MakeDepthCopy { false };
 
     // Libraries
     CustomOptional<std::wstring, NoDefault> MainDllPath;
@@ -309,16 +273,20 @@ class Config
     CustomOptional<std::wstring, NoDefault> NvapiDllPath;
 
     // Sharpness
-    CustomOptional<SharpenShader> SharpnessShader { SharpenShader::RCAS };
     CustomOptional<bool> OverrideSharpness { false };
     CustomOptional<float> Sharpness { 0.4f };
 
-    // RCAS
+    // CAS
     CustomOptional<bool> RcasEnabled { false };
+
+    // RCAS
     CustomOptional<bool> ContrastEnabled { false };
     CustomOptional<float> Contrast { -0.3f };
 
     // DA Sharpening
+    CustomOptional<bool> UseDepthAwareSharpen { false };
+    CustomOptional<bool> UseDASDepthAwareSharpen { false };
+    CustomOptional<bool> DADepthIsLinear { false };
     CustomOptional<float, NoDefault> DADepthScale;
     CustomOptional<float, NoDefault> DADepthBias;
     CustomOptional<bool, NoDefault> DAClampOutput;
@@ -330,16 +298,6 @@ class Config
     CustomOptional<float> MotionThreshold { 0.0f };
     CustomOptional<float> MotionScaleLimit { 10.0f };
 
-    // Magnifier
-    CustomOptional<bool> MagnifierEnabled { false };
-    CustomOptional<float> MagnifierSize { 15.f }; // % of screen Height
-    CustomOptional<int> MagnifierZoomFactor { 4 };
-    CustomOptional<float> MagnifierBorderSize { 0.3f };   // % of screen Height
-    CustomOptional<float> MagnifierCursorOffsetX { 0.f }; // Pixels
-    CustomOptional<float> MagnifierCursorOffsetY { 0.f }; // Pixels
-    CustomOptional<float, NoDefault> MagnifierStaticPosX; // % of screen Width, static pos enabled if both are defined
-    CustomOptional<float, NoDefault> MagnifierStaticPosY; // % of screen Height
-
     // Menu
     CustomOptional<float, NoDefault> MenuScale;
     CustomOptional<bool> OverlayMenu { true };
@@ -347,7 +305,7 @@ class Config
     CustomOptional<bool> ExtendedLimits { false };
     CustomOptional<bool> ShowFps { false };
     /// 0 Top Left, 1 Top Right, 2 Bottom Left, 3 Bottom Right
-    CustomOptional<FpsOverlayPos> FpsOverlayPosition { FpsOverlayPos_TopLeft };
+    CustomOptional<int> FpsOverlayPos { 0 };
     /// 0 Only FPS, 1 +Avg FPS & Upscaler info 2 +Frame Time,
     /// 3 +Upscaler Time, 4 +Frame Time Graph, 5 +Upscaler Time Graph
     /// 6 +Reflex timings
@@ -363,7 +321,6 @@ class Config
     CustomOptional<std::wstring, NoDefault> TTFFontPath;
     CustomOptional<int> FGShortcutKey { VK_END };
     CustomOptional<bool> LightTheme { false };
-    CustomOptional<bool> OverlaysUseTheme { false };
     CustomOptional<float> MenuAccentColorR { 0.00f };
     CustomOptional<float> MenuAccentColorG { 0.40f };
     CustomOptional<float> MenuAccentColorB { 0.77f };
@@ -397,17 +354,18 @@ class Config
     // ProcessFilter
     CustomOptional<std::wstring, NoDefault> TargetProcess;
     CustomOptional<std::wstring> ProcessExclusionList = {
-        L"crashpad_handler.exe|crashreport.exe|crashreporter.exe|crs-handler.exe|crs-uploader.exe|crs-video.exe|"
-        L"unitycrashhandler64.exe|idtechlauncher.exe|cefviewwing.exe|ace-setup64.exe|ace-service64.exe|"
-        L"qtwebengineprocess.exe|platformprocess.exe|bugsplathd64.exe|bssndrpt64.exe|pspcsdkappmgr.exe|pspcsdkcore.exe|"
-        L"pspcsdkstttts.exe|pspcsdktelemetry.exe|pspcsdkui.exe|pspcsdkupdatechecker.exe|pspcsdkvoicechat.exe|"
-        L"pspcsdkwebview.exe|windhawk.exe|vscodium.exe|crash_reporter.exe|steamerrorreporter64.exe|crashreportclient."
-        L"exe|edcefcrashpadprocess.exe|edcefrenderprocess.exe"
+        L"crashpad_handler.exe|crashreport.exe|crashreporter.exe|crs-handler.exe|unitycrashhandler64.exe|"
+        L"idtechlauncher.exe|cefviewwing.exe|ace-setup64.exe|ace-service64.exe|qtwebengineprocess.exe|"
+        L"platformprocess.exe|bugsplathd64.exe|bssndrpt64.exe|pspcsdkappmgr.exe|pspcsdkcore.exe|pspcsdkstttts.exe|"
+        L"pspcsdktelemetry.exe|pspcsdkui.exe|pspcsdkupdatechecker.exe|pspcsdkvoicechat.exe|pspcsdkwebview.exe|windhawk."
+        L"exe|vscodium.exe|crash_reporter.exe|steamerrorreporter64.exe|crashreportclient.exe|edcefcrashpadprocess.exe|"
+        L"edcefrenderprocess.exe"
     };
 
     // Hotfixes
     CustomOptional<bool> CheckForUpdate { true };
-    CustomOptional<bool, SoftDefault> DisableOverlays { false };
+    CustomOptional<bool> DisableOverlays { false };
+    CustomOptional<bool> ManualInputPolling { false };
 
     CustomOptional<bool> SimulateWaitableObject { false };
 
@@ -432,7 +390,7 @@ class Config
     CustomOptional<bool> UsePrecompiledShaders { true };
 
     CustomOptional<bool> UseGenericAppIdWithDlss { false };
-    CustomOptional<bool> PreferDedicatedGpu { true };
+    CustomOptional<bool> PreferDedicatedGpu { false };
     CustomOptional<bool> PreferFirstDedicatedGpu { false };
 
     CustomOptional<int32_t, NoDefault> ColorResourceBarrier;    // disabled by default
@@ -445,9 +403,9 @@ class Config
     CustomOptional<bool> CreateD3D12DeviceForLuma { false };
 
     // Upscalers
-    CustomOptional<Upscaler, SoftDefault> Dx11Upscaler { Upscaler::FSR22 };
-    CustomOptional<Upscaler, SoftDefault> Dx12Upscaler { Upscaler::XeSS };
-    CustomOptional<Upscaler, SoftDefault> VulkanUpscaler { Upscaler::FSR22 };
+    CustomOptional<std::string, SoftDefault> Dx11Upscaler { "fsr22" };
+    CustomOptional<std::string, SoftDefault> Dx12Upscaler { "xess" };
+    CustomOptional<std::string, SoftDefault> VulkanUpscaler { "fsr22" };
 
     // Output Scaling
     CustomOptional<bool> OutputScalingEnabled { false };
@@ -472,8 +430,10 @@ class Config
     CustomOptional<float> FsrMinDisOccAcc { -0.333f };
 
     // FSR4
-    CustomOptional<FSR4Support> Fsr4ForceModel { FSR4Support::None };
+    CustomOptional<bool> Fsr4Update { false };
+    CustomOptional<bool> Fsr4ForceEnableInt8 { false };
     CustomOptional<uint32_t, NoDefault> Fsr4Preset;
+    CustomOptional<bool> Fsr4EnableDebugView { false };
     CustomOptional<bool> Fsr4EnableWatermark { false };
     CustomOptional<bool> Fsr4DoNotLoadAmdxc64 { false };
 
@@ -493,10 +453,12 @@ class Config
     CustomOptional<bool> VulkanUseCopyForOutput { false };
 
     // NVAPI Override
+    CustomOptional<bool> OverrideNvapiDll { false };
+    CustomOptional<bool> DontUseFakenvapiForXeLLOnNvidia { false };
     CustomOptional<bool> DisableFlipMetering { false };
 
     // Spoofing
-    CustomOptional<bool, SoftDefault> DxgiSpoofing { true };
+    CustomOptional<bool> DxgiSpoofing { true };
     CustomOptional<bool> DxgiFactoryWrapping { false };
     CustomOptional<bool> StreamlineSpoofing { true };
     CustomOptional<std::string, NoDefault> DxgiBlacklist; // disabled by default
@@ -520,14 +482,12 @@ class Config
     CustomOptional<std::wstring, NoDefault> PluginPath;
     CustomOptional<bool> LoadSpecialK { false };
     CustomOptional<bool> LoadReShade { false };
-    CustomOptional<bool> LoadCustomAmdxc64OnRdna2 { false };
     CustomOptional<bool> LoadAsiPlugins { false };
     CustomOptional<int> LateAsiPluginsDelay { 30 };
 
     // Frame Generation
     CustomOptional<FGInput> FGInput { FGInput::NoFG };
     CustomOptional<FGOutput> FGOutput { FGOutput::NoFG };
-    CustomOptional<FGNvngxReplacement> FGNvngxReplacement { FGNvngxReplacement::None };
     CustomOptional<bool> FGDrawUIOverFG { false };
     CustomOptional<bool> FGUIPremultipliedAlpha { true };
     CustomOptional<bool> FGDisableHudless { false };
@@ -542,7 +502,6 @@ class Config
     CustomOptional<bool> FGSkipResizeBuffers { false };
     CustomOptional<bool> FGModifyBufferState { false };
     CustomOptional<bool> FGModifySCIndex { false };
-    CustomOptional<float> FGHudCutoff { 0.0f };
     CustomOptional<FrameTimeSource> FTInput { FrameTimeSource::Input };
 
     // OptiFG
@@ -603,7 +562,7 @@ class Config
     CustomOptional<bool> FSRFGSkipDispatchForHudless { false };
     CustomOptional<bool> FSRFGEnableWatermark { false };
 
-    // XeFG
+    // OptiFG - XeFG
     CustomOptional<bool> FGXeFGIgnoreInitChecks { false };
     CustomOptional<int> FGXeFGInterpolationCount { 1 };
     CustomOptional<bool> FGXeFGUIComposition { false };
@@ -613,30 +572,12 @@ class Config
     CustomOptional<bool> FGXeFGDebugView { false };
     CustomOptional<bool> FGXeFGForceBorderless { false };
 
-    // DLSSG
-    CustomOptional<int> FGDLSSGInterpolationCount { 1 }; // For Opti's own SL instance
-    CustomOptional<bool> FGDLSSGUseGamesReflexMarkers { true };
-    CustomOptional<int, NoDefault>
-        FGDLSSGOverrideInterpolationCount; // For overriding game's value sent to SL, could be Nvngx FG, could be noFG
-                                           // but someone just uses real DLSSG
-    CustomOptional<bool> FGDLSSGOverrideForceDMFG { false };   // Overrides game's DLSSG mode to Dynamic
-    CustomOptional<bool> FGDLSSGForceDMFG { false };           // Overrides Opti's DLSSG mode to Dynamic
-    CustomOptional<float> FGDLSSGFramerateTargetDMFG { 0.0f }; // 0.0 means auto-detects the display refresh rate
-
-    // As per
-    // https://github.com/artur-graniszewski/dlss-enabler-main/blob/a92464d468eb0d91ae17befa66c6bf6229f20b9f/Utils/DlssgProxy.cpp#L1033
-    CustomOptional<uint32_t> NvngxFGDispatchFlags { 0x10000000 }; // IGNORE_UI_TEXTURE
-    CustomOptional<bool> NvngxFGShowDebug { false };
-    CustomOptional<bool> NvngxFGDisableHudless { false };
-
     // fakenvapi
-    CustomOptional<bool> UseFakenvapi { true };
-    CustomOptional<bool> ForceXeLL { false };
+    CustomOptional<bool> FN_EnableLogs { true };
+    CustomOptional<bool> FN_EnableTraceLogs { false };
     CustomOptional<bool> FN_ForceLatencyFlex { false };
-    CustomOptional<LFXMode> FN_LatencyFlexMode { LFXMode::Conservative };
-    CustomOptional<ForceReflex> FN_ForceReflex { ForceReflex::InGame };
-    CustomOptional<LowLatencyInput> LowLatencyInput { LowLatencyInput::Auto }; // TODO: no reading/saving to config
-    CustomOptional<LowLatencyMode> LowLatencyOutput { LowLatencyMode::Auto };
+    CustomOptional<uint32_t> FN_LatencyFlexMode { 0 }; // conservative - aggressive - reflex ids
+    CustomOptional<uint32_t> FN_ForceReflex { 0 };     // in-game - force disable - force enable
 
     // Inputs
     CustomOptional<bool> EnableDlssInputs { true };
@@ -666,12 +607,12 @@ class Config
     CustomOptional<bool, NoDefault> ForceVsync;
     CustomOptional<UINT> VsyncInterval { 0 };
 
-    // Old configs for compat reasons
-    CustomOptional<bool, NoDefault> _DONTUSE_Fsr4ForceEnableInt8;
-
     bool LoadFromPath(const wchar_t* InPath);
     bool SaveIni();
     bool SaveXeFG();
+
+    bool ReloadFakenvapi();
+    bool SaveFakenvapiIni();
 
     void CheckUpscalerFiles();
 
@@ -694,6 +635,4 @@ class Config
     std::optional<int> readInt(std::string section, std::string key);
     std::optional<uint32_t> readUInt(std::string section, std::string key);
     std::optional<bool> readBool(std::string section, std::string key);
-
-    template <typename Enum> std::optional<Enum> readEnum(std::string section, std::string key);
 };

@@ -25,7 +25,7 @@ class FSR2FeatureVk212 : public FSR2Feature212, public IFeature_Vk
     bool Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Parameter* InParameters) override;
 
     feature_version Version() override { return FSR2Feature212::Version(); }
-    Upscaler GetUpscalerType() const final { return Upscaler::FSR21; }
+    std::string Name() const override { return FSR2Feature212::Name(); }
 
     bool IsWithDx12() override { return false; }
 };

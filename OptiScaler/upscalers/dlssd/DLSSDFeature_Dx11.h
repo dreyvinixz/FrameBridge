@@ -12,7 +12,7 @@ class DLSSDFeatureDx11 : public DLSSDFeature, public IFeature_Dx11
     bool Evaluate(ID3D11DeviceContext* InDeviceContext, NVSDK_NGX_Parameter* InParameters) override;
 
     feature_version Version() override { return DLSSDFeature::Version(); }
-    Upscaler GetUpscalerType() const final { return DLSSDFeature::GetUpscalerType(); }
+    std::string Name() const override { return DLSSDFeature::Name(); }
 
     bool IsWithDx12() override { return false; }
 

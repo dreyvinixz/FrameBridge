@@ -75,7 +75,7 @@ std::optional<float> GetQualityOverrideRatio(const NVSDK_NGX_PerfQuality_Value i
     return output;
 }
 
-NVNGX_Parameters::NVNGX_Parameters(API api, bool isPersistent) : Api(api)
+NVNGX_Parameters::NVNGX_Parameters(std::string_view name, bool isPersistent) : Name(name)
 {
     // Old flag used to indicate custom table. Obsolete?
     Set("OptiScaler", 1);
@@ -349,8 +349,7 @@ void NVNGX_Parameters::Reset()
 
     LOG_DEBUG("Start");
 
-    // As fallback using api during params creation
-    InitNGXParameters(this, Api);
+    InitNGXParameters(this);
 
     LOG_DEBUG("End");
 }
@@ -702,7 +701,7 @@ NVSDK_NGX_Result NVSDK_CONV NVSDK_NGX_DLSS_GetStatsCallback(NVSDK_NGX_Parameter*
     return NVSDK_NGX_Result_Success;
 }
 
-void InitNGXParameters(NVSDK_NGX_Parameter* InParams, API api)
+void InitNGXParameters(NVSDK_NGX_Parameter* InParams)
 {
     InParams->Set(NVSDK_NGX_Parameter_SuperSampling_Available, 1);
 
@@ -799,8 +798,9 @@ void InitNGXParameters(NVSDK_NGX_Parameter* InParams, API api)
         InParams->Set("SuperSamplingDenoising.FeatureInitResult", 0);
     }
 
-    if ((api == API::DX12 || api == API::Vulkan) && (State::Instance().activeFgInput == FGInput::DLSSG ||
-                                                     State::Instance().activeFgNvngx != FGNvngxReplacement::None))
+    // not ideal as it doesn't take different APIs into account
+    if (State::Instance().activeFgInput == FGInput::NvngxFG || State::Instance().activeFgInput == FGInput::DLSSG ||
+        State::Instance().activeFgOutput == FGOutput::DLSSGWithNvngx)
     {
         InParams->Set("FrameGeneration.Available", 1);
         InParams->Set("FrameGeneration.NeedsUpdatedDriver", 0);
@@ -810,9 +810,7 @@ void InitNGXParameters(NVSDK_NGX_Parameter* InParams, API api)
         InParams->Set(NVSDK_NGX_Parameter_FrameInterpolation_FeatureInitResult, 1);
 
         // Streamline handle the max interpolated frame count
-        int countMax =
-            State::Instance().activeFgNvngx != FGNvngxReplacement::None ? Nvngx_FG::getMaxFakeFramesCount() : 1;
-        InParams->Set("DLSSG.MultiFrameCountMax", countMax);
+        InParams->Set("DLSSG.MultiFrameCountMax", Nvngx_FG::isMFG() ? 5 : 1);
 
         if (State::Instance().NVNGX_Engine == NVSDK_NGX_ENGINE_TYPE_UNREAL ||
             State::Instance().gameEngine == GameEngineType::Unreal ||
@@ -829,10 +827,10 @@ void InitNGXParameters(NVSDK_NGX_Parameter* InParams, API api)
     }
 }
 
-NVNGX_Parameters* GetNGXParameters(API api, bool isPersistent)
+NVNGX_Parameters* GetNGXParameters(std::string_view name, bool isPersistent)
 {
-    auto params = new NVNGX_Parameters(api, isPersistent);
-    InitNGXParameters(params, api);
+    auto params = new NVNGX_Parameters(name, isPersistent);
+    InitNGXParameters(params);
     return params;
 }
 

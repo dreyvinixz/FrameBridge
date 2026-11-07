@@ -139,22 +139,43 @@ static void CleanupRenderTargetDx12(bool clearQueue)
             ImGui_ImplDX12_Shutdown(false);
         }
 
-        SAFE_RELEASE(g_pd3dRtvDescHeap);
-        SAFE_RELEASE(g_pd3dSrvDescHeap);
+        if (g_pd3dRtvDescHeap != nullptr)
+        {
+            g_pd3dRtvDescHeap->Release();
+            g_pd3dRtvDescHeap = nullptr;
+        }
+
+        if (g_pd3dSrvDescHeap != nullptr)
+        {
+            g_pd3dSrvDescHeap->Release();
+            g_pd3dSrvDescHeap = nullptr;
+        }
 
         for (UINT i = 0; i < NUM_BACK_BUFFERS; ++i)
         {
-            SAFE_RELEASE(g_commandAllocators[i]);
+            if (g_commandAllocators[i] != nullptr)
+            {
+                g_commandAllocators[i]->Release();
+                g_commandAllocators[i] = nullptr;
+            }
         }
 
-        SAFE_RELEASE(g_pd3dCommandList);
+        if (g_pd3dCommandList != nullptr)
+        {
+            g_pd3dCommandList->Release();
+            g_pd3dCommandList = nullptr;
+        }
 
         if (g_pd3dCommandQueue != nullptr)
             g_pd3dCommandQueue = nullptr;
 
         g_pd3dSrvDescHeapAlloc.Destroy();
 
-        // SAFE_RELEASE(g_pd3dDeviceParam);
+        // if (g_pd3dDeviceParam != nullptr)
+        //{
+        //     g_pd3dDeviceParam->Release();
+        //     g_pd3dDeviceParam = nullptr;
+        // }
 
         _dx12Device = false;
         _isInited = false;
@@ -188,7 +209,11 @@ static void CleanupRenderTargetDx11(bool shutDown)
     if (!shutDown)
         LOG_FUNC();
 
-    SAFE_RELEASE(g_pd3dRenderTarget);
+    if (g_pd3dRenderTarget != nullptr)
+    {
+        g_pd3dRenderTarget->Release();
+        g_pd3dRenderTarget = nullptr;
+    }
 
     if (g_pd3dDevice != nullptr)
         g_pd3dDevice = nullptr;
@@ -514,7 +539,7 @@ void MenuOverlayDx::CleanupRenderTarget(bool clearQueue, HWND hWnd)
     auto fg = State::Instance().currentFG;
     if (fg != nullptr && fg->FrameGenerationContext() != nullptr && fg->IsActive())
     {
-        State::Instance().fgChanged = true;
+        State::Instance().FGchanged = true;
         fg->UpdateTarget();
         fg->Deactivate();
     }

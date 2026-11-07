@@ -1,7 +1,6 @@
 #include <pch.h>
 #include "XeSSFeature_Vk.h"
 #include <nvsdk_ngx_vk.h>
-#include <imgui/ImGuiNotify.hpp>
 
 static std::string ResultToString(xess_result_t result)
 {
@@ -71,8 +70,6 @@ bool XeSSFeature_Vk::Init(VkInstance InInstance, VkPhysicalDevice InPD, VkDevice
 
     if (!_moduleLoaded)
     {
-        ImGui::InsertNotification(
-            { ImGuiToastType::Warning, 10000, "Couldn't load libxess.dll\nCheck if the dll is present" });
         LOG_ERROR("libxess.dll not loaded!");
         return false;
     }
@@ -300,6 +297,9 @@ bool XeSSFeature_Vk::Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Parameter* 
     if (!OS->IsInit())
         Config::Instance()->OutputScalingEnabled.set_volatile_value(false);
 
+    if (Config::Instance()->DADepthIsLinear.value_for_config_ignore_default() == std::nullopt)
+        Config::Instance()->DADepthIsLinear.set_volatile_value(false);
+
     if (State::Instance().xessDebug)
     {
         LOG_ERROR("xessDebug");
@@ -408,7 +408,7 @@ bool XeSSFeature_Vk::Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Parameter* 
         else
         {
             LOG_WARN("AutoExposure disabled but ExposureTexture is not exist, it may cause problems!!");
-            State::Instance().autoExposure = true;
+            State::Instance().AutoExposure = true;
             State::Instance().changeBackend[_handle->Id] = true;
             return true;
         }
@@ -613,37 +613,16 @@ bool XeSSFeature_Vk::Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Parameter* 
                              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, range);
 
         RcasConstants rcasConstants {};
-        rcasConstants.DepthIsLinear = DepthLinear();
-        rcasConstants.DepthIsReversed = DepthInverted();
-        rcasConstants.IsHdr = IsHdr();
         rcasConstants.Sharpness = _sharpness;
         InParameters->Get(NVSDK_NGX_Parameter_MV_Scale_X, &rcasConstants.MvScaleX);
         InParameters->Get(NVSDK_NGX_Parameter_MV_Scale_Y, &rcasConstants.MvScaleY);
         rcasConstants.CameraNear = Config::Instance()->FsrCameraNear.value_or_default();
         rcasConstants.CameraFar = Config::Instance()->FsrCameraFar.value_or_default();
 
-        VkImageInfo InResourceInfo {};
-        InResourceInfo.ImageView = RCAS->GetImageView();
-        InResourceInfo.Image = RCAS->GetImage();
-        // Missing the rest of the info
+        VkExtent2D outExtent = { DisplayWidth(), DisplayHeight() };
 
-        VkImageInfo OutResourceInfo {};
-        OutResourceInfo.ImageView = finalOutputView;
-        OutResourceInfo.Image = finalOutputImage;
-        OutResourceInfo.Width = DisplayWidth();
-        OutResourceInfo.Height = DisplayHeight();
-        // Missing the rest of the info
-
-        VkImageInfo InDepthInfo {};
-        InDepthInfo.ImageView = params.depthTexture.imageView;
-        InDepthInfo.Image = params.depthTexture.image;
-        InDepthInfo.Width = params.depthTexture.width;
-        InDepthInfo.Height = params.depthTexture.height;
-        InDepthInfo.Format = params.depthTexture.format;
-        InDepthInfo.SubresourceRange = params.depthTexture.subresourceRange;
-
-        RCAS->Dispatch(Device, InCmdBuffer, rcasConstants, &InResourceInfo,
-                       (VkImageInfo*) &paramVelocity->Resource.ImageViewInfo, &OutResourceInfo, &InDepthInfo);
+        RCAS->Dispatch(Device, InCmdBuffer, rcasConstants, RCAS->GetImageView(), params.velocityTexture.imageView,
+                       finalOutputView, outExtent, params.depthTexture.imageView);
     }
 
     _frameCount++;

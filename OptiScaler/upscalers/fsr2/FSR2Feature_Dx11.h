@@ -44,7 +44,7 @@ class FSR2FeatureDx11 : public FSR2Feature, public IFeature_Dx11
     bool Evaluate(ID3D11DeviceContext* DeviceContext, NVSDK_NGX_Parameter* InParameters) override;
 
     feature_version Version() override { return FSR2Feature::Version(); }
-    Upscaler GetUpscalerType() const final { return Upscaler::FSR22; }
+    std::string Name() const override { return FSR2Feature::Name(); }
 
     bool IsWithDx12() override { return false; }
 

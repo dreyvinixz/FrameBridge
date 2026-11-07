@@ -169,7 +169,7 @@ bool FSR2FeatureVkOnDx12_212::Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Pa
             if (InParameters->Get(NVSDK_NGX_Parameter_ExposureTexture, &paramExpo) != NVSDK_NGX_Result_Success)
             {
                 LOG_WARN("ExposureTexture does not exist, enabling AutoExposure!!");
-                State::Instance().autoExposure = true;
+                State::Instance().AutoExposure = true;
             }
         }
 
@@ -236,6 +236,9 @@ bool FSR2FeatureVkOnDx12_212::Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Pa
     if (!OutputScaler->IsInit())
         Config::Instance()->OutputScalingEnabled.set_volatile_value(false);
 
+    if (Config::Instance()->DADepthIsLinear.value_for_config_ignore_default() == std::nullopt)
+        Config::Instance()->DADepthIsLinear.set_volatile_value(false);
+
     // Set up dispatch parameters
     Fsr212::FfxFsr2DispatchDescription params = {};
 
@@ -261,6 +264,14 @@ bool FSR2FeatureVkOnDx12_212::Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Pa
         params.sharpness = _sharpness;
     }
 
+    // Force enable RCAS when in FSR4 debug view mode
+    if (Version() >= feature_version { 4, 0, 2 } && Config::Instance()->FsrDebugView.value_or_default() &&
+        Config::Instance()->Fsr4EnableDebugView.value_or_default() && !params.enableSharpening)
+    {
+        params.enableSharpening = true;
+        params.sharpness = 0.01f;
+    }
+
     unsigned int reset;
     InParameters->Get(NVSDK_NGX_Parameter_Reset, &reset);
     params.reset = (reset == 1);
@@ -272,7 +283,7 @@ bool FSR2FeatureVkOnDx12_212::Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Pa
 
     LOG_DEBUG("Input Resolution: {0}x{1}", params.renderSize.width, params.renderSize.height);
 
-    auto frame = _frameCount % VKDX12_BUFFER_COUNT;
+    auto frame = _frameCount % 2;
     auto cmdList = Dx12CommandList[frame];
 
     params.commandList = cmdList;
@@ -324,7 +335,7 @@ bool FSR2FeatureVkOnDx12_212::Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Pa
                 state = 1;
                 Bias->SetBufferState(cmdList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
-                if (Bias->Dispatch(cmdList, vkReactive.Dx12Resource,
+                if (Bias->Dispatch(_dx11on12Device, cmdList, vkReactive.Dx12Resource,
                                    Config::Instance()->DlssReactiveMaskBias.value_or_default(), Bias->Buffer()))
                 {
                     Bias->SetBufferState(cmdList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
@@ -473,9 +484,7 @@ bool FSR2FeatureVkOnDx12_212::Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Pa
             RCAS->SetBufferState(cmdList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 
             RcasConstants rcasConstants {};
-            rcasConstants.DepthIsLinear = DepthLinear();
-            rcasConstants.DepthIsReversed = DepthInverted();
-            rcasConstants.IsHdr = IsHdr();
+
             rcasConstants.Sharpness = _sharpness;
             InParameters->Get(NVSDK_NGX_Parameter_MV_Scale_X, &rcasConstants.MvScaleX);
             InParameters->Get(NVSDK_NGX_Parameter_MV_Scale_Y, &rcasConstants.MvScaleY);
@@ -493,7 +502,7 @@ bool FSR2FeatureVkOnDx12_212::Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Pa
 
             if (useSS)
             {
-                if (!RCAS->Dispatch(cmdList, (ID3D12Resource*) params.output.resource,
+                if (!RCAS->Dispatch(_dx11on12Device, cmdList, (ID3D12Resource*) params.output.resource,
                                     (ID3D12Resource*) params.motionVectors.resource, rcasConstants,
                                     OutputScaler->Buffer(), (ID3D12Resource*) params.depth.resource))
                 {
@@ -503,7 +512,7 @@ bool FSR2FeatureVkOnDx12_212::Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Pa
             }
             else
             {
-                if (!RCAS->Dispatch(cmdList, (ID3D12Resource*) params.output.resource,
+                if (!RCAS->Dispatch(_dx11on12Device, cmdList, (ID3D12Resource*) params.output.resource,
                                     (ID3D12Resource*) params.motionVectors.resource, rcasConstants, vkOut.Dx12Resource,
                                     (ID3D12Resource*) params.depth.resource))
                 {
@@ -518,7 +527,7 @@ bool FSR2FeatureVkOnDx12_212::Evaluate(VkCommandBuffer InCmdBuffer, NVSDK_NGX_Pa
             LOG_DEBUG("downscaling output...");
             OutputScaler->SetBufferState(cmdList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 
-            if (!OutputScaler->Dispatch(cmdList, OutputScaler->Buffer(), vkOut.Dx12Resource))
+            if (!OutputScaler->Dispatch(_dx11on12Device, cmdList, OutputScaler->Buffer(), vkOut.Dx12Resource))
             {
                 Config::Instance()->OutputScalingEnabled.set_volatile_value(false);
                 State::Instance().changeBackend[Handle()->Id] = true;

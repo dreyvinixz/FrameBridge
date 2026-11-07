@@ -19,18 +19,16 @@
 
 #include <nvsdk_ngx_vk.h>
 
-#define VKDX12_BUFFER_COUNT 2
-
 class IFeature_VkwDx12 : public virtual IFeature_Vk
 {
   protected:
     // Vulkan with D3D12 interop structures
     using QUERY_INDEX_BUFFERS = struct QUERY_INDEX_BUFFERS
     {
-        VkCommandBuffer VulkanCopyCommandBuffer[VKDX12_BUFFER_COUNT] {};
-        VkCommandPool VulkanCopyCommandPool[VKDX12_BUFFER_COUNT] {};
-        VkCommandBuffer VulkanBarrierCommandBuffer[VKDX12_BUFFER_COUNT] {};
-        VkCommandPool VulkanBarrierCommandPool[VKDX12_BUFFER_COUNT] {};
+        VkCommandBuffer VulkanCopyCommandBuffer[2] = { VK_NULL_HANDLE, VK_NULL_HANDLE };
+        VkCommandPool VulkanCopyCommandPool[2] = { VK_NULL_HANDLE, VK_NULL_HANDLE };
+        VkCommandBuffer VulkanBarrierCommandBuffer[2] = { VK_NULL_HANDLE, VK_NULL_HANDLE };
+        VkCommandPool VulkanBarrierCommandPool[2] = { VK_NULL_HANDLE, VK_NULL_HANDLE };
     };
 
     using VK_TEXTURE2D_RESOURCE_C = struct VK_TEXTURE2D_RESOURCE_C
@@ -64,8 +62,8 @@ class IFeature_VkwDx12 : public virtual IFeature_Vk
 
     // D3D12 context
     ID3D12CommandQueue* Dx12CommandQueue = nullptr;
-    ID3D12CommandAllocator* Dx12CommandAllocator[VKDX12_BUFFER_COUNT] {};
-    ID3D12GraphicsCommandList* Dx12CommandList[VKDX12_BUFFER_COUNT] {};
+    ID3D12CommandAllocator* Dx12CommandAllocator[2] = { nullptr, nullptr };
+    ID3D12GraphicsCommandList* Dx12CommandList[2] = { nullptr, nullptr };
     ID3D12Fence* Dx12Fence = nullptr;
     HANDLE Dx12FenceEvent = nullptr;
     D3D12_COMMAND_LIST_TYPE Dx12CommandListType = D3D12_COMMAND_LIST_TYPE_DIRECT;
@@ -79,10 +77,10 @@ class IFeature_VkwDx12 : public virtual IFeature_Vk
     VK_TEXTURE2D_RESOURCE_C vkOut = {};
 
     // Vulkan synchronization for texture copies - using shared fence pattern like Dx11wDx12
-    VkSemaphore vkSemaphoreTextureCopy[VKDX12_BUFFER_COUNT] {};
-    VkSemaphore vkSemaphoreCopyBack[VKDX12_BUFFER_COUNT] {};
-    ID3D12Fence* dx12FenceTextureCopy[VKDX12_BUFFER_COUNT] {};
-    HANDLE vkSHForTextureCopy[VKDX12_BUFFER_COUNT] {};
+    VkSemaphore vkSemaphoreTextureCopy[2] = { VK_NULL_HANDLE, VK_NULL_HANDLE };
+    VkSemaphore vkSemaphoreCopyBack[2] = { VK_NULL_HANDLE, VK_NULL_HANDLE };
+    ID3D12Fence* dx12FenceTextureCopy[2] = { nullptr, nullptr };
+    HANDLE vkSHForTextureCopy[2] = { nullptr, nullptr };
     ULONG _fenceValue = 0;
 
     // D3D12 processing shaders
@@ -106,6 +104,8 @@ class IFeature_VkwDx12 : public virtual IFeature_Vk
 
     // Helper methods
     HRESULT CreateDx12Device();
+    void GetHardwareAdapter(IDXGIFactory1* InFactory, IDXGIAdapter** InAdapter, D3D_FEATURE_LEVEL InFeatureLevel,
+                            bool InRequestHighPerformanceAdapter);
 
     bool CreateSharedTexture(const VkImageCreateInfo& ImageInfo, VkImage& VulkanResource, VkDeviceMemory& VulkanMemory,
                              ID3D12Resource*& D3D12Resource, bool InOutput);
@@ -130,9 +130,6 @@ class IFeature_VkwDx12 : public virtual IFeature_Vk
   public:
     bool BaseInit(VkInstance InInstance, VkPhysicalDevice InPD, VkDevice InDevice, VkCommandBuffer InCmdList,
                   PFN_vkGetInstanceProcAddr InGIPA, PFN_vkGetDeviceProcAddr InGDPA, NVSDK_NGX_Parameter* InParameters);
-
-    API Api() const override { return API::DX12; }
-    bool IsWithDx12() override { return true; }
 
     IFeature_VkwDx12(unsigned int InHandleId, NVSDK_NGX_Parameter* InParameters);
     ~IFeature_VkwDx12();
