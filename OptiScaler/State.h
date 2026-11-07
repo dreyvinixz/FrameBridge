@@ -2,6 +2,7 @@
 #include "upscalers/IFeature.h"
 #include "framegen/IFGFeature_Dx12.h"
 #include <inputs/FG/Streamline_Inputs_Dx12.h>
+#include <sl_dlss_g.h>
 #include "misc/Quirks.h"
 
 #include <set>
