@@ -4,7 +4,8 @@ Last reviewed: 2026-11-07
 
 ## Current state
 
-- Active work is isolated on `codex/freetype-vram-audit-2026-11-07`, created from `codex/update-audit-2026-11-07`; `main` and the `v1.0.68` baseline were left unchanged. No commit, push, merge, or release was made.
+- **Current audit branch:** `codex/low-latency-audit-2026-11-07`, created from `codex/freetype-vram-audit-2026-11-07` at `6e141f6`. Audit and benchmark plan are in `docs/LOW_LATENCY_MFG_AUDIT.md`. This branch currently adds documentation only; no runtime performance change or latency improvement is claimed. `main` and release `v1.0.68` remain untouched. This branch has documentation commits on GitHub; no merge or release was made.
+- Previous integration work was on `codex/freetype-vram-audit-2026-11-07` (based on `codex/update-audit-2026-11-07`).
 - The runtime source tree is based on OptiScaler development commit `d94fb15f03800fe48d36cc31e9e042c66f508a3f` (446 commits after the old target). This is not the stable v0.9.4 release and remains a candidate pending build and runtime validation.
 - Updated pins: FidelityFX SDK v2.4.0, magic_enum v0.9.8, spdlog v1.17.0, unordered_dense v5.3.3, plus Vulkan-Headers aligned to upstream. XeSS v3.0.2 and Nukem9 v0.130 remain unchanged.
 - Official AMD FSR DLL 4.1.2.4555 is installed at `installer/assets/fsr4/amd_fidelityfx_upscaler_dx12.dll`; manifest hash/signature checks pass.
@@ -14,6 +15,12 @@ Last reviewed: 2026-11-07
 - Optional `Performance/LowVRAMMode` was added. It disables OptiScaler's D3D12 HUD capture/tracking path, caps the supported frame-generation routes at 2X, and turns off forced Dynamic MFG. It is off by default and cannot change game-owned texture pools, resolution, or engine budgets.
 - The repository-local `github-actions-efficiency` skill exists under `.agents/skills/`.
 - Native DLSSG config/state wiring was restored for the imported runtime. Optional RTX 40 Ada 6X unlock and an RTX 20/30 SM75/SM86 external-runtime loader are integrated under `OptiScaler/framegen/dlssg/`; both default off. The external runtime is user supplied and not packaged. GTX 16/10 are not enabled by this path. Read `docs/OPTISCALER_UPSTREAM_ASSESSMENT.md` and the adjacent `THIRD_PARTY_NOTICES.md` before changing or distributing it.
+
+## Low-latency audit findings (2026-11-07)
+
+- Static code review identified synthetic GPU/driver/OS latency fields in `OptiScaler/low_latency/input/input_common.cpp` and a missing Reflex backend in the low-latency translation layer (native Reflex pathways are separate). Do not report those synthetic fields as measured performance.
+- Further hypotheses: repeated DLSS-G/Reflex SetOptions in Dispatch; possible FPS-cap mismatch with high MFG multipliers; LatencyFlex sleep/reset and lock contention; FSR-FG frame pacing; DXGI waitable-object ownership in Streamline. All require measurement; do not prematurely remove pacing sleeps or force DXGI latency limits.
+- Prioritize instrumentation, marker correctness, input-to-photon/FrameView measurements, then isolated A/B optimizations. See `docs/LOW_LATENCY_MFG_AUDIT.md` for evidence, line ranges, experiment matrix, and release gates.
 
 ## Validation and outstanding work
 
@@ -28,6 +35,7 @@ Last reviewed: 2026-11-07
 
 1. `.agents/AGENTS.md`
 2. This handoff
-3. `docs/OPTISCALER_UPSTREAM_ASSESSMENT.md`
-4. `manifests/runtime-dependencies.json`
-5. `scripts/Verify-Integration.ps1`
+3. `docs/LOW_LATENCY_MFG_AUDIT.md`
+4. `docs/OPTISCALER_UPSTREAM_ASSESSMENT.md`
+5. `manifests/runtime-dependencies.json`
+6. `scripts/Verify-Integration.ps1`
