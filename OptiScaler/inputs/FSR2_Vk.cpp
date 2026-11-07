@@ -17,6 +17,14 @@
 #include <nvsdk_ngx_vk.h>
 #include <nvsdk_ngx_helpers_vk.h>
 
+// This compatibility entry point is provided by OptiScaler's NGX interposer.
+// The current public NGX Vulkan headers no longer declare the legacy export.
+NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_VULKAN_Init_ProjectID_Ext(
+    const char* InProjectId, NVSDK_NGX_EngineType InEngineType, const char* InEngineVersion,
+    const wchar_t* InApplicationDataPath, VkInstance InInstance, VkPhysicalDevice InPD, VkDevice InDevice,
+    PFN_vkGetInstanceProcAddr InGIPA, PFN_vkGetDeviceProcAddr InGDPA, NVSDK_NGX_Version InSDKVersion,
+    const NVSDK_NGX_FeatureCommonInfo* InFeatureInfo);
+
 typedef FfxErrorCode (*PFN_ffxFsr2ContextCreate)(FfxFsr2Context* context,
                                                  const FfxFsr2ContextDescription* contextDescription);
 typedef FfxErrorCode (*PFN_ffxFsr2ContextDispatch)(FfxFsr2Context* context,

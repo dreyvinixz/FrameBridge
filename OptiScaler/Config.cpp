@@ -242,9 +242,6 @@ bool Config::Reload(std::filesystem::path iniPath)
             FGDLSSGAmpereMfgLinuxFsrFallback.set_from_config(readString("DLSSG", "AmpereMfgLinuxFsrFallback"));
             FGDLSSGAmpereMfgLinuxFallbackType.set_from_config(readString("DLSSG", "AmpereMfgLinuxFallbackType"));
             FGDLSSGAmpereMfgBlockGameXeFG.set_from_config(readBool("DLSSG", "AmpereMfgBlockGameXeFG"));
-            FGDLSSGSmoothMotion.set_from_config(readBool("DLSSG", "SmoothMotion"));
-            SmoothMotionNVSmooth30.set_from_config(readBool("SmoothMotion", "EnableNVSmooth30"));
-
             if (FGDLSSGAmpereMfgUnlock.value_or_default())
             {
                 const bool adaUnlockRequested =

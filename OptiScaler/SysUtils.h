@@ -18,8 +18,17 @@
 #define NVSDK_NGX
 #define NGX_ENABLE_DEPRECATED_GET_PARAMETERS
 #define NGX_ENABLE_DEPRECATED_SHUTDOWN
+#define VK_ENABLE_BETA_EXTENSIONS
 #include <nvsdk_ngx.h>
 #include <nvsdk_ngx_defs.h>
+
+// OptiScaler's NGX interposer owns synthetic feature handles identified by Id.
+// The current public NGX headers make the handle opaque, so complete the type
+// locally for the interposer's private handle representation.
+struct NVSDK_NGX_Handle
+{
+    unsigned int Id;
+};
 
 #define SPDLOG_USE_STD_FORMAT
 #define SPDLOG_WCHAR_FILENAMES
