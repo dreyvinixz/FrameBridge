@@ -1,8 +1,10 @@
 #pragma once
+#include <cstdint>
 #include <nvapi.h>
 #include <proxies/D3D12_Proxy.h>
 #include <device_info/device_info.hpp>
-#include <OptiTypes.h>
+
+enum class FSR4Support : uint8_t;
 
 // vkd3d-proton
 MIDL_INTERFACE("39da4e09-bd1c-4198-9fae-86bbe3be41fd")
