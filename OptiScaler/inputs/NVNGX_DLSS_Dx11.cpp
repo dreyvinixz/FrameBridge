@@ -697,9 +697,10 @@ NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_D3D11_GetFeatureRequirements(
 
 NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_D3D11_EvaluateFeature(ID3D11DeviceContext* InDevCtx,
                                                                const NVSDK_NGX_Handle* InFeatureHandle,
-                                                               NVSDK_NGX_Parameter* InParameters,
+                                                               const NVSDK_NGX_Parameter* InParameters,
                                                                PFN_NVSDK_NGX_ProgressCallback InCallback)
 {
+    auto* mutableParameters = const_cast<NVSDK_NGX_Parameter*>(InParameters);
     if (InFeatureHandle == nullptr)
     {
         LOG_DEBUG("InFeatureHandle is null");
@@ -744,8 +745,8 @@ NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_D3D11_EvaluateFeature(ID3D11DeviceConte
 
     if (State::Instance().changeBackend[handleId])
     {
-        FeatureProvider_Dx11::ChangeFeature(State::Instance().newBackend, D3D11Device, InDevCtx, handleId, InParameters,
-                                            activeContext);
+        FeatureProvider_Dx11::ChangeFeature(State::Instance().newBackend, D3D11Device, InDevCtx, handleId,
+                                            mutableParameters, activeContext);
 
         evalCounter = 0;
 
@@ -783,7 +784,7 @@ NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_D3D11_EvaluateFeature(ID3D11DeviceConte
 
     UpscalerTimeDx11::UpscaleStart(InDevCtx);
 
-    if (!deviceContext->Evaluate(InDevCtx, InParameters) && !deviceContext->IsInited() &&
+    if (!deviceContext->Evaluate(InDevCtx, mutableParameters) && !deviceContext->IsInited() &&
         (deviceContext->Name() == "XeSS" || deviceContext->Name() == "DLSS" || deviceContext->Name() == "FSR3 w/Dx12"))
     {
         State::Instance().newBackend = "fsr22";

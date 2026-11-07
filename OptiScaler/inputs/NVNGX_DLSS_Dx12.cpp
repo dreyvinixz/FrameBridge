@@ -815,9 +815,10 @@ NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_D3D12_GetFeatureRequirements(
 
 NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_D3D12_EvaluateFeature(ID3D12GraphicsCommandList* InCmdList,
                                                                const NVSDK_NGX_Handle* InFeatureHandle,
-                                                               NVSDK_NGX_Parameter* InParameters,
+                                                               const NVSDK_NGX_Parameter* InParameters,
                                                                PFN_NVSDK_NGX_ProgressCallback InCallback)
 {
+    auto* mutableParameters = const_cast<NVSDK_NGX_Parameter*>(InParameters);
     if (InFeatureHandle == nullptr)
     {
         LOG_DEBUG("InFeatureHandle is null");
@@ -895,7 +896,7 @@ NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_D3D12_EvaluateFeature(ID3D12GraphicsCom
 
         // FSR 3.1 supports upscaleSize that doesn't need reinit to change output resolution
         if (!(feature->Name().starts_with("FSR") && feature->Version() >= feature_version { 3, 1, 0 }) &&
-            feature->UpdateOutputResolution(InParameters))
+            feature->UpdateOutputResolution(mutableParameters))
             State::Instance().changeBackend[handleId] = true;
     }
 
@@ -906,7 +907,7 @@ NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_D3D12_EvaluateFeature(ID3D12GraphicsCom
         D3D12Hooks::SetRootSignatureTracking(true);
 
         FeatureProvider_Dx12::ChangeFeature(State::Instance().newBackend, D3D12Device, InCmdList, handleId,
-                                            InParameters, deviceContext);
+                                            mutableParameters, deviceContext);
 
         evalCounter = 0;
 
@@ -931,8 +932,8 @@ NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_D3D12_EvaluateFeature(ID3D12GraphicsCom
         D3D12Hooks::HookToCommandListLate(InCmdList);
     }
 
-    UpscalerInputsDx12::UpscaleStart(InCmdList, InParameters, deviceContext->feature.get());
-    FSR3FG::SetUpscalerInputs(InCmdList, InParameters, deviceContext->feature.get());
+    UpscalerInputsDx12::UpscaleStart(InCmdList, mutableParameters, deviceContext->feature.get());
+    FSR3FG::SetUpscalerInputs(InCmdList, mutableParameters, deviceContext->feature.get());
 
     // Record the first timestamp
     if (State::Instance().workingMode != WorkingMode::Nvngx)
@@ -943,10 +944,10 @@ NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_D3D12_EvaluateFeature(ID3D12GraphicsCom
     // Run upscaler
     {
         // Resource tracking
-        UpscalerInputsDx12::UpscaleEnd(InCmdList, InParameters, deviceContext->feature.get());
+        UpscalerInputsDx12::UpscaleEnd(InCmdList, mutableParameters, deviceContext->feature.get());
 
         ScopedSkipHeapCapture skipHeapCapture {};
-        evalResult = deviceContext->feature->Evaluate(InCmdList, InParameters);
+        evalResult = deviceContext->feature->Evaluate(InCmdList, mutableParameters);
     }
 
     if (evalResult)
