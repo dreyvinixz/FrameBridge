@@ -55,6 +55,7 @@ bool Config::Reload(std::filesystem::path iniPath)
     {
         State::Instance().nvngxIniDetected = exists(iniPath.parent_path() / "nvngx.ini");
         _log.clear();
+        LowVRAMMode.set_from_config(readBool("Performance", "LowVRAMMode"));
 
         // Upscalers
         {
@@ -751,6 +752,21 @@ bool Config::Reload(std::filesystem::path iniPath)
             XeSSDx11Library.set_from_config(readWString("Libraries", "XeSSDx11Path"));
         }
 
+        if (LowVRAMMode.value_or_default())
+        {
+            // Reduce OptiScaler-owned frame-gen overhead for low-memory GPUs.
+            // This does not change the game's texture quality or resolution.
+            FGDisableHUDFix.set_volatile_value(true);
+            FGDLSSGInterpolationCount.set_volatile_value(1);
+            FGDLSSGOverrideInterpolationCount.set_volatile_value(1);
+            FGDLSSGForceDMFG.set_volatile_value(false);
+            FGDLSSGOverrideForceDMFG.set_volatile_value(false);
+            FGXeFGInterpolationCount.set_volatile_value(1);
+            FGDLSSGAmpereMfgMaxFrames.set_volatile_value(1);
+            NotifyRuntimeConfigurationChanged();
+            LOG_INFO("Performance: LowVRAMMode active; HUD capture disabled and frame generation capped at 2X.");
+        }
+
         if (fakenvapi::isUsingFakenvapi())
             return ReloadFakenvapi();
 
@@ -821,6 +837,8 @@ bool Config::SaveIni()
 
     // Frame Generation
     {
+        ini.SetValue("Performance", "LowVRAMMode",
+                     GetBoolValue(Instance()->LowVRAMMode.value_for_config()).c_str());
         ini.SetValue("FrameGen", "Enabled", GetBoolValue(Instance()->FGEnabled.value_for_config()).c_str());
         ini.SetValue("FrameGen", "DebugView", GetBoolValue(Instance()->FGDebugView.value_for_config()).c_str());
         std::string FGInputString = "auto";

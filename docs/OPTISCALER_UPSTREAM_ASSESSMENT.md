@@ -1,6 +1,6 @@
 # OptiScaler and dependency update assessment
 
-Review and implementation branch: `codex/update-audit-2026-11-07` (2026-11-07).
+Review and implementation branch: `codex/freetype-vram-audit-2026-11-07` (2026-11-07).
 
 ## Upstream decision
 
@@ -19,7 +19,11 @@ The imported snapshot includes significant FSR 3.1, FSR4, Vulkan, XeSS, DLSS, co
 - XeSS remains v3.0.2; Nukem9 remains v0.130.
 - Inno Setup is pinned to 6.7.4 in CI and contributor instructions.
 
-FreeType is still 2.13.3. The project links a tracked `freetype.lib`; only replacing its headers with 2.15.0 would produce an ABI mismatch. Upgrade the source and rebuild the static library together using a Windows MSVC toolchain, then validate the output before changing this pin.
+FreeType is still 2.13.3. The project links a tracked `freetype.lib`; only replacing its headers with 2.15.0 would produce an ABI mismatch. The official 2.15.0 source pin is `VER-2-15-0` at `37515cf56ba3349656049edbed89ffc6f6466f2d`. Upgrade the source and rebuild the static library together using a compatible Windows MSVC toolchain, then validate the output before changing this pin.
+
+## Low VRAM performance audit
+
+`docs/LOW_VRAM_PERFORMANCE_AUDIT.md` records the D3D12 resource-allocation inventory and measurement gates. An optional `Performance/LowVRAMMode` setting reduces OptiScaler-owned HUD capture/tracking and limits supported frame generation to 2X. It cannot change engine-owned texture residency or make a global 4 GB AAA compatibility promise. The mode remains off by default pending build and game measurements.
 
 ## Validation and release gate
 

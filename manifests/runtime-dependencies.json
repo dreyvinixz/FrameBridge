@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "status": "update-in-progress",
-  "generated_for_branch": "codex/update-audit-2026-11-07",
+  "generated_for_branch": "codex/freetype-vram-audit-2026-11-07",
   "runtime": {
     "name": "OptiScaler",
     "source_repository": "https://github.com/optiscaler/OptiScaler.git",
@@ -146,8 +146,12 @@
     {
       "name": "FreeType",
       "target": "2.15.0",
+      "source_repository": "https://github.com/freetype/freetype.git",
+      "source_tag": "VER-2-15-0",
+      "source_commit": "37515cf56ba3349656049edbed89ffc6f6466f2d",
       "current": "2.13.3",
-      "reason": "Update source and tracked freetype.lib together; MSVC build required."
+      "status": "pending matching static-library rebuild",
+      "reason": "Update headers and tracked freetype.lib together with a compatible MSVC build; no local MSVC, CMake, or Ninja toolchain is available."
     }
   ]
 }

@@ -485,6 +485,9 @@ class Config
     CustomOptional<bool> LoadAsiPlugins { false };
     CustomOptional<int> LateAsiPluginsDelay { 30 };
 
+    // Performance profiles
+    CustomOptional<bool> LowVRAMMode { false };
+
     // Frame Generation
     CustomOptional<FGInput> FGInput { FGInput::NoFG };
     CustomOptional<FGOutput> FGOutput { FGOutput::NoFG };

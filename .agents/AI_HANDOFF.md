@@ -4,13 +4,14 @@ Last reviewed: 2026-11-07
 
 ## Current state
 
-- Active work is isolated on `codex/update-audit-2026-11-07`; `main` and the `v1.0.68` baseline were left unchanged. No commit, push, merge, or release was made.
+- Active work is isolated on `codex/freetype-vram-audit-2026-11-07`, created from `codex/update-audit-2026-11-07`; `main` and the `v1.0.68` baseline were left unchanged. No commit, push, merge, or release was made.
 - The runtime source tree is based on OptiScaler development commit `d94fb15f03800fe48d36cc31e9e042c66f508a3f` (446 commits after the old target). This is not the stable v0.9.4 release and remains a candidate pending build and runtime validation.
 - Updated pins: FidelityFX SDK v2.4.0, magic_enum v0.9.8, spdlog v1.17.0, unordered_dense v5.3.3, plus Vulkan-Headers aligned to upstream. XeSS v3.0.2 and Nukem9 v0.130 remain unchanged.
 - Official AMD FSR DLL 4.1.2.4555 is installed at `installer/assets/fsr4/amd_fidelityfx_upscaler_dx12.dll`; manifest hash/signature checks pass.
 - Streamline headers are v2.14.16 and NVIDIA DLSS SDK headers are v310.9.16.
 - Inno Setup CI install is pinned to 6.7.4.
-- FreeType remains 2.13.3 because the tracked static library must be rebuilt alongside upgraded headers. Do not change headers alone.
+- FreeType is currently 2.13.3. The latest official stable target is 2.15.0 (`VER-2-15-0`, `37515cf56ba3349656049edbed89ffc6f6466f2d`). Its header and tracked `freetype.lib` must be updated together; the local environment has no MSVC/CMake/Ninja toolchain, so this dependency remains pending. See the dependency manifest and `docs/LOW_VRAM_PERFORMANCE_AUDIT.md`.
+- Optional `Performance/LowVRAMMode` was added. It disables OptiScaler's D3D12 HUD capture/tracking path, caps the supported frame-generation routes at 2X, and turns off forced Dynamic MFG. It is off by default and cannot change game-owned texture pools, resolution, or engine budgets.
 - The repository-local `github-actions-efficiency` skill exists under `.agents/skills/`.
 - Native DLSSG config/state wiring was restored for the imported runtime. Optional RTX 40 Ada 6X unlock and an RTX 20/30 SM75/SM86 external-runtime loader are integrated under `OptiScaler/framegen/dlssg/`; both default off. The external runtime is user supplied and not packaged. GTX 16/10 are not enabled by this path. Read `docs/OPTISCALER_UPSTREAM_ASSESSMENT.md` and the adjacent `THIRD_PARTY_NOTICES.md` before changing or distributing it.
 
@@ -18,9 +19,10 @@ Last reviewed: 2026-11-07
 
 - `scripts/Verify-Integration.ps1` passes locally.
 - Release x64 and installer builds, plus game/API smoke tests, have not run. MSBuild, C++ compiler, and ISCC were not found on PATH in this environment.
-- Before merge/release: run the native build with Visual Studio Build Tools; confirm new output paths and license payload against `installer/setup.iss` and `.github/workflows/build.yml`; build installer; exercise supported game/API scenarios; record artifact hashes. Upgrade FreeType source and library together when a suitable MSVC environment is available.
+- Before merge/release: build FreeType 2.15.0 source and the tracked static library with a compatible MSVC toolset; verify headers/library versions; run Release x64; confirm output paths and license payload against `installer/setup.iss` and `.github/workflows/build.yml`; build installer; exercise supported game/API scenarios; record artifact hashes.
 - Preserve this as a candidate branch until all gates are evidenced. Do not represent static integration verification as build/runtime validation.
 - The Ada and SM75/SM86 MFG integrations have not yet been compiled or exercised in a game. Treat them as experimental; obtain RTX 40 and RTX 30 smoke-test evidence before considering any default change or release claim. Upstream has not reported an in-game Turing test.
+- The low-VRAM audit identifies on-demand full-resolution HUD capture copies as a controllable allocation, with a potential 4-slot RGBA16F footprint near 253 MiB at 4K before conversion resources. Game-specific VRAM benchmarking is still needed; MFG may add VRAM use and does not guarantee AAA playability on 4 GB cards. Read `docs/LOW_VRAM_PERFORMANCE_AUDIT.md`.
 
 ## Read order
 
