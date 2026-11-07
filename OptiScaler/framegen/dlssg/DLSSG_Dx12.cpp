@@ -47,6 +47,7 @@ bool DLSSG_Dx12::CreateSwapchain(IDXGIFactory* factory, ID3D12CommandQueue* cmdQ
                               desc->BufferDesc.Format, desc->Flags) == S_OK;
 
             *swapChain = State::Instance().currentFGSwapchain;
+            InvalidateOptionCaches();
             return result;
         }
         // Game is creating new swapchain without releasing old one,
@@ -151,6 +152,7 @@ bool DLSSG_Dx12::CreateSwapchain1(IDXGIFactory* factory, ID3D12CommandQueue* cmd
                               desc->BufferCount, desc->Width, desc->Height, desc->Format, desc->Flags) == S_OK;
 
             *swapChain = (IDXGISwapChain1*) State::Instance().currentFGSwapchain;
+            InvalidateOptionCaches();
             return result;
         }
         // Game is creating new swapchain without releasing old one,
