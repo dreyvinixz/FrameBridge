@@ -1031,6 +1031,9 @@
     <ClCompile Include="misc\FrameLimit.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="misc\IdentifyGpu.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="hooks\Reflex_Hooks.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

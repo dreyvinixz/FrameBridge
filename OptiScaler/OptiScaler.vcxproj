@@ -649,6 +649,7 @@ copy NUL "$(SolutionDir)x64\Release\a\!! EXTRACT ALL FILES TO GAME FOLDER !!" /Y
     <ClCompile Include="inputs\XeSS_Dbg.cpp" />
     <ClCompile Include="inputs\XeSS_Vulkan.cpp" />
     <ClCompile Include="misc\FrameLimit.cpp" />
+    <ClCompile Include="misc\IdentifyGpu.cpp" />
     <ClCompile Include="nvapi\fakenvapi.cpp" />
     <ClCompile Include="nvapi\NvApiHooks.cpp" />
     <ClCompile Include="nvapi\NvApiTypes.cpp" />
