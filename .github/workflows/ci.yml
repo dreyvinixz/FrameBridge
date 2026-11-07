@@ -38,20 +38,7 @@ jobs:
       run: |
         $package = Join-Path $env:GITHUB_WORKSPACE 'freetype-build-artifact'
         .\scripts\Build-FreeType.ps1 -OutputDirectory $package
-
-        $dependencyRoot = Join-Path $env:GITHUB_WORKSPACE 'external\freetype'
-        $headerRoot = Join-Path $package 'include\freetype2'
-        Remove-Item -LiteralPath (Join-Path $dependencyRoot 'freetype') -Recurse -Force
-        Copy-Item -LiteralPath (Join-Path $headerRoot 'freetype') -Destination $dependencyRoot -Recurse -Force
-        Copy-Item -LiteralPath (Join-Path $headerRoot 'ft2build.h') -Destination $dependencyRoot -Force
-        Copy-Item -LiteralPath (Join-Path $package 'lib\freetype.lib') -Destination $dependencyRoot -Force
-
-        $versionHeader = Get-Content (Join-Path $dependencyRoot 'freetype\freetype.h') -Raw
-        if ($versionHeader -notmatch '(?m)^#define FREETYPE_MAJOR\s+2' -or
-            $versionHeader -notmatch '(?m)^#define FREETYPE_MINOR\s+15' -or
-            $versionHeader -notmatch '(?m)^#define FREETYPE_PATCH\s+0') {
-          throw 'FreeType headers staged for FrameBridge are not version 2.15.0.'
-        }
+        Write-Host 'The freshly built package is archived for review; integration uses the tracked and hash-verified dependency.'
 
     - name: Upload rebuilt FreeType dependency
       uses: actions/upload-artifact@v7
