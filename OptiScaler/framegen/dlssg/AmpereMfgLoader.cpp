@@ -205,8 +205,8 @@ void NoteGameDlssgRuntime(const std::vector<std::wstring>& searchPaths)
     if (runtime.empty() || runtime == s_status.GameDlssgPath)
         return;
 
-    version_t version {};
-    if (!Util::GetFileVersion(runtime, &version))
+    Util::version_t version {};
+    if (!Util::GetDLLVersion(runtime, &version))
         version = {};
 
     const auto generation = DlssgRuntimeGeneration::Classify(version.major);

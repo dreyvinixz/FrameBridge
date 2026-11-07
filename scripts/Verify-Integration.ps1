@@ -36,6 +36,10 @@ $mfgPath = Join-Path $RepositoryRoot "OptiScaler\framegen\dlssg\MfgUnlock.cpp"
 $mfgHeaderPath = Join-Path $RepositoryRoot "OptiScaler\framegen\dlssg\MfgUnlock.h"
 $amperePath = Join-Path $RepositoryRoot "OptiScaler\framegen\dlssg\AmpereMfgLoader.cpp"
 $ampereHeaderPath = Join-Path $RepositoryRoot "OptiScaler\framegen\dlssg\AmpereMfgLoader.h"
+$freeTypeManifestPath = Join-Path $RepositoryRoot "manifests\runtime-dependencies.json"
+$freeTypeHeaderPath = Join-Path $RepositoryRoot "external\freetype\freetype\freetype.h"
+$freeTypeLibraryPath = Join-Path $RepositoryRoot "external\freetype\freetype.lib"
+$installerPath = Join-Path $RepositoryRoot "installer\setup.iss"
 $iniPath = Join-Path $RepositoryRoot "OptiScaler.ini"
 
 Assert-Condition -Condition (Test-Path $manifestPath) -Message "Missing runtime dependency manifest."
@@ -48,10 +52,31 @@ Assert-Condition -Condition (Test-Path $mfgPath) -Message "Experimental Ada MFG 
 Assert-Condition -Condition (Test-Path $mfgHeaderPath) -Message "Experimental Ada MFG header is missing."
 Assert-Condition -Condition (Test-Path $amperePath) -Message "External RTX 20/30 MFG loader is missing."
 Assert-Condition -Condition (Test-Path $ampereHeaderPath) -Message "External RTX 20/30 MFG loader header is missing."
+Assert-Condition -Condition (Test-Path $freeTypeHeaderPath) -Message "FreeType public header is missing."
+Assert-Condition -Condition (Test-Path $freeTypeLibraryPath) -Message "FreeType static library is missing."
+Assert-Condition -Condition (Test-Path $installerPath) -Message "Inno Setup definition is missing."
 
 $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
 Assert-Condition -Condition ($manifest.runtime.import_strategy -eq "vendor-snapshot") -Message "Runtime import strategy must be vendor-snapshot."
 Assert-Condition -Condition ($manifest.runtime.target_upstream_commit -match "^[0-9a-f]{40}$") -Message "Target upstream commit must be pinned."
+
+$freeType = @($manifest.pending_dependency_updates | Where-Object { $_.name -eq "FreeType" })[0]
+Assert-Condition -Condition ($null -ne $freeType -and $freeType.current -eq "2.15.0") -Message "FreeType manifest must identify the current 2.15.0 dependency."
+$freeTypeHeader = Get-Content $freeTypeHeaderPath -Raw
+foreach ($versionPart in @(@("MAJOR", "2"), @("MINOR", "15"), @("PATCH", "0"))) {
+    Assert-Condition -Condition ($freeTypeHeader -match "(?m)^#define FREETYPE_$($versionPart[0])\s+$($versionPart[1])(?:\s|$)") -Message "FreeType header version differs from 2.15.0."
+}
+$freeTypeHash = (Get-FileHash $freeTypeLibraryPath -Algorithm SHA256).Hash
+Assert-Condition -Condition ($freeTypeHash -eq $freeType.library_sha256) -Message "FreeType library hash differs from the dependency manifest."
+$installer = Get-Content $installerPath -Raw
+foreach ($licenseName in @("LICENSE.TXT", "FTL.TXT", "GPLv2.TXT")) {
+    Assert-Condition -Condition ((Test-Path (Join-Path (Split-Path $freeTypeLibraryPath) $licenseName)) -and $installer.Contains($licenseName)) -Message "FreeType license $licenseName must exist and be installed."
+}
+$fakeNvapi = @($manifest.build_submodules | Where-Object { $_.path -eq "external/fakenvapi" })[0]
+Assert-Condition -Condition ($null -ne $fakeNvapi -and $fakeNvapi.commit -eq "c39271ab990fab3b80ebac93a593b963cdac0f0d") -Message "FakeNVAPI submodule must use the reviewed pinned commit."
+$fakeNvapiPath = Join-Path $RepositoryRoot "external\fakenvapi\include\fakenvapi_inc.h"
+Assert-Condition -Condition (Test-Path $fakeNvapiPath) -Message "FakeNVAPI public header is missing."
+Assert-Condition -Condition ($installer.Contains("FakeNVAPI_LICENSE.txt")) -Message "FakeNVAPI license must be installed with the upscalers component."
 
 $releaseInputs = @{}
 foreach ($asset in $manifest.release_inputs) {

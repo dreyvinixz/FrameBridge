@@ -32,6 +32,12 @@
       "commit": "9b181ea572f680327fe01a14a0f1f41c78034104"
     },
     {
+      "path": "external/fakenvapi",
+      "source_repository": "https://github.com/optiscaler/fakenvapi.git",
+      "commit": "c39271ab990fab3b80ebac93a593b963cdac0f0d",
+      "version": "1.3.5"
+    },
+    {
       "path": "external/simpleini",
       "source_repository": "https://github.com/brofield/simpleini",
       "commit": "6048871ea9ee0ec24be5bd099d161a10567d7dc2"
@@ -149,9 +155,11 @@
       "source_repository": "https://github.com/freetype/freetype.git",
       "source_tag": "VER-2-15-0",
       "source_commit": "37515cf56ba3349656049edbed89ffc6f6466f2d",
-      "current": "2.13.3",
-      "status": "pending matching static-library rebuild",
-      "reason": "Update headers and tracked freetype.lib together; the pinned MSVC rebuild is staged in GitHub Actions but has not run."
+      "current": "2.15.0",
+      "status": "headers and matching static x64 library updated from successful GitHub Actions artifact; full OptiScaler build is pending",
+      "library_sha256": "EDFC1F34383CE9B1729014825A71B3E2BCA4F754D64D51940B4C016D05FA4A5F",
+      "build_artifact_run": "42416241659",
+      "reason": "FreeType 2.15.0 headers and freetype.lib were rebuilt together with the pinned MSVC workflow; OptiScaler Release x64 compilation still needs repair and rerun."
     }
   ]
 }

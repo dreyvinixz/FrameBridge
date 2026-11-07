@@ -93,6 +93,10 @@ Source: "build\licenses\XeSS_LICENSE.txt"; DestDir: "{app}/licenses"; Flags: ign
 Source: "build\licenses\FidelityFX_v1_LICENSE.md"; DestDir: "{app}/licenses"; DestName: "FidelityFX_v1_LICENSE.md"; Flags: ignoreversion skipifsourcedoesntexist; Components: upscalers
 Source: "build\licenses\FidelityFX_v2_LICENSE.md"; DestDir: "{app}/licenses"; DestName: "FidelityFX_v2_LICENSE.md"; Flags: ignoreversion skipifsourcedoesntexist; Components: upscalers
 Source: "build\licenses\DirectX_LICENSE.txt"; DestDir: "{app}/licenses"; Flags: ignoreversion skipifsourcedoesntexist; Components: upscalers
+Source: "..\external\freetype\LICENSE.TXT"; DestDir: "{app}/licenses"; DestName: "FreeType_LICENSE.txt"; Flags: ignoreversion; Components: upscalers
+Source: "..\external\freetype\FTL.TXT"; DestDir: "{app}/licenses"; Flags: ignoreversion; Components: upscalers
+Source: "..\external\freetype\GPLv2.TXT"; DestDir: "{app}/licenses"; Flags: ignoreversion; Components: upscalers
+Source: "..\external\fakenvapi\LICENSE"; DestDir: "{app}/licenses"; DestName: "FakeNVAPI_LICENSE.txt"; Flags: ignoreversion; Components: upscalers
 
 ; ============================================================
 ; Injection Options (OptiScaler Runtime)

@@ -19,7 +19,7 @@ The imported snapshot includes significant FSR 3.1, FSR4, Vulkan, XeSS, DLSS, co
 - XeSS remains v3.0.2; Nukem9 remains v0.130.
 - Inno Setup is pinned to 6.7.4 in CI and contributor instructions.
 
-FreeType is still 2.13.3. The project links a tracked `freetype.lib`; only replacing its headers with 2.15.0 would produce an ABI mismatch. The official 2.15.0 source pin is `VER-2-15-0` at `37515cf56ba3349656049edbed89ffc6f6466f2d`. Upgrade the source and rebuild the static library together using a compatible Windows MSVC toolchain, then validate the output before changing this pin.
+FreeType headers and the tracked `freetype.lib` are now both 2.15.0, built together by the pinned MSVC GitHub Actions workflow from `VER-2-15-0` at `37515cf56ba3349656049edbed89ffc6f6466f2d`. The artifact passed its version and hash checks. The full OptiScaler build still fails on source/API compile errors, so the updated dependency has not yet been verified as part of a complete DLL build. The library SHA-256 is `EDFC1F34383CE9B1729014825A71B3E2BCA4F754D64D51940B4C016D05FA4A5F`.
 
 ## Low VRAM performance audit
 

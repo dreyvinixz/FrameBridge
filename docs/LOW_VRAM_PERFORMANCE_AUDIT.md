@@ -21,7 +21,7 @@ The D3D12 resource-creation scan also found per-frame-generation input copies in
 
 ### FreeType does not materially affect game VRAM
 
-FreeType is statically linked for OptiScaler's ImGui font rendering. Updating it matters for dependency maintenance and UI font handling, but it does not change a game's texture residency or materially free game VRAM. The repository currently has 2.13.3 headers and a tracked `freetype.lib`; both must be rebuilt/replaced together. The current official stable target is 2.15.0, tag `VER-2-15-0`, commit `37515cf56ba3349656049edbed89ffc6f6466f2d`. This checkout has no MSVC, CMake, or Ninja toolchain, so no new matching library has been built. Keep the existing headers and library paired until the new library is built with a compatible MSVC toolset and verified.
+FreeType is statically linked for OptiScaler's ImGui font rendering. Updating it matters for dependency maintenance and UI font handling, but it does not change a game's texture residency or materially free game VRAM. The repository now contains the matching 2.15.0 headers and static x64 library, rebuilt by GitHub Actions run `42416241659` from tag `VER-2-15-0`, commit `37515cf56ba3349656049edbed89ffc6f6466f2d`. The library SHA-256 is `EDFC1F34383CE9B1729014825A71B3E2BCA4F754D64D51940B4C016D05FA4A5F`. FreeType build and artifact checks passed; the complete OptiScaler Release x64 build failed on unrelated source/API compile errors, so the combined runtime has not yet been validated.
 
 ## 4 GB usage guidance
 
@@ -31,7 +31,7 @@ Frame generation cannot make every AAA title fit in 4 GB. If the base game alrea
 
 ## Validation still required
 
-- Build the Release x64 DLL with the updated FreeType headers and matching static library.
+- Repair the OptiScaler compile errors and rebuild the Release x64 DLL with the updated FreeType headers and matching static library.
 - Build the installer after the FreeType update and dependency/license checks.
 - Compare each supported game/API with LowVRAMMode off and on. Record dedicated and shared VRAM, GPU time, 1% lows, frametime spikes, and HUD artifacts.
 - Test 2X, 3X/4X, and 6X MFG separately on supported hardware; do not infer VRAM savings from generated FPS.

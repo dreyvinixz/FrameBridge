@@ -57,10 +57,9 @@ std::string ModuleVersion(HMODULE module)
     if (GetModuleFileNameW(module, path, MAX_PATH) == 0)
         return {};
 
-    version_t file {};
-    version_t product {};
+    Util::version_t file {};
 
-    if (!Util::GetFileVersion(path, &file, &product))
+    if (!Util::GetDLLVersion(path, &file))
         return {};
 
     return std::format("{}.{}.{}", file.major, file.minor, file.patch);
