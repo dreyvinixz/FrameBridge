@@ -56,6 +56,7 @@ bool Config::Reload(std::filesystem::path iniPath)
         State::Instance().nvngxIniDetected = exists(iniPath.parent_path() / "nvngx.ini");
         _log.clear();
         LowVRAMMode.set_from_config(readBool("Performance", "LowVRAMMode"));
+        OptimizeStreamlineOptions.set_from_config(readBool("Performance", "OptimizeStreamlineOptions"));
 
         // Upscalers
         {
@@ -838,6 +839,8 @@ bool Config::SaveIni()
     // Frame Generation
     {
         ini.SetValue("Performance", "LowVRAMMode", GetBoolValue(Instance()->LowVRAMMode.value_for_config()).c_str());
+        ini.SetValue("Performance", "OptimizeStreamlineOptions",
+                     GetBoolValue(Instance()->OptimizeStreamlineOptions.value_for_config()).c_str());
         ini.SetValue("FrameGen", "Enabled", GetBoolValue(Instance()->FGEnabled.value_for_config()).c_str());
         ini.SetValue("FrameGen", "DebugView", GetBoolValue(Instance()->FGDebugView.value_for_config()).c_str());
         std::string FGInputString = "auto";
