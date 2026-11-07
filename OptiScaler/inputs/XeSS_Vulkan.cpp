@@ -2,6 +2,7 @@
 #include "XeSS_Vulkan.h"
 
 #include "NVNGX_Parameter.h"
+#include "NVNGX_VulkanCompat.h"
 
 #include <proxies/XeSS_Proxy.h>
 #include "menu/menu_overlay_vk.h"

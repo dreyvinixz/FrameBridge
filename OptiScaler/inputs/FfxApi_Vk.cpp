@@ -5,6 +5,7 @@
 #include <Config.h>
 #include <resource.h>
 #include <NVNGX_Parameter.h>
+#include <NVNGX_VulkanCompat.h>
 
 #include <proxies/FfxApi_Proxy.h>
 

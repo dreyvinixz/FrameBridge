@@ -37,8 +37,47 @@ struct FfxRuntimeConfiguration
     float minimumDisocclusionAccumulation = 0.0f;
 };
 
+// Keep the established FSR 3.1 dispatch snapshot while FFX API settings use
+// their dedicated runtime view above.
+struct Fsr31Configuration
+{
+    bool debugView = false;
+    bool enableDebugViewForFsr4 = false;
+    bool rcasEnabled = false;
+    bool outputScalingEnabled = false;
+    bool extendedLimits = false;
+    bool overlayMenu = false;
+    bool overrideSharpness = false;
+    float sharpness = 0.0f;
+    bool motionSharpnessEnabled = false;
+    float motionSharpness = 0.0f;
+    float outputScalingMultiplier = 1.0f;
+    int ffxUpscalerIndex = 0;
+    bool nonLinearPQ = false;
+    bool nonLinearSRGB = false;
+    bool nonLinearColorSpace = false;
+    bool daDepthIsLinear = false;
+    bool useFsrInputValues = false;
+    std::optional<float> verticalFov = std::nullopt;
+    float horizontalFov = 0.0f;
+    float cameraNear = 0.0f;
+    float cameraFar = 0.0f;
+    float velocity = 1.0f;
+    float reactiveScale = 1.0f;
+    float shadingScale = 1.0f;
+    float accAddPerFrame = 0.0f;
+    float minDisOccAcc = 0.0f;
+    std::optional<int> colorResourceBarrier = std::nullopt;
+    std::optional<int> mvResourceBarrier = std::nullopt;
+    std::optional<int> outputResourceBarrier = std::nullopt;
+    std::optional<int> depthResourceBarrier = std::nullopt;
+    std::optional<int> exposureResourceBarrier = std::nullopt;
+    std::optional<int> maskResourceBarrier = std::nullopt;
+};
+
 struct RuntimeConfigurationSnapshot
 {
+    Fsr31Configuration fsr31;
     FfxRuntimeConfiguration ffx;
 };
 

@@ -44,6 +44,9 @@
     <ClInclude Include="NVNGX_Parameter.h">
       <Filter>NVNGX</Filter>
     </ClInclude>
+    <ClInclude Include="inputs\NVNGX_VulkanCompat.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="Util.h">
       <Filter>Util</Filter>
     </ClInclude>
