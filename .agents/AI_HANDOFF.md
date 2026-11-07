@@ -4,29 +4,23 @@ Last reviewed: 2026-11-07
 
 ## Current state
 
-- Working tree was clean on branch `main` (`origin/main`) at review time.
-- Latest local commit: `05ba9320945b1d47c062f29b171b60776c0bed10`, dated 2026-08-18, subject `fix: align FSR4 installer eligibility`.
-- This is about 11 weeks since the last recorded commit, rather than three full months.
-- `external/` submodules are not initialized in this checkout (`git submodule status` prefixes each with `-`).
-- `OptiScaler/` is a vendored runtime source tree and is built as part of this repository. `manifests/runtime-dependencies.json` is the provenance record; `scripts/Verify-Integration.ps1` enforces local integration and asset invariants.
-- Latest official stable OptiScaler release checked on 2026-11-07: `v0.9.4` (published 2026-07-18; upstream tag commit `7534ad0`). Official release notes describe FFX SDK 2.3 / FSR 4.1.1, official RDNA3 desktop INT8 support, changes to installer/setup behavior, and FSR3 fallback detection. Nightly builds are active and include ongoing compatibility changes; they are not stable release candidates by default.
-- The local runtime changelog still has a `v0.7.8` heading. The repository manifest pins a distinct upstream target commit (`dcbabe62a939336299794e97c8dcab29f8ccd778`) and a FrameBridge imported commit (`62a45d44c2d74de07cd3bf90b6e23a74a27c2a5d`). Do not infer exact ancestry or patch parity from the version heading; establish it with a source diff before importing.
-- GitHub's compare endpoint reports the manifest target and upstream `v0.9.4` tag as diverged (325 commits ahead, 844 behind, 254 files changed). This confirms that the migration is a substantial source reconciliation, not a simple version bump.
+- Active work is isolated on `codex/update-audit-2026-11-07`; `main` and the `v1.0.68` baseline were left unchanged. No commit, push, merge, or release was made.
+- The runtime source tree is based on OptiScaler development commit `d94fb15f03800fe48d36cc31e9e042c66f508a3f` (446 commits after the old target). This is not the stable v0.9.4 release and remains a candidate pending build and runtime validation.
+- Updated pins: FidelityFX SDK v2.4.0, magic_enum v0.9.8, spdlog v1.17.0, unordered_dense v5.3.3, plus Vulkan-Headers aligned to upstream. XeSS v3.0.2 and Nukem9 v0.130 remain unchanged.
+- Official AMD FSR DLL 4.1.2.4555 is installed at `installer/assets/fsr4/amd_fidelityfx_upscaler_dx12.dll`; manifest hash/signature checks pass.
+- Streamline headers are v2.14.16 and NVIDIA DLSS SDK headers are v310.9.16.
+- Inno Setup CI install is pinned to 6.7.4.
+- FreeType remains 2.13.3 because the tracked static library must be rebuilt alongside upgraded headers. Do not change headers alone.
+- The repository-local `github-actions-efficiency` skill exists under `.agents/skills/`.
 
-## Main integration risk
+## Validation and outstanding work
 
-The installer expects specific root-level proxy DLL names and separately places some runtime files under `D3D12_OptiScaler`. Upstream 0.9.x changed bundled components and FSR4 behavior; nightly work continues to change plugin/upscaler loading and compatibility. A direct binary swap could omit assets, invalidate provenance/hash checks, break installer mappings, or lose local runtime changes.
+- `scripts/Verify-Integration.ps1` passes locally.
+- Release x64 and installer builds, plus game/API smoke tests, have not run. MSBuild, C++ compiler, and ISCC were not found on PATH in this environment.
+- Before merge/release: run the native build with Visual Studio Build Tools; confirm new output paths and license payload against `installer/setup.iss` and `.github/workflows/build.yml`; build installer; exercise supported game/API scenarios; record artifact hashes. Upgrade FreeType source and library together when a suitable MSVC environment is available.
+- Preserve this as a candidate branch until all gates are evidenced. Do not represent static integration verification as build/runtime validation.
 
-## Recommended next work
-
-1. Inspect upstream `v0.9.4` source and its changes from the exact pinned commit; also inspect a dated nightly separately if a nightly feature is desired.
-2. Produce a patch inventory and an import plan on a dedicated branch; preserve local FrameBridge runtime/config changes.
-3. Reconcile the version/changelog and `manifests/runtime-dependencies.json` with the actual imported source only after that comparison.
-4. Validate `scripts/Verify-Integration.ps1`, MSBuild Release x64, CI, installer payloads, and representative game/API smoke tests.
-
-No OptiScaler source, dependency pin, binary payload, or installer behavior was changed during this review. No build or game compatibility check was run.
-
-## Read order for the next session
+## Read order
 
 1. `.agents/AGENTS.md`
 2. This handoff

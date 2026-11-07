@@ -9,7 +9,7 @@ Thank you for your interest in contributing to FrameBridge! This document provid
 - **Visual Studio 2022** with C++ Desktop Development workload
 - **Windows SDK 10.0+**
 - **Git** with submodule support
-- **Inno Setup 6.2.0** (for installer builds)
+- **Inno Setup 6.7.4** (for installer builds)
 
 ### Setting Up the Development Environment
 
@@ -81,3 +81,4 @@ When reporting issues, please include:
 ## License
 
 By contributing to FrameBridge, you agree that your contributions will be licensed under the **GNU General Public License v3.0**.
+

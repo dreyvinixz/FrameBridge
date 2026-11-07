@@ -43,4 +43,3 @@ if(!s_ ##func) {                                                                
     sl::Result res = slGetFeatureFunction(feature, #func, (void*&) s_ ##func);  \
     if(res != sl::Result::eOk) return res;                                      \
 }                                                                               \
-

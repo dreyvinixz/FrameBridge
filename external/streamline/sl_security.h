@@ -460,4 +460,3 @@ bool verifyEmbeddedSignature(const wchar_t* pathToFile)
 
 }
 }
-

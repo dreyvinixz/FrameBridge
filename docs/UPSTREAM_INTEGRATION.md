@@ -95,10 +95,11 @@ The shared [`scripts/Verify-Integration.ps1`](../scripts/Verify-Integration.ps1)
 
 ### FSR4 release-input audit
 
-The official AMD FidelityFX SDK 2.0.0 release contains FSR 4.0.2 and a signed `Kits/FidelityFX/signedbin/amd_fidelityfx_upscaler_dx12.dll`. Its verified binary is version `4.0.2.44888` with SHA-256 `241E6E5E4D848424EB8EC9A6B22C43FE34CF0CF52D30002CA435BA42E53A9CA0` and a valid Advanced Micro Devices signature.
+The official AMD FidelityFX SDK 2.4.0 release contains FSR 4.1.2 and a signed `Kits/FidelityFX/signedbin/amd_fidelityfx_upscaler_dx12.dll`. Its verified binary is version `4.1.2.4555` with SHA-256 `AAD4FCCCCB29084A655F9A4F9F613BD22C8C03FB4A0F8840148CC6543B4CCACE` and a valid Advanced Micro Devices signature.
 
 The previous local asset had a different SHA-256 (`9123F83739E7BB39FCB135CAFC339606DEC78A74C650338AD275EE45C2D59D02`) and was not signed, so it was never eligible for release. It has now been deliberately replaced with the verified official binary, and the manifest and integration gate require both its exact SHA-256 and the valid AMD Authenticode signature. The installer exposes it only as the optional official Radeon RX 9000/RDNA4 path; other hardware retains the provider selected by `auto`. This approves the *release input* only; Release x64, benchmark, and FINAL FANTASY VII REBIRTH regression tests remain mandatory before the integration itself can be treated as validated.
 
 ## Non-authoritative artefacts
 
 Third-party RAR packages are useful for reconnaissance only. They are not an upstream source of record and must not be used as a release input. FrameBridge releases are assembled from the pinned upstream source and verified vendor dependencies.
+

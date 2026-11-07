@@ -64,7 +64,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "gtx_compat"; Description: "Apply GTX/Kepler Compatibility Patch (Forces D3D12 Feature Level 11.0)"; Flags: unchecked
-Name: "fsr4_rdna4"; Description: "Install official FSR 4.0.2 for AMD Radeon RX 9000 (RDNA 4) GPUs"; Flags: unchecked
+Name: "fsr4_rdna4"; Description: "Install official FSR 4.1.2 for supported AMD Radeon GPUs"; Flags: unchecked
 [Files]
 
 
@@ -90,7 +90,8 @@ Source: "build\D3D12_OptiScaler\*"; DestDir: "{app}\D3D12_OptiScaler"; Flags: ig
 
 ; License files
 Source: "build\licenses\XeSS_LICENSE.txt"; DestDir: "{app}/licenses"; Flags: ignoreversion skipifsourcedoesntexist; Components: upscalers
-Source: "build\licenses\FidelityFX_LICENSE.md"; DestDir: "{app}/licenses"; Flags: ignoreversion skipifsourcedoesntexist; Components: upscalers
+Source: "build\licenses\FidelityFX_v1_LICENSE.md"; DestDir: "{app}/licenses"; DestName: "FidelityFX_v1_LICENSE.md"; Flags: ignoreversion skipifsourcedoesntexist; Components: upscalers
+Source: "build\licenses\FidelityFX_v2_LICENSE.md"; DestDir: "{app}/licenses"; DestName: "FidelityFX_v2_LICENSE.md"; Flags: ignoreversion skipifsourcedoesntexist; Components: upscalers
 Source: "build\licenses\DirectX_LICENSE.txt"; DestDir: "{app}/licenses"; Flags: ignoreversion skipifsourcedoesntexist; Components: upscalers
 
 ; ============================================================
@@ -160,3 +161,6 @@ begin
     end;
   end;
 end;
+
+
+

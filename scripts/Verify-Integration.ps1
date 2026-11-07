@@ -31,14 +31,14 @@ $projectPath = Join-Path $RepositoryRoot "OptiScaler\OptiScaler.vcxproj"
 $configHeaderPath = Join-Path $RepositoryRoot "OptiScaler\Config.h"
 $configSourcePath = Join-Path $RepositoryRoot "OptiScaler\Config.cpp"
 $ffxPath = Join-Path $RepositoryRoot "OptiScaler\upscalers\ffx\FFXFeature_Dx12.cpp"
-$removedFsr31Path = Join-Path $RepositoryRoot "OptiScaler\upscalers\fsr31\FSR31Feature_Dx12.cpp"
+$fsr31Path = Join-Path $RepositoryRoot "OptiScaler\upscalers\fsr31\FSR31Feature_Dx12.cpp"
 
 Assert-Condition -Condition (Test-Path $manifestPath) -Message "Missing runtime dependency manifest."
 Assert-Condition -Condition (Test-Path $projectPath) -Message "Missing OptiScaler project."
 Assert-Condition -Condition (Test-Path $configHeaderPath) -Message "Missing configuration header."
 Assert-Condition -Condition (Test-Path $configSourcePath) -Message "Missing configuration source."
 Assert-Condition -Condition (Test-Path $ffxPath) -Message "Missing active FFX DX12 backend."
-Assert-Condition -Condition (-not (Test-Path $removedFsr31Path)) -Message "Removed FSR 3.1 DX12 backend is present."
+Assert-Condition -Condition (Test-Path $fsr31Path) -Message "Upstream FSR 3.1 DX12 backend is missing."
 
 $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
 Assert-Condition -Condition ($manifest.runtime.import_strategy -eq "vendor-snapshot") -Message "Runtime import strategy must be vendor-snapshot."
@@ -54,7 +54,7 @@ Assert-Condition -Condition $releaseInputs.ContainsKey("amd-fsr4-upscaler") -Mes
 Assert-Condition -Condition $releaseInputs.ContainsKey("nukem-dlssg-to-fsr3") -Message "DLSSG release asset is missing from the manifest."
 
 $fsr4 = $releaseInputs["amd-fsr4-upscaler"]
-Assert-Condition -Condition ($fsr4.official_source_release -eq "https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK/releases/tag/v2.0.0") -Message "FSR4 official release source must be pinned."
+Assert-Condition -Condition ($fsr4.official_source_release -eq "https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK/releases/tag/v2.4.0") -Message "FSR4 official release source must be pinned."
 Assert-Condition -Condition ($fsr4.official_sha256 -match "^[0-9A-F]{64}$") -Message "FSR4 official SHA-256 must be recorded."
 Assert-Condition -Condition ($fsr4.official_signature_status -eq "valid") -Message "FSR4 official signature verification must be recorded."
 Assert-Condition -Condition ($fsr4.release_eligibility -eq "approved") -Message "FSR4 release input is blocked: $($fsr4.release_eligibility)"
@@ -113,3 +113,4 @@ Assert-Condition -Condition ($LASTEXITCODE -eq 0) -Message "Unable to inspect tr
 Assert-Condition -Condition ($trackedArchives.Count -eq 0) -Message "RAR archives must not be tracked: $($trackedArchives -join ', ')"
 
 Write-Host "FrameBridge integration verification passed."
+

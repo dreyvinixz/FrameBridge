@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
-  "status": "integration-baseline",
-  "generated_for_branch": "integration/optiscaler-20260818",
+  "status": "update-in-progress",
+  "generated_for_branch": "codex/update-audit-2026-11-07",
   "runtime": {
     "name": "OptiScaler",
     "source_repository": "https://github.com/optiscaler/OptiScaler.git",
-    "current_framebridge_import": "62a45d44c2d74de07cd3bf90b6e23a74a27c2a5d",
-    "target_upstream_commit": "dcbabe62a939336299794e97c8dcab29f8ccd778",
+    "current_framebridge_import": "29a2464220453f42ed511fe1cd4700ce151e1a91",
+    "target_upstream_commit": "d94fb15f03800fe48d36cc31e9e042c66f508a3f",
     "import_strategy": "vendor-snapshot",
     "vendor_path": "OptiScaler"
   },
@@ -19,12 +19,12 @@
     {
       "path": "external/FidelityFX-SDK-v2",
       "source_repository": "https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK.git",
-      "commit": "60f4ea81909200d8542eca14dccb2628b763a9a3"
+      "commit": "7539ae8b6568ad29ed78a753404351daf3b5cca7"
     },
     {
       "path": "external/magic_enum",
       "source_repository": "https://github.com/Neargye/magic_enum",
-      "commit": "a733a2ea665ca5d72b7270f0334bf2e7b82bd0cc"
+      "commit": "1384769c66bd16ec9bb1353f45fe8ec8ccc12dbd"
     },
     {
       "path": "external/nvapi",
@@ -39,17 +39,17 @@
     {
       "path": "external/spdlog",
       "source_repository": "https://github.com/gabime/spdlog.git",
-      "commit": "faa0a7a9c5a3550ed5461fab7d8e31c37fd1a2ef"
+      "commit": "79524ddd08a4ec981b7fea76afd08ee05f83755d"
     },
     {
       "path": "external/unordered_dense",
       "source_repository": "https://github.com/martinus/unordered_dense.git",
-      "commit": "73f3cbb237e84d483afafc743f1f14ec53e12314"
+      "commit": "7c58a8b7a48e790fe72f6508eb3b46317cbba9d5"
     },
     {
       "path": "external/vulkan",
       "source_repository": "https://github.com/KhronosGroup/Vulkan-Headers.git",
-      "commit": "d64e9e156ac818c19b722ca142230b68e3daafe3"
+      "commit": "8864cdc896bbc2a9b6eb36b3218fc9ef57908d77"
     },
     {
       "path": "external/xess",
@@ -61,17 +61,17 @@
     {
       "id": "amd-fsr4-upscaler",
       "distribution_path": "installer/assets/fsr4/amd_fidelityfx_upscaler_dx12.dll",
-      "version": "4.0.2.44888",
-      "sha256": "241E6E5E4D848424EB8EC9A6B22C43FE34CF0CF52D30002CA435BA42E53A9CA0",
+      "version": "4.1.2.4555",
+      "sha256": "AAD4FCCCCB29084A655F9A4F9F613BD22C8C03FB4A0F8840148CC6543B4CCACE",
       "signature_status": "valid",
       "signer_subject": "CN=Advanced Micro Devices, O=Advanced Micro Devices, S=California, C=US",
-      "official_source_release": "https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK/releases/tag/v2.0.0",
-      "official_archive": "https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK/releases/download/v2.0.0/FidelityFX-SDK-v2.0.0.zip",
+      "official_source_release": "https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK/releases/tag/v2.4.0",
+      "official_archive": "https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK/archive/refs/tags/v2.4.0.zip",
       "official_distribution_path": "Kits/FidelityFX/signedbin/amd_fidelityfx_upscaler_dx12.dll",
-      "official_version": "4.0.2.44888",
-      "official_sha256": "241E6E5E4D848424EB8EC9A6B22C43FE34CF0CF52D30002CA435BA42E53A9CA0",
+      "official_version": "4.1.2.4555",
+      "official_sha256": "AAD4FCCCCB29084A655F9A4F9F613BD22C8C03FB4A0F8840148CC6543B4CCACE",
       "official_signature_status": "valid",
-      "source_status": "official source verified; signed binary installed 2026-08-18",
+      "source_status": "official AMD signed binary verified from SDK v2.4.0 and installed 2026-11-07",
       "release_eligibility": "approved"
     },
     {
@@ -99,5 +99,29 @@
     "require_pinned_source_or_asset_hash": true,
     "require_signature_verification_when_available": true,
     "record_final_artifact_hashes": true
-  }
+  },
+  "header_snapshots": [
+    {
+      "name": "NVIDIA Streamline",
+      "repository": "https://github.com/NVIDIA-RTX/Streamline",
+      "path": "external/streamline",
+      "version": "2.14.16",
+      "commit": "625db07d4bca5abc67d781c42af7e7fb0761f1b6"
+    },
+    {
+      "name": "NVIDIA DLSS SDK headers",
+      "repository": "https://github.com/NVIDIA/DLSS",
+      "path": "external/nvngx_dlss_sdk",
+      "version": "310.9.16",
+      "commit": "9981c6350dc58c0ce21f024fd65e31e851c31689"
+    }
+  ],
+  "pending_dependency_updates": [
+    {
+      "name": "FreeType",
+      "target": "2.15.0",
+      "current": "2.13.3",
+      "reason": "Update source and tracked freetype.lib together; MSVC build required."
+    }
+  ]
 }
