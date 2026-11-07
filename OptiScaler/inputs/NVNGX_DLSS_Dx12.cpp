@@ -851,7 +851,7 @@ NVSDK_NGX_API NVSDK_NGX_Result NVSDK_NGX_D3D12_EvaluateFeature(ID3D12GraphicsCom
     }
     else if (State::Instance().activeFgInput == FGInput::Nukems && handleId >= DLSSG_MOD_ID_OFFSET)
     {
-        return DLSSGMod::D3D12_EvaluateFeature(InCmdList, InFeatureHandle, InParameters, InCallback);
+        return DLSSGMod::D3D12_EvaluateFeature(InCmdList, InFeatureHandle, mutableParameters, InCallback);
     }
 
     if (!Dx12Contexts.contains(handleId))
