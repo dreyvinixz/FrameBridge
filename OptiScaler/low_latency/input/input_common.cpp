@@ -545,7 +545,7 @@ InputResult InputCommon::get_latency(const InputContext& inputContext, IUnknown*
 }
 
 #define UPDATE_TIMING_ENTRY(name, type)                                                                                \
-    if (frameReport.name##StartTime != 0 && frameReport.name##EndTime >= frameReport.name##StartTime)                                                      \
+    if (frameReport.name##EndTime > frameReport.name##StartTime)                                                      \
     {                                                                                                                  \
         double name##Pos = (double) (frameReport.name##StartTime - start) / rangeNs;                                   \
         double name##Length = (double) (frameReport.name##EndTime - frameReport.name##StartTime) / rangeNs;            \
