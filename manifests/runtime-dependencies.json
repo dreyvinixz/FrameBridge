@@ -132,6 +132,14 @@
       "license": "MIT",
       "scope": "Ada interpolation kernel adaptation",
       "status": "experimental; attribution and MIT license included with source"
+    },
+    {
+      "name": "dlssg_for_sm86 external RTX 20/30 MFG runtime",
+      "repository": "https://github.com/sdli1995/dlssg_for_sm86",
+      "release": "0.4.1",
+      "commit": "44f40064aed100ff1104a555e4d0bc3122086d64",
+      "scope": "Optional user-provided SM75/SM86 runtime loaded from OptiScaler/dlssg_sm86; not included in installer",
+      "status": "experimental; RTX 30 tested by upstream fork, Turing and GTX 16 not verified in game; NVIDIA runtime assets retain separate terms"
     }
   ],
   "pending_dependency_updates": [

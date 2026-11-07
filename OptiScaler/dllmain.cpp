@@ -26,6 +26,7 @@
 #include "inputs/FG/FSR3_Dx12_FG.h"
 
 #include <fsr4/FSR4ModelSelection.h>
+#include <framegen/dlssg/AmpereMfgLoader.h>
 
 #include <hooks/Dxgi_Hooks.h>
 #include <hooks/D3D11_Hooks.h>
@@ -1753,6 +1754,8 @@ DWORD WINAPI getGpuInfo(LPVOID hModuleVoid)
     if (hModuleVoid)
         IdentifyGpu::updateD3d12Capabilities();
 
+    AmpereMfgLoader::TrySetup();
+
     return 0;
 }
 
@@ -1861,6 +1864,9 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
         State::Instance().activeFgInput = Config::Instance()->FGInput.value_or_default();
         State::Instance().activeFgOutput = Config::Instance()->FGOutput.value_or_default();
         State::Instance().activeFgNvngx = Config::Instance()->FGNvngxReplacement.value_or_default();
+        State::Instance().externalFrameGeneration =
+            Config::Instance()->FGDLSSGAmpereMfgUnlock.value_or_default() &&
+            Config::Instance()->FGDLSSGAmpereMfgMode.value_or("External") == "External";
 
         // Ensure valid FG configuration
         if (State::Instance().activeFgInput != FGInput::NvngxFG && State::Instance().activeFgOutput != FGOutput::DLSSG)

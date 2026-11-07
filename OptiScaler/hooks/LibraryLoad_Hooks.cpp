@@ -52,6 +52,20 @@ HMODULE LibraryLoadHooks::LoadLibraryCheckW(std::wstring libName, LPCWSTR lpLibF
     // C:\\Path\\like\\this.dll
     auto normalizedPath = std::filesystem::path(libName).lexically_normal().wstring();
 
+    // The optional SM75/SM86 runtime owns Streamline and DLSS-G loading. Let its
+    // hooks see these requests before FrameBridge's proxy routing is considered.
+    if (State::Instance().externalFrameGeneration)
+    {
+        auto normalizedLower = normalizedPath;
+        std::transform(normalizedLower.begin(), normalizedLower.end(), normalizedLower.begin(), ::towlower);
+        const auto filename = std::filesystem::path(normalizedLower).filename().wstring();
+        const bool streamline = filename.starts_with(L"sl.") && filename.ends_with(L".dll");
+        const bool otaFg = normalizedLower.contains(L"\\versions\\") &&
+                           (normalizedLower.contains(L"\\sl_") || normalizedLower.contains(L"\\dlssg\\"));
+        if (streamline || otaFg || filename == L"nvngx_dlssg.dll")
+            return nullptr;
+    }
+
     // Keep track of the game's native DLSS-G module for the optional RTX 40 unlock.
     auto loadedFileName = std::filesystem::path(normalizedPath).filename().wstring();
     if (_wcsicmp(loadedFileName.c_str(), L"nvngx_dlssg.dll") == 0)

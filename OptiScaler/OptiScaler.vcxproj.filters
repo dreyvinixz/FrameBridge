@@ -32,6 +32,15 @@
     <ClInclude Include="Config.h">
       <Filter>Config</Filter>
     </ClInclude>
+    <ClInclude Include="framegen\dlssg\AmpereMfgLoader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="framegen\dlssg\AmpereMfgStatusText.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="framegen\dlssg\DlssgRuntimeGeneration.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="NVNGX_Parameter.h">
       <Filter>NVNGX</Filter>
     </ClInclude>
@@ -817,6 +826,9 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="framegen\dlssg\AmpereMfgLoader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="Config.cpp">
       <Filter>Config</Filter>
     </ClCompile>

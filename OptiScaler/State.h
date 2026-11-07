@@ -64,6 +64,12 @@ enum class FGOutput : uint32_t
     XeFG
 };
 
+enum class AmpereMfgMode : uint32_t
+{
+    External,
+    Internal
+};
+
 enum class WorkingMode : uint32_t
 {
     Dxgi,
@@ -204,6 +210,9 @@ class State
     bool dlssgOptiDMFGSupported = false;
     sl::DLSSGMode dlssgLastSetMode = sl::DLSSGMode::eOff;
     HMODULE nativeDlssgModule = nullptr;
+    bool externalFrameGeneration = false;
+    AmpereMfgMode ampereMfgMode = AmpereMfgMode::External;
+    bool ampereMfgInternalActive = false;
 
     // DLSS
     bool dlssPresetsOverriddenExternally = false;

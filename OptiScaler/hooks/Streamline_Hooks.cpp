@@ -675,12 +675,13 @@ sl::Result StreamlineHooks::hkslDLSSGSetOptions(const sl::ViewportHandle& viewpo
 
     auto& state = State::Instance();
     const bool nativeGameDlssg = state.activeFgInput == FGInput::NoFG && state.activeFgOutput == FGOutput::NoFG;
-    if (nativeGameDlssg && state.nativeDlssgModule != nullptr &&
+    if (!state.externalFrameGeneration && nativeGameDlssg && state.nativeDlssgModule != nullptr &&
         Config::Instance()->FGDLSSGAdaMfgUnlock.value_or_default())
         MfgUnlock::TryApply(state.nativeDlssgModule);
 
     const bool dlssgMayRun = newOptions.mode != sl::DLSSGMode::eOff;
-    if (nativeGameDlssg && dlssgMayRun && Config::Instance()->FGDLSSGOverrideForceDMFG.value_or_default() &&
+    if (!state.externalFrameGeneration && nativeGameDlssg && dlssgMayRun &&
+        Config::Instance()->FGDLSSGOverrideForceDMFG.value_or_default() &&
         state.dlssgGameDMFGSupported)
         newOptions.mode = sl::DLSSGMode::eDynamic;
 
@@ -688,7 +689,8 @@ sl::Result StreamlineHooks::hkslDLSSGSetOptions(const sl::ViewportHandle& viewpo
         Config::Instance()->FGDLSSGFramerateTargetDMFG.has_value())
         newOptions.dynamicTargetFrameRate = Config::Instance()->FGDLSSGFramerateTargetDMFG.value();
 
-    if (nativeGameDlssg && dlssgMayRun && Config::Instance()->FGDLSSGOverrideInterpolationCount.has_value())
+    if (!state.externalFrameGeneration && nativeGameDlssg && dlssgMayRun &&
+        Config::Instance()->FGDLSSGOverrideInterpolationCount.has_value())
     {
         const int overrideCount = Config::Instance()->FGDLSSGOverrideInterpolationCount.value();
         if (overrideCount == 0)

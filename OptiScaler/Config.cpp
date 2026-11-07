@@ -222,6 +222,36 @@ bool Config::Reload(std::filesystem::path iniPath)
             if (FGDLSSGBoundaryMitigation.has_value() &&
                 (FGDLSSGBoundaryMitigation.value() < 0 || FGDLSSGBoundaryMitigation.value() > 2))
                 FGDLSSGBoundaryMitigation.reset();
+
+            FGDLSSGAmpereMfgUnlock.set_from_config(readBool("DLSSG", "AmpereMfgUnlock"));
+            FGDLSSGAmpereMfgMode.set_from_config("External");
+            State::Instance().ampereMfgMode = AmpereMfgMode::External;
+            FGDLSSGAmpereMfgMaxFrames.set_from_config(readInt("DLSSG", "AmpereMfgMaxFrames"));
+            if (FGDLSSGAmpereMfgMaxFrames.has_value() &&
+                (FGDLSSGAmpereMfgMaxFrames.value() < 0 || FGDLSSGAmpereMfgMaxFrames.value() > 5))
+                FGDLSSGAmpereMfgMaxFrames.reset();
+            FGDLSSGAmpereMfgKernelImage.set_from_config(readString("DLSSG", "AmpereMfgKernelImage"));
+            FGDLSSGAmpereMfgRouter.set_from_config(readString("DLSSG", "AmpereMfgRouter"));
+            FGDLSSGAmpereMfgHardwareBilinear.set_from_config(readBool("DLSSG", "AmpereMfgHardwareBilinear"));
+            FGDLSSGAmpereMfgOptimized.set_from_config(readInt("DLSSG", "AmpereMfgOptimized"));
+            FGDLSSGAmpereMfgPreset.set_from_config(readString("DLSSG", "AmpereMfgPreset"));
+            FGDLSSGAmpereMfgSpoofArchToGame.set_from_config(readString("DLSSG", "AmpereMfgSpoofArchToGame"));
+            FGDLSSGAmpereMfgLogLevel.set_from_config(readInt("DLSSG", "AmpereMfgLogLevel"));
+            FGDLSSGAmpereMfgLinuxFsrFallback.set_from_config(readString("DLSSG", "AmpereMfgLinuxFsrFallback"));
+            FGDLSSGAmpereMfgLinuxFallbackType.set_from_config(readString("DLSSG", "AmpereMfgLinuxFallbackType"));
+            FGDLSSGAmpereMfgBlockGameXeFG.set_from_config(readBool("DLSSG", "AmpereMfgBlockGameXeFG"));
+            FGDLSSGSmoothMotion.set_from_config(readBool("DLSSG", "SmoothMotion"));
+            SmoothMotionNVSmooth30.set_from_config(readBool("SmoothMotion", "EnableNVSmooth30"));
+
+            if (FGDLSSGAmpereMfgUnlock.value_or_default())
+            {
+                const bool adaUnlockRequested = FGDLSSGAdaMfgUnlock.value_or_default() ||
+                                                FGDLSSGUnlockAdaMFG.value_or_default();
+                if (adaUnlockRequested)
+                    LOG_WARN("Config: Ampere/Turing and Ada MFG unlocks conflict; disabling Ada unlock.");
+                FGDLSSGAdaMfgUnlock.set_from_config(false);
+                FGDLSSGUnlockAdaMFG.set_from_config(false);
+            }
         }
 
         // FSR FG Inputs
@@ -920,6 +950,31 @@ bool Config::SaveIni()
                      GetBoolValue(Instance()->FGDLSSGAdaBlackwellKernels.value_for_config()).c_str());
         ini.SetValue("DLSSG", "BoundaryMitigation",
                      GetIntValue(Instance()->FGDLSSGBoundaryMitigation.value_for_config()).c_str());
+        ini.SetValue("DLSSG", "AmpereMfgUnlock",
+                     GetBoolValue(Instance()->FGDLSSGAmpereMfgUnlock.value_for_config()).c_str());
+        ini.SetValue("DLSSG", "AmpereMfgMode", "External");
+        ini.SetValue("DLSSG", "AmpereMfgMaxFrames",
+                     GetIntValue(Instance()->FGDLSSGAmpereMfgMaxFrames.value_for_config()).c_str());
+        ini.SetValue("DLSSG", "AmpereMfgKernelImage",
+                     Instance()->FGDLSSGAmpereMfgKernelImage.value_for_config_or("auto").c_str());
+        ini.SetValue("DLSSG", "AmpereMfgRouter",
+                     Instance()->FGDLSSGAmpereMfgRouter.value_for_config_or("auto").c_str());
+        ini.SetValue("DLSSG", "AmpereMfgHardwareBilinear",
+                     GetBoolValue(Instance()->FGDLSSGAmpereMfgHardwareBilinear.value_for_config()).c_str());
+        ini.SetValue("DLSSG", "AmpereMfgOptimized",
+                     GetIntValue(Instance()->FGDLSSGAmpereMfgOptimized.value_for_config()).c_str());
+        ini.SetValue("DLSSG", "AmpereMfgPreset",
+                     Instance()->FGDLSSGAmpereMfgPreset.value_for_config_or("auto").c_str());
+        ini.SetValue("DLSSG", "AmpereMfgSpoofArchToGame",
+                     Instance()->FGDLSSGAmpereMfgSpoofArchToGame.value_for_config_or("auto").c_str());
+        ini.SetValue("DLSSG", "AmpereMfgLogLevel",
+                     GetIntValue(Instance()->FGDLSSGAmpereMfgLogLevel.value_for_config()).c_str());
+        ini.SetValue("DLSSG", "AmpereMfgLinuxFsrFallback",
+                     Instance()->FGDLSSGAmpereMfgLinuxFsrFallback.value_for_config_or("auto").c_str());
+        ini.SetValue("DLSSG", "AmpereMfgLinuxFallbackType",
+                     Instance()->FGDLSSGAmpereMfgLinuxFallbackType.value_for_config_or("fsrfg").c_str());
+        ini.SetValue("DLSSG", "AmpereMfgBlockGameXeFG",
+                     GetBoolValue(Instance()->FGDLSSGAmpereMfgBlockGameXeFG.value_for_config()).c_str());
     }
 
     // OptiFG

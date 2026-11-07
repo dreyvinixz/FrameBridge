@@ -34,6 +34,8 @@ $ffxPath = Join-Path $RepositoryRoot "OptiScaler\upscalers\ffx\FFXFeature_Dx12.c
 $fsr31Path = Join-Path $RepositoryRoot "OptiScaler\upscalers\fsr31\FSR31Feature_Dx12.cpp"
 $mfgPath = Join-Path $RepositoryRoot "OptiScaler\framegen\dlssg\MfgUnlock.cpp"
 $mfgHeaderPath = Join-Path $RepositoryRoot "OptiScaler\framegen\dlssg\MfgUnlock.h"
+$amperePath = Join-Path $RepositoryRoot "OptiScaler\framegen\dlssg\AmpereMfgLoader.cpp"
+$ampereHeaderPath = Join-Path $RepositoryRoot "OptiScaler\framegen\dlssg\AmpereMfgLoader.h"
 $iniPath = Join-Path $RepositoryRoot "OptiScaler.ini"
 
 Assert-Condition -Condition (Test-Path $manifestPath) -Message "Missing runtime dependency manifest."
@@ -44,6 +46,8 @@ Assert-Condition -Condition (Test-Path $ffxPath) -Message "Missing active FFX DX
 Assert-Condition -Condition (Test-Path $fsr31Path) -Message "Upstream FSR 3.1 DX12 backend is missing."
 Assert-Condition -Condition (Test-Path $mfgPath) -Message "Experimental Ada MFG source is missing."
 Assert-Condition -Condition (Test-Path $mfgHeaderPath) -Message "Experimental Ada MFG header is missing."
+Assert-Condition -Condition (Test-Path $amperePath) -Message "External RTX 20/30 MFG loader is missing."
+Assert-Condition -Condition (Test-Path $ampereHeaderPath) -Message "External RTX 20/30 MFG loader header is missing."
 
 $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
 Assert-Condition -Condition ($manifest.runtime.import_strategy -eq "vendor-snapshot") -Message "Runtime import strategy must be vendor-snapshot."
@@ -94,7 +98,9 @@ $configHeader = Get-Content $configHeaderPath -Raw
 $configSource = Get-Content $configSourcePath -Raw
 Assert-Condition -Condition ((Get-Content $iniPath -Raw).Contains("AdaMfgUnlock=auto")) -Message "Ada MFG unlock must remain documented as default-off."
 Assert-Condition -Condition ($project.Contains("framegen\dlssg\MfgUnlock.cpp")) -Message "Experimental Ada MFG source is not registered in the native project."
+Assert-Condition -Condition ($project.Contains("framegen\dlssg\AmpereMfgLoader.cpp")) -Message "External MFG loader is not registered in the native project."
 Assert-Condition -Condition ($configHeader.Contains("FGDLSSGAdaMfgUnlock { false }")) -Message "Ada MFG unlock must default off in the configuration model."
+Assert-Condition -Condition ($configHeader.Contains("FGDLSSGAmpereMfgUnlock { false }")) -Message "RTX 20/30 MFG unlock must default off in the configuration model."
 $mfgSource = Get-Content $mfgPath -Raw
 Assert-Condition -Condition ($mfgSource.Contains("kAdvertisePattern") -and $mfgSource.Contains("kAdvertisePattern309") -and $mfgSource.Contains("kValidatePattern") -and $mfgSource.Contains("kValidatePattern309")) -Message "Ada MFG must retain separate reviewed signature sets."
 Assert-Condition -Condition ($configHeader.Contains("void NotifyRuntimeConfigurationChanged();")) -Message "Configuration changes do not publish runtime snapshot events."

@@ -583,6 +583,20 @@ class Config
     CustomOptional<bool, NoDefault> FGDLSSGAdaBlackwellKernels;
     CustomOptional<bool> FGDLSSGUnlockAdaMFG { false };
     CustomOptional<int> FGDLSSGBoundaryMitigation { 1 };
+    // Optional SM75/SM86 third-party MFG runtime. External mode only; the runtime is user supplied.
+    CustomOptional<bool> FGDLSSGAmpereMfgUnlock { false };
+    CustomOptional<std::string, NoDefault> FGDLSSGAmpereMfgMode;
+    CustomOptional<int> FGDLSSGAmpereMfgMaxFrames { 3 };
+    CustomOptional<std::string, NoDefault> FGDLSSGAmpereMfgKernelImage;
+    CustomOptional<std::string, NoDefault> FGDLSSGAmpereMfgRouter;
+    CustomOptional<bool> FGDLSSGAmpereMfgHardwareBilinear { false };
+    CustomOptional<int> FGDLSSGAmpereMfgOptimized { 1 };
+    CustomOptional<std::string, NoDefault> FGDLSSGAmpereMfgPreset;
+    CustomOptional<std::string, NoDefault> FGDLSSGAmpereMfgSpoofArchToGame;
+    CustomOptional<int> FGDLSSGAmpereMfgLogLevel { 1 };
+    CustomOptional<std::string, NoDefault> FGDLSSGAmpereMfgLinuxFsrFallback;
+    CustomOptional<std::string, NoDefault> FGDLSSGAmpereMfgLinuxFallbackType;
+    CustomOptional<bool> FGDLSSGAmpereMfgBlockGameXeFG { true };
 
     // fakenvapi
     CustomOptional<bool> FN_EnableLogs { true };
