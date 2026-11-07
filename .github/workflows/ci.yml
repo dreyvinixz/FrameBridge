@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [ "main", "feature/*", "integration/**" ]
+    branches: [ "main", "feature/*", "integration/**", "codex/**" ]
   pull_request:
     branches: [ "main" ]
   workflow_dispatch:
@@ -13,6 +13,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+    - name: Test Streamline applied-options cache (portable C++)
+      run: |
+        g++ -std=c++20 -Wall -Wextra -Werror tests/applied_options_cache_test.cpp -o /tmp/framebridge-cache-test
+        /tmp/framebridge-cache-test
+    - name: Test latency CSV comparison utility
+      run: python3 -m unittest discover -s tests -p 'compare_latency_csv_test.py'
     - name: Run clang-format style check
       uses: jidicula/clang-format-action@v4.15.0
       with:
