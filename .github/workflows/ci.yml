@@ -7,6 +7,11 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
 
+# Keep only the latest CI run per branch; rapid audit commits should not waste runners.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   formatting-check:
     name: Formatting Check
@@ -28,7 +33,7 @@ jobs:
 
   build:
     name: Build (Windows)
-    needs: formatting-check
+    # Compile independently of formatting to expose MSVC errors during audits.
     runs-on: windows-2022
     steps:
     - name: Checkout Code
