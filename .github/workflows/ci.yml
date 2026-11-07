@@ -12,6 +12,9 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   formatting-check:
     name: Formatting Check
@@ -64,3 +67,87 @@ jobs:
 
     - name: Build with MSBuild
       run: msbuild /m /p:Configuration=Release /p:Platform=x64 OptiScaler.sln /verbosity:minimal
+
+    - name: Prepare installer payload from verified build
+      shell: pwsh
+      run: .\scripts\Prepare-InstallerPayload.ps1
+
+    - name: Install pinned Inno Setup 6.7.4
+      shell: pwsh
+      run: choco install innosetup --version=6.7.4 -y --no-progress
+
+    - name: Compile and inspect installer payload
+      shell: pwsh
+      run: |
+        $isccCandidates = @(
+          "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
+          "C:\Program Files\Inno Setup 6\ISCC.exe"
+        )
+        $iscc = $isccCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+        if (-not $iscc) { throw "ISCC.exe was not found after installing Inno Setup 6.7.4." }
+
+        $actualVersion = (Get-Item -LiteralPath $iscc).VersionInfo.ProductVersion
+        if (-not $actualVersion.StartsWith("6.7.4")) { throw "Expected Inno Setup 6.7.4, found $actualVersion." }
+
+        $outputDir = Join-Path $env:RUNNER_TEMP "FrameBridgeInstallerOutput"
+        New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
+        & $iscc "installer\setup.iss" "/O$outputDir"
+        if ($LASTEXITCODE -ne 0) { throw "Inno Setup compilation failed with exit code $LASTEXITCODE." }
+
+        $installer = Get-ChildItem -LiteralPath $outputDir -Filter "framebridge-setup-*.exe" -File | Select-Object -First 1
+        if (-not $installer) { throw "The compiled FrameBridge installer was not produced." }
+
+        $installDir = Join-Path $env:RUNNER_TEMP "FrameBridgeInstallerSmoke"
+        $installArgs = @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/DIR=$installDir", "/TYPE=full", "/TASKS=fsr4_rdna4")
+        $process = Start-Process -FilePath $installer.FullName -ArgumentList $installArgs -Wait -PassThru -WindowStyle Hidden
+        if ($process.ExitCode -ne 0) { throw "Silent install/extraction failed with exit code $($process.ExitCode)." }
+
+        $requiredFiles = @(
+          "dxgi.dll",
+          "OptiScaler.ini",
+          "libxess.dll",
+          "libxess_dx11.dll",
+          "amd_fidelityfx_upscaler_dx12.dll",
+          "dlssg_to_fsr3_amd_is_better.dll",
+          "licenses\FreeType_LICENSE.txt",
+          "licenses\FTL.TXT",
+          "licenses\GPLv2.TXT",
+          "licenses\FakeNVAPI_LICENSE.txt",
+          "licenses\XeSS_LICENSE.txt",
+          "licenses\FidelityFX_v1_LICENSE.md",
+          "licenses\FidelityFX_v2_LICENSE.md",
+          "licenses\DirectX_LICENSE.txt",
+          "docs\README.md",
+          "docs\OptiScaler_Config.md"
+        )
+        foreach ($relativePath in $requiredFiles) {
+          $installedPath = Join-Path $installDir $relativePath
+          if (-not (Test-Path -LiteralPath $installedPath -PathType Leaf)) { throw "Installer extraction is missing required payload: $relativePath" }
+        }
+
+        $fsr4Manifest = Get-Content "manifests\runtime-dependencies.json" -Raw | ConvertFrom-Json
+        $expectedFsr4Hash = @($fsr4Manifest.release_inputs | Where-Object { $_.id -eq "amd-fsr4-upscaler" })[0].sha256
+        $installedFsr4Hash = (Get-FileHash -LiteralPath (Join-Path $installDir "amd_fidelityfx_upscaler_dx12.dll") -Algorithm SHA256).Hash
+        if ($installedFsr4Hash -ne $expectedFsr4Hash) { throw "Installed FSR4 payload differs from the pinned manifest hash." }
+
+        $reportPath = Join-Path $env:RUNNER_TEMP "installer-payload-inspection.txt"
+        Get-ChildItem -LiteralPath $installDir -File -Recurse | Sort-Object FullName | ForEach-Object {
+          $relativePath = [IO.Path]::GetRelativePath($installDir, $_.FullName)
+          $hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
+          "{0}`t{1}`t{2}" -f $relativePath, $_.Length, $hash
+        } | Set-Content -LiteralPath $reportPath -Encoding utf8
+        $installerHash = (Get-FileHash -LiteralPath $installer.FullName -Algorithm SHA256).Hash
+        "installer`t{0}`t{1}" -f $installer.Length, $installerHash | Add-Content -LiteralPath $reportPath -Encoding utf8
+
+        New-Item -ItemType Directory -Force -Path "installer\validation-output" | Out-Null
+        Copy-Item -LiteralPath $installer.FullName -Destination "installer\validation-output" -Force
+        Copy-Item -LiteralPath $reportPath -Destination "installer\validation-output\payload-inspection.txt" -Force
+        Write-Host "Inno Setup $actualVersion compiled; silent extraction and payload/license checks passed."
+
+    - name: Upload non-release installer validation artifact
+      uses: actions/upload-artifact@v7
+      with:
+        name: framebridge-installer-validation-${{ github.sha }}
+        path: installer/validation-output/
+        if-no-files-found: error
+        retention-days: 14

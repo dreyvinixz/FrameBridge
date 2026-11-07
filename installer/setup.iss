@@ -1,5 +1,7 @@
 #define MyAppName "FrameBridge"
-#define MyAppVersion "1.00.000.0"
+#ifndef MyAppVersion
+#define MyAppVersion "0.10.0-pre1"
+#endif
 #define MyAppPublisher "dreyvinixz"
 #define MyAppExeName "my-game.exe"
 
