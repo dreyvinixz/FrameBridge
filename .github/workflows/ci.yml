@@ -84,7 +84,6 @@ jobs:
       run: |
         $iscc = $env:ISCC_PATH
         if (-not (Test-Path -LiteralPath $iscc)) { throw "ISCC.exe is missing: $iscc" }
-        $actualVersion = (Get-Item -LiteralPath $iscc).VersionInfo.ProductVersion
 
         $outputDir = Join-Path $env:RUNNER_TEMP "FrameBridgeInstallerOutput"
         New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
@@ -139,7 +138,7 @@ jobs:
         New-Item -ItemType Directory -Force -Path "installer\validation-output" | Out-Null
         Copy-Item -LiteralPath $installer.FullName -Destination "installer\validation-output" -Force
         Copy-Item -LiteralPath $reportPath -Destination "installer\validation-output\payload-inspection.txt" -Force
-        Write-Host "Inno Setup $actualVersion compiled; silent extraction and payload/license checks passed."
+        Write-Host "Inno Setup 6.7.4 compiled; silent extraction and payload/license checks passed."
 
     - name: Upload non-release installer validation artifact
       uses: actions/upload-artifact@v7

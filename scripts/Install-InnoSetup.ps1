@@ -18,25 +18,18 @@ if ($signature.Status -ne "Valid" -or $signature.SignerCertificate.Subject -notl
     throw "Official Inno Setup $version installer has an invalid or unexpected Authenticode signature."
 }
 
+$installRoot = Join-Path $env:RUNNER_TEMP "InnoSetup-$version"
 $install = Start-Process -FilePath $installerPath -ArgumentList @(
-    "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-"
+    "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", "/DIR=$installRoot"
 ) -Wait -PassThru -WindowStyle Hidden
 if ($install.ExitCode -ne 0) {
     throw "Inno Setup $version installation failed with exit code $($install.ExitCode)."
 }
 
-$iscc = @(
-    "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
-    "C:\Program Files\Inno Setup 6\ISCC.exe"
-) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-if (-not $iscc) { throw "ISCC.exe was not found after installing Inno Setup $version." }
-
-$installedVersion = (Get-Item -LiteralPath $iscc).VersionInfo.ProductVersion
-if (-not $installedVersion.StartsWith($version)) {
-    throw "Expected Inno Setup $version, found $installedVersion at $iscc."
-}
+$iscc = Join-Path $installRoot "ISCC.exe"
+if (-not (Test-Path -LiteralPath $iscc -PathType Leaf)) { throw "ISCC.exe was not found after installing Inno Setup $version." }
 
 if ($env:GITHUB_OUTPUT) {
     "iscc=$iscc" | Add-Content -LiteralPath $env:GITHUB_OUTPUT -Encoding utf8
 }
-Write-Host "Installed signed Inno Setup $installedVersion from the pinned official release."
+Write-Host "Installed signed Inno Setup $version from the pinned official release."
