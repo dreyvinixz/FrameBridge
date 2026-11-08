@@ -1,5 +1,11 @@
 name: clang-format Check
-on: [push, pull_request]
+on:
+  push:
+    paths-ignore:
+      - '.agents/**'
+      - 'docs/**'
+      - '**/*.md'
+  pull_request:
 jobs:
   formatting-check:
     name: Formatting Check
