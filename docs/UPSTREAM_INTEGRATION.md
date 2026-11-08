@@ -58,7 +58,7 @@ The target also introduces eleven `framegen/nvngx/` files. They are new upstream
 
 `OptiScaler/` and its required external runtime headers were imported from the pinned target. The working tree matches that snapshot byte-for-byte except for the documented legacy DLL-name compatibility patch in `OptiScaler/dllmain.cpp`. The XeSS submodule is now pinned to `8fe81bdbbaf00b3c1b733fd0d830c333dc84e6f0` (v3.0.2).
 
-Local compilation is pending because the current development environment has no MSBuild/Visual Studio toolchain installed. This is an environment limitation, not a successful build result; CI and a Windows development machine must run the build gate before this branch can merge.
+Local compilation is unavailable because this development environment has no MSBuild/Visual Studio toolchain installed. GitHub Actions run `42428708468` passed the complete Release x64 build and installer validation for this branch. Runtime game/API testing and VRAM/latency measurement remain outstanding.
 
 ## Retained FrameBridge extensions
 
@@ -91,7 +91,7 @@ The implementation phase must carry a typed pending-change mask (rather than a g
 
 All Windows build workflows now select `OptiScaler.sln` with `Configuration=Release`/`Platform=x64` (or their explicit debug configuration) and initialize submodules recursively. The integration validation workflow rejects a build that lacks the FFX snapshot connection or still contains the removed `FSR31Feature_Dx12.cpp` source.
 
-The shared [`scripts/Verify-Integration.ps1`](../scripts/Verify-Integration.ps1) gate is executed locally and by the CI/release workflows. It checks the pinned manifest, FSR4 asset hash, FFX snapshot wiring, target project registration, absence of the removed FSR 3.1 DX12 backend, and the policy that no RAR is tracked. The release workflow additionally verifies the downloaded DLSSG archive/source assets against their recorded SHA-256 hashes before assembly. This does not validate a release by itself: the final CI artifact hashes, Release x64 build, benchmark, and game test must still be recorded before merge.
+The shared [`scripts/Verify-Integration.ps1`](../scripts/Verify-Integration.ps1) gate is executed locally and by CI/release workflows. It checks the pinned manifest, FSR4 asset hash, FFX snapshot wiring, target project registration, absence of the removed FSR 3.1 DX12 backend, and the policy that no RAR is tracked. The installer validation gate verifies downloaded DLSSG archive/source assets against their recorded SHA-256 hashes, compiles with Inno Setup 6.7.4, silently installs into a temporary directory, and checks the resulting DLL and license payload. The Release x64 and installer validation gates passed in CI run `42428708468`; game/API smoke tests and VRAM/latency benchmarks remain required before merge.
 
 ### FSR4 release-input audit
 

@@ -1,6 +1,6 @@
 # OptiScaler and dependency update assessment
 
-Review and implementation branch: `codex/freetype-vram-audit-2026-11-07` (2026-11-07).
+Review and implementation branch: `codex/combined-performance-audit-2026-11-07` (2026-11-07).
 
 ## Upstream decision
 
@@ -19,7 +19,7 @@ The imported snapshot includes significant FSR 3.1, FSR4, Vulkan, XeSS, DLSS, co
 - XeSS remains v3.0.2; Nukem9 remains v0.130.
 - Inno Setup is pinned to 6.7.4 in CI and contributor instructions.
 
-FreeType headers and the tracked `freetype.lib` are now both 2.15.0, built together by the pinned MSVC GitHub Actions workflow from `VER-2-15-0` at `37515cf56ba3349656049edbed89ffc6f6466f2d`. The artifact passed its version and hash checks. The full OptiScaler build still fails on source/API compile errors, so the updated dependency has not yet been verified as part of a complete DLL build. The library SHA-256 is `EDFC1F34383CE9B1729014825A71B3E2BCA4F754D64D51940B4C016D05FA4A5F`.
+FreeType headers and the tracked `freetype.lib` are both 2.15.0, built together by the pinned MSVC GitHub Actions workflow from `VER-2-15-0` at `37515cf56ba3349656049edbed89ffc6f6466f2d`. The artifact passed its version and hash checks. The complete OptiScaler Release x64 build passed in CI run `42428708468`, verifying the dependency in the combined DLL build. The library SHA-256 is `EDFC1F34383CE9B1729014825A71B3E2BCA4F754D64D51940B4C016D05FA4A5F`.
 
 ## Low VRAM performance audit
 
@@ -27,7 +27,7 @@ FreeType headers and the tracked `freetype.lib` are now both 2.15.0, built toget
 
 ## Validation and release gate
 
-`./scripts/Verify-Integration.ps1` passes locally. The AMD DLL version, SHA-256, and Authenticode signature were checked. No MSBuild/Visual Studio compiler or Inno Setup compiler was available on PATH during this pass, so no Release x64 build, installer build, or game test is claimed. Keep `main` and `v1.0.68` unchanged; review this branch and run those checks before merge or release.
+`./scripts/Verify-Integration.ps1` passes locally. CI run `42428708468` passed the Release x64 build, Inno Setup 6.7.4 compilation, and silent install/payload/license inspection. The validation installer is SHA-256 `4CF273CEC1A4C473211E6278D177A637965326032794EAE05D1F9E0EE8341545`; it is a CI validation artifact, not a public release. The extracted runtime reports OptiScaler `0.10.0.1` (`0.10.0-pre1`), FSR4 `4.1.2.4555`, and XeSS DLL `2.0.2.68`; FreeType `2.15.0` headers/library and license files were checked by the integration gate and installer inspection. No game/API smoke test or VRAM/latency benchmark has run. Keep `main` and `v1.0.68` unchanged until those runtime gates pass.
 
 ## Multi Frame Generation compatibility study
 

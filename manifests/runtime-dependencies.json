@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "status": "update-in-progress",
-  "generated_for_branch": "codex/freetype-vram-audit-2026-11-07",
+  "status": "validation-in-progress",
+  "generated_for_branch": "codex/combined-performance-audit-2026-11-07",
   "runtime": {
     "name": "OptiScaler",
     "source_repository": "https://github.com/optiscaler/OptiScaler.git",
@@ -156,10 +156,10 @@
       "source_tag": "VER-2-15-0",
       "source_commit": "37515cf56ba3349656049edbed89ffc6f6466f2d",
       "current": "2.15.0",
-      "status": "headers and matching static x64 library updated from successful GitHub Actions artifact; full OptiScaler build is pending",
+      "status": "headers and matching static x64 library updated; complete Release x64 build and installer validation passed in GitHub Actions; game/runtime benchmarks remain pending",
       "library_sha256": "EDFC1F34383CE9B1729014825A71B3E2BCA4F754D64D51940B4C016D05FA4A5F",
       "build_artifact_run": "42416241659",
-      "reason": "FreeType 2.15.0 headers and freetype.lib were rebuilt together with the pinned MSVC workflow; OptiScaler Release x64 compilation still needs repair and rerun."
+      "reason": "FreeType 2.15.0 headers and freetype.lib were rebuilt together with the pinned MSVC workflow; combined branch Release x64 build passed in CI run 42428708468 at commit 1d55c1d45ffeeb174bcba6f0bc474d1f7418b88b. No game/runtime or VRAM/latency benchmark is implied."
     }
   ]
 }

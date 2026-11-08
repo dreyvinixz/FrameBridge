@@ -21,7 +21,7 @@ The D3D12 resource-creation scan also found per-frame-generation input copies in
 
 ### FreeType does not materially affect game VRAM
 
-FreeType is statically linked for OptiScaler's ImGui font rendering. Updating it matters for dependency maintenance and UI font handling, but it does not change a game's texture residency or materially free game VRAM. The repository now contains the matching 2.15.0 headers and static x64 library, rebuilt by GitHub Actions run `42416241659` from tag `VER-2-15-0`, commit `37515cf56ba3349656049edbed89ffc6f6466f2d`. The library SHA-256 is `EDFC1F34383CE9B1729014825A71B3E2BCA4F754D64D51940B4C016D05FA4A5F`. FreeType build and artifact checks passed; the complete OptiScaler Release x64 build failed on unrelated source/API compile errors, so the combined runtime has not yet been validated.
+FreeType is statically linked for OptiScaler's ImGui font rendering. Updating it matters for dependency maintenance and UI font handling, but it does not change a game's texture residency or materially free game VRAM. The repository now contains the matching 2.15.0 headers and static x64 library, rebuilt by GitHub Actions run `42416241659` from tag `VER-2-15-0`, commit `37515cf56ba3349656049edbed89ffc6f6466f2d`. The library SHA-256 is `EDFC1F34383CE9B1729014825A71B3E2BCA4F754D64D51940B4C016D05FA4A5F`. FreeType's version/hash checks and the complete OptiScaler Release x64 build passed in CI run `42428708468`; in-game VRAM and latency measurements remain pending.
 
 ## 4 GB usage guidance
 
